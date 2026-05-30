@@ -13,6 +13,7 @@ import traceback
 from typing import Callable, Literal
 
 from .config import MaintenanceConfig
+from .i18n import t
 from .processes import (
     ProcessInfo,
     ProcessProvider,
@@ -212,8 +213,7 @@ class MaintenanceRunner:
                 result.add(
                     "Codex-Prozessprüfung",
                     "blocked",
-                    "Prozessliste konnte nicht gelesen werden (0 Prozesse — "
-                    "PowerShell-Fehler vermutet); Wartung abgebrochen (fail-closed).",
+                    t("process_check_fail_closed"),
                 )
                 return
             provider = lambda: all_processes
@@ -224,16 +224,9 @@ class MaintenanceRunner:
         result.codex_processes = [asdict(process) for process in codex_processes]
         if codex_processes:
             result.status = "blocked"
-            result.add(
-                "Codex-Prozessprüfung",
-                "blocked",
-                (
-                    "Codex-Desktop läuft (exakter Exe-Pfad erkannt). Aktive Aufträge können "
-                    "lokal nicht sicher ausgeschlossen werden; Wartung wird nicht gestartet."
-                ),
-            )
+            result.add("Codex-Prozessprüfung", "blocked", t("process_check_blocked"))
             return
-        result.add("Codex-Prozessprüfung", "ok", "Keine Codex-Desktop-Prozesse erkannt.")
+        result.add("Codex-Prozessprüfung", "ok", t("process_check_ok"))
 
         if is_onedrive_path(db_path) and not self.config.allow_onedrive_control:
             result.status = "blocked"

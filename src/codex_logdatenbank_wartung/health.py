@@ -366,9 +366,12 @@ def repair_start(
     # 2) Verwaistes Lockfile entfernen.
     # Nach dem Zombie-Kill kann das Lockfile nun verwaist sein, auch wenn der Snapshot
     # es noch nicht als stale markiert hatte (weil damals mains existierten).
+    # Sicher: nur entfernen wenn ALLE mains Zombies waren UND alle Kills erfolgreich
+    # (eine aktive Sitzung mit Renderer wird nie gestört).
     lockfile = Path(report.lockfile_path)
+    no_live_mains = set(report.main_pids) <= set(report.zombie_main_pids)
     lockfile_stale = report.stale_lockfile or (
-        execute and did_something and lockfile.exists()
+        execute and did_something and not had_failure and no_live_mains and lockfile.exists()
     )
     if lockfile_stale:
         if not execute:

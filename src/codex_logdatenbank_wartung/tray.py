@@ -1127,6 +1127,10 @@ def run_tray(config_path: Path) -> int:
             pass
 
     config = MaintenanceConfig.load(config_path)
+
+    from .i18n import detect_language, set_language
+    set_language(config.language if config.language in ("de", "en") else detect_language())
+
     guard = SingleInstanceGuard(
         "Global\\CareCenterForCodex",
         config.lock_path.with_name("tray-instance.lock"),

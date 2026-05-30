@@ -77,3 +77,65 @@ def test_language_switch_is_consistent() -> None:
     assert en != de
     assert "No Codex" in en
     assert "Keine Codex" in de
+
+
+# ---------------------------------------------------------------------------
+# Integration: i18n wirkt im echten Code-Pfad (nicht nur im Katalog)
+# ---------------------------------------------------------------------------
+
+def test_maintenance_runner_uses_i18n_english(tmp_path) -> None:
+    """MaintenanceRunner gibt englische Meldungen aus, wenn language=en gesetzt ist."""
+    import sqlite3
+    from codex_logdatenbank_wartung.config import MaintenanceConfig
+    from codex_logdatenbank_wartung.maintenance import MaintenanceRunner
+    from codex_logdatenbank_wartung.processes import ProcessInfo
+
+    set_language("en")
+    try:
+        db_path = tmp_path / "logs_2.sqlite"
+        with sqlite3.connect(db_path) as conn:
+            conn.execute("CREATE TABLE logs (id INTEGER PRIMARY KEY, msg TEXT)")
+            conn.execute("INSERT INTO logs (msg) VALUES ('test')")
+
+        CODEX_EXE = r"C:\Users\dev\AppData\Local\Programs\Codex\Codex.exe"
+        config = MaintenanceConfig(
+            codex_executable=CODEX_EXE,
+            database_path=str(db_path),
+            backup_dir=str(tmp_path / "backups"),
+            log_dir=str(tmp_path / "logs"),
+            maintenance_lock_path=str(tmp_path / "maintenance.lock"),
+        )
+
+        provider = lambda: [ProcessInfo(99, "Codex.exe", CODEX_EXE, f'"{CODEX_EXE}"')]
+        result = MaintenanceRunner(config, provider).run(dry_run=True)
+
+        assert result.status == "blocked"
+        blocked_step = next(s for s in result.steps if s.status == "blocked")
+        assert "running" in blocked_step.message.lower() or "Desktop" in blocked_step.message
+    finally:
+        set_language("de")
+
+
+def test_maintenance_runner_uses_i18n_german(tmp_path) -> None:
+    """MaintenanceRunner gibt deutsche Meldungen aus, wenn language=de gesetzt ist."""
+    import sqlite3
+    from codex_logdatenbank_wartung.config import MaintenanceConfig
+    from codex_logdatenbank_wartung.maintenance import MaintenanceRunner
+
+    set_language("de")
+    db_path = tmp_path / "logs_2.sqlite"
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("CREATE TABLE logs (id INTEGER PRIMARY KEY, msg TEXT)")
+        conn.execute("INSERT INTO logs (msg) VALUES ('test')")
+
+    config = MaintenanceConfig(
+        codex_executable=r"C:\test\Codex.exe",
+        database_path=str(db_path),
+        backup_dir=str(tmp_path / "backups"),
+        log_dir=str(tmp_path / "logs"),
+        maintenance_lock_path=str(tmp_path / "maintenance.lock"),
+    )
+
+    result = MaintenanceRunner(config, lambda: []).run(dry_run=False)
+    ok_step = next(s for s in result.steps if s.name == "Codex-Prozessprüfung")
+    assert "Keine Codex" in ok_step.message

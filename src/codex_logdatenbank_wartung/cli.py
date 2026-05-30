@@ -363,6 +363,11 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+
+    from .i18n import detect_language, set_language
+    config = MaintenanceConfig.load(Path(args.config))
+    set_language(config.language if config.language in ("de", "en") else detect_language())
+
     return int(args.func(args))
 
 
