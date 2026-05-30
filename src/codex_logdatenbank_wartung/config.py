@@ -78,6 +78,7 @@ class MaintenanceConfig:
     allow_wal_checkpoint: bool = True
     allow_archive_old_logs: bool = False
     archive_days: int = 0
+    language: str = "de"
     # Hintergrund-Waechter (Start-Praevention): tickt periodisch read-only und raeumt bei
     # GESCHLOSSENEM Codex haengende Reste (Ghost-Hauptprozesse ohne Renderer + verwaistes
     # Lockfile) ab, damit der naechste Start sauber ist -- der Start-Block ist der erste
