@@ -364,14 +364,20 @@ def repair_start(
         result.add("Zombie-Pruefung", "ok", "Keine Zombie-Hauptprozesse erkannt.")
 
     # 2) Verwaistes Lockfile entfernen.
-    if report.stale_lockfile:
+    # Nach dem Zombie-Kill kann das Lockfile nun verwaist sein, auch wenn der Snapshot
+    # es noch nicht als stale markiert hatte (weil damals mains existierten).
+    lockfile = Path(report.lockfile_path)
+    lockfile_stale = report.stale_lockfile or (
+        execute and did_something and lockfile.exists()
+    )
+    if lockfile_stale:
         if not execute:
             result.add("Lockfile", "planned", f"{report.lockfile_path} wuerde entfernt.")
         elif not config.allow_clear_lockfile:
             result.add("Lockfile", "blocked", "Entfernen durch Konfiguration deaktiviert.")
         else:
             try:
-                Path(report.lockfile_path).unlink()
+                lockfile.unlink()
                 did_something = True
                 result.add("Lockfile", "ok", f"Verwaistes Lockfile entfernt: {report.lockfile_path}")
             except FileNotFoundError:

@@ -160,3 +160,28 @@ def test_repair_clears_stale_lockfile_on_execute(tmp_path: Path) -> None:
 
     repair_start(config, provider=lambda: [], killer=lambda pid: (True, "ok"), execute=True)
     assert not lock.exists()
+
+
+def test_repair_clears_lockfile_after_zombie_kill_same_pass(tmp_path: Path) -> None:
+    """Regressions-Test: Nach dem Killen von Zombie-Prozessen muss das Lockfile
+    im SELBEN Durchlauf entfernt werden (nicht erst beim naechsten Watchdog-Tick).
+
+    Vor dem Fix war report.stale_lockfile=False wenn Zombies existierten (weil mains
+    nicht leer war), sodass das Lockfile nach dem Kill stehen blieb.
+    """
+    config = make_config(tmp_path)
+    lock = Path(config.lockfile_path)
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    lock.write_text("", encoding="utf-8")
+
+    killed: list[int] = []
+    result = repair_start(
+        config,
+        provider=lambda: zombie_tree(),
+        killer=lambda pid: (killed.append(pid) or (True, "ok")),
+        execute=True,
+    )
+    assert killed == [200]
+    assert not lock.exists(), "Lockfile muss nach Zombie-Kill im selben Pass entfernt werden"
+    assert result.status == "repaired"
+    assert any("Lockfile entfernt" in step.message for step in result.steps)
