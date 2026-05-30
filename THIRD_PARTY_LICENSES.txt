@@ -1,0 +1,34 @@
+THIRD-PARTY LICENSES
+====================
+
+This project ("CareCenter for Codex") is licensed under the MIT License (see LICENSE).
+It uses the following third-party components:
+
+--------------------------------------------------------------------------------
+PySide6  (runtime dependency, GUI)
+--------------------------------------------------------------------------------
+License: GNU Lesser General Public License v3 (LGPL-3.0)
+Project: https://pypi.org/project/PySide6/  (The Qt Company)
+Notes:   Used as an unmodified, dynamically linked library. The LGPL permits use
+         from an MIT-licensed application as long as PySide6/Qt itself remains
+         replaceable and is not modified. No Qt/PySide6 source is included or
+         modified in this repository.
+
+--------------------------------------------------------------------------------
+PyInstaller  (build-time only, optional)
+--------------------------------------------------------------------------------
+License: GNU General Public License v2.0 with a special bootloader exception
+Project: https://pyinstaller.org/
+Notes:   Used only to produce a standalone .exe. The bootloader exception
+         explicitly allows distributing the resulting executable under the
+         application's own (here: MIT) license.
+
+--------------------------------------------------------------------------------
+Standard library only otherwise
+--------------------------------------------------------------------------------
+All other functionality relies on the Python standard library. No other
+third-party runtime dependencies are bundled.
+
+Trademark note: "OpenAI" and "Codex" are trademarks of OpenAI. They are used in
+this project solely to identify the software this tool is compatible with
+(nominative use). This project is not affiliated with or endorsed by OpenAI.

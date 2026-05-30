@@ -1,0 +1,49 @@
+# --- Build / packaging artifacts ---
+build/
+dist/
+*.spec
+*.exe
+*.msi
+*.msix
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- Environments ---
+.venv/
+venv/
+.env
+.env.*
+
+# --- IDE / tooling / OS ---
+.vscode/
+.idea/
+.claude/
+Thumbs.db
+desktop.ini
+
+# --- Local runtime data (never committed) ---
+# Config, logs and backups live outside the repo by default
+# (C:\_Local_DEV\codex-maintenance). Ignore any local copies just in case.
+config.json
+logs/
+backups/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.log
+
+# --- Internal working docs (not part of the public release) ---
+AGENTS.md
+CLAUDE.md
+BUGS.md
+DONE.md
+STATE.md
+START.md
+TODO.md
+DECISIONS.md
+HANDOFF-CODEX-START.md
+CODEX-AUTO-DEBUG-DESIGN.md
