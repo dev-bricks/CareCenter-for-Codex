@@ -13,7 +13,7 @@ import traceback
 from typing import Callable, Literal
 
 from .config import MaintenanceConfig
-from .processes import ProcessInfo, ProcessProvider, find_codex_processes
+from .processes import ProcessInfo, ProcessProvider, find_codex_processes_by_executable
 
 ResultStatus = Literal["ok", "blocked", "failed", "dry-run"]
 StepStatus = Literal["ok", "blocked", "failed", "skipped", "planned"]
@@ -200,7 +200,9 @@ class MaintenanceRunner:
             f"{db_path} vorhanden; {len(existing_sidecars)} Datei(en) inklusive WAL/SHM gefunden.",
         )
 
-        codex_processes = find_codex_processes(self.config, self.process_provider)
+        codex_processes = find_codex_processes_by_executable(
+            self.config, self.process_provider
+        )
         result.codex_processes = [asdict(process) for process in codex_processes]
         if codex_processes:
             result.status = "blocked"
@@ -208,12 +210,12 @@ class MaintenanceRunner:
                 "Codex-Prozessprüfung",
                 "blocked",
                 (
-                    "Codex läuft. Aktive Aufträge können lokal nicht sicher ausgeschlossen "
-                    "werden; Wartung wird nicht gestartet."
+                    "Codex-Desktop läuft (exakter Exe-Pfad erkannt). Aktive Aufträge können "
+                    "lokal nicht sicher ausgeschlossen werden; Wartung wird nicht gestartet."
                 ),
             )
             return
-        result.add("Codex-Prozessprüfung", "ok", "Keine Codex-Prozesse erkannt.")
+        result.add("Codex-Prozessprüfung", "ok", "Keine Codex-Desktop-Prozesse erkannt.")
 
         if is_onedrive_path(db_path) and not self.config.allow_onedrive_control:
             result.status = "blocked"

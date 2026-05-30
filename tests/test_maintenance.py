@@ -14,25 +14,45 @@ def make_db(path: Path) -> None:
         connection.execute("INSERT INTO logs (message) VALUES ('ok')")
 
 
+CODEX_EXE = r"C:\Users\dev\AppData\Local\Programs\Codex\Codex.exe"
+
+
 def make_config(tmp_path: Path, db_path: Path) -> MaintenanceConfig:
     return MaintenanceConfig(
         database_path=str(db_path),
         backup_dir=str(tmp_path / "backups"),
         log_dir=str(tmp_path / "logs"),
         maintenance_lock_path=str(tmp_path / "maintenance.lock"),
+        codex_executable=CODEX_EXE,
     )
 
 
-def test_dry_run_blocks_when_codex_is_running(tmp_path: Path) -> None:
+def test_dry_run_blocks_when_codex_desktop_is_running(tmp_path: Path) -> None:
     db_path = tmp_path / "logs_2.sqlite"
     make_db(db_path)
     config = make_config(tmp_path, db_path)
-    provider = lambda: [ProcessInfo(123, "Codex", r"C:\Program Files\Codex\Codex.exe", "")]
+    provider = lambda: [ProcessInfo(123, "Codex.exe", CODEX_EXE, f'"{CODEX_EXE}"')]
 
     result = MaintenanceRunner(config, provider).run(dry_run=True)
 
     assert result.status == "blocked"
     assert not (tmp_path / "backups").exists()
+
+
+def test_cli_codex_does_not_block_maintenance(tmp_path: Path) -> None:
+    """npm-CLI 'codex' und node_repl duerfen die Wartung NICHT blockieren."""
+    db_path = tmp_path / "logs_2.sqlite"
+    make_db(db_path)
+    config = make_config(tmp_path, db_path)
+    provider = lambda: [
+        ProcessInfo(500, "node.exe", r"C:\Program Files\nodejs\node.exe",
+                    r"node C:\Users\dev\.codex\run.js"),
+        ProcessInfo(501, "node_repl.exe", r"C:\tools\node_repl.exe", ""),
+    ]
+
+    result = MaintenanceRunner(config, provider).run(dry_run=False)
+
+    assert result.status == "ok"
 
 
 def test_execute_creates_backup_and_log_when_safe(tmp_path: Path) -> None:

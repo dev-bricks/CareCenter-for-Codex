@@ -218,3 +218,54 @@ def test_dry_run_does_not_touch_codex() -> None:
     assert k["closed"] == [] and k["killed"] == [] and k["launched"] == []
     assert calls == [True]            # Dry-Run-Wartung lief (ohne Änderungen)
     assert res.closed_codex is False
+
+
+# ---------------------------------------------------------------------------
+# End-to-End: Safe-Modus mit echtem MaintenanceRunner (nicht fake_maintain)
+# ---------------------------------------------------------------------------
+
+def test_safe_mode_reaches_real_maintenance_despite_cli_noise(tmp_path) -> None:
+    """Regressions-Test fuer den gemeldeten Bug: Safe-Modus erreicht die echte
+    Wartung auch wenn CLI-Prozesse (node mit .codex-Pfad, node_repl) laufen.
+
+    Vor dem Fix blockierte MaintenanceRunner.find_codex_processes (breiter Matcher)
+    die Wartung, obwohl der Orchestrator per striktem Matcher bereits bestaetigte,
+    dass keine Desktop-App laeuft.
+    """
+    import sqlite3
+    from codex_logdatenbank_wartung.maintenance import MaintenanceRunner
+
+    db_path = tmp_path / "logs_2.sqlite"
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("CREATE TABLE logs (id INTEGER PRIMARY KEY, msg TEXT)")
+        conn.execute("INSERT INTO logs (msg) VALUES ('test')")
+
+    config = MaintenanceConfig(
+        codex_executable=CODEX_EXE,
+        database_path=str(db_path),
+        backup_dir=str(tmp_path / "backups"),
+        log_dir=str(tmp_path / "logs"),
+        maintenance_lock_path=str(tmp_path / "maintenance.lock"),
+    )
+
+    cli_noise = lambda: [
+        ProcessInfo(500, "node.exe", r"C:\Program Files\nodejs\node.exe",
+                    r"node C:\Users\dev\.codex\run.js"),
+        ProcessInfo(501, "node_repl.exe", r"C:\tools\node_repl.exe", ""),
+    ]
+
+    real_maintain = lambda: MaintenanceRunner(config, cli_noise).run(
+        dry_run=False, trigger="auto-maintain")
+
+    res = auto_maintain(
+        config, mode="safe", execute=True, allow_close=True,
+        observe_fn=observe_sequence([CodexActivity(present=False, active=False)]),
+        killer=lambda pid: (True, "ok"),
+        graceful_closer=lambda pid: (True, "ok"),
+        launcher=lambda: (True, "ok"),
+        maintain_fn=real_maintain, sleeper=noop_sleep,
+    )
+
+    assert res.status == "ok"
+    assert res.maintenance is not None
+    assert res.maintenance["status"] == "ok"
