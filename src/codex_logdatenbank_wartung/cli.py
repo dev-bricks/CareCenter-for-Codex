@@ -365,8 +365,13 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     from .i18n import detect_language, set_language
-    config = MaintenanceConfig.load(Path(args.config))
-    set_language(config.language if config.language in ("de", "en") else detect_language())
+    config_path = Path(args.config)
+    if config_path.exists():
+        try:
+            config = MaintenanceConfig.load(config_path)
+            set_language(config.language if config.language in ("de", "en") else detect_language())
+        except (ValueError, OSError):
+            pass
 
     return int(args.func(args))
 
