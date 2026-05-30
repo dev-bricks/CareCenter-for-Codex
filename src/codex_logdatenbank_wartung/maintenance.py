@@ -13,7 +13,12 @@ import traceback
 from typing import Callable, Literal
 
 from .config import MaintenanceConfig
-from .processes import ProcessInfo, ProcessProvider, find_codex_processes_by_executable
+from .processes import (
+    ProcessInfo,
+    ProcessProvider,
+    find_codex_processes_by_executable,
+    windows_processes,
+)
 
 ResultStatus = Literal["ok", "blocked", "failed", "dry-run"]
 StepStatus = Literal["ok", "blocked", "failed", "skipped", "planned"]
@@ -200,9 +205,22 @@ class MaintenanceRunner:
             f"{db_path} vorhanden; {len(existing_sidecars)} Datei(en) inklusive WAL/SHM gefunden.",
         )
 
-        codex_processes = find_codex_processes_by_executable(
-            self.config, self.process_provider
-        )
+        if self.process_provider is None:
+            all_processes = windows_processes()
+            if not all_processes:
+                result.status = "blocked"
+                result.add(
+                    "Codex-Prozessprüfung",
+                    "blocked",
+                    "Prozessliste konnte nicht gelesen werden (0 Prozesse — "
+                    "PowerShell-Fehler vermutet); Wartung abgebrochen (fail-closed).",
+                )
+                return
+            provider = lambda: all_processes
+        else:
+            provider = self.process_provider
+
+        codex_processes = find_codex_processes_by_executable(self.config, provider)
         result.codex_processes = [asdict(process) for process in codex_processes]
         if codex_processes:
             result.status = "blocked"

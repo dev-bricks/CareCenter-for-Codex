@@ -55,6 +55,24 @@ def test_cli_codex_does_not_block_maintenance(tmp_path: Path) -> None:
     assert result.status == "ok"
 
 
+def test_blocks_fail_closed_when_process_list_empty(tmp_path: Path, monkeypatch) -> None:
+    """Wenn windows_processes() leer zurueckgibt (PowerShell-Fehler), bricht die
+    Wartung ab statt fortzufahren (fail-closed, nicht fail-open)."""
+    db_path = tmp_path / "logs_2.sqlite"
+    make_db(db_path)
+    config = make_config(tmp_path, db_path)
+
+    monkeypatch.setattr(
+        "codex_logdatenbank_wartung.maintenance.windows_processes", lambda: []
+    )
+    runner = MaintenanceRunner(config)  # kein injizierter Provider -> nutzt windows_processes
+
+    result = runner.run(dry_run=False)
+
+    assert result.status == "blocked"
+    assert any("fail-closed" in step.message for step in result.steps)
+
+
 def test_execute_creates_backup_and_log_when_safe(tmp_path: Path) -> None:
     db_path = tmp_path / "logs_2.sqlite"
     make_db(db_path)
