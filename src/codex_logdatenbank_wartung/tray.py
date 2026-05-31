@@ -360,48 +360,23 @@ class WatchdogWorker(QObject):
             pass
 
     def _run_config_audit(self, config: MaintenanceConfig) -> None:
-        """Config-Audit im Watchdog-Tick: auto-fix oder notify (entprellt).
-
-        Auto-fix schreibt nur wenn Codex NICHT laeuft (kein Renderer-Prozess),
-        um Races mit dem Codex-eigenen config-Writer zu vermeiden.
-        """
-        from .config_audit import audit_config_toml, fix_duplicate_mcp, fix_unused_plugins
+        """Config-Audit im Watchdog-Tick via run_audit_cycle (reine Funktion)."""
+        from .config_audit import run_audit_cycle
+        from .health import diagnose
 
         try:
             if config.audit_duplicate_mcp == "off" and config.audit_unused_plugins == "off":
                 return
 
-            # Auto-Fix: nur wenn Codex geschlossen (kein Renderer-Prozess)
+            renderer_present = True
             if config.audit_duplicate_mcp == "auto" or config.audit_unused_plugins == "auto":
-                from .health import diagnose
                 report = diagnose(config)
-                if not report.renderer_present:
-                    if config.audit_duplicate_mcp == "auto":
-                        fix_duplicate_mcp(config)
-                    if config.audit_unused_plugins == "auto":
-                        fix_unused_plugins(config)
+                renderer_present = report.renderer_present
 
-            # Notify: entprellt, per-Kategorie gefiltert
-            notify_mcp = config.audit_duplicate_mcp == "notify"
-            notify_plugins = config.audit_unused_plugins == "notify"
-            if notify_mcp or notify_plugins:
-                audit_report = audit_config_toml(config)
-                relevant = [
-                    f for f in audit_report.findings
-                    if f.auto_fixable and (
-                        (notify_mcp and f.category == "MCP-Duplikat")
-                        or (notify_plugins and f.category == "Ungenutztes Plugin")
-                    )
-                ]
-                if not relevant:
-                    self._last_audit_hash = ""
-                    return
-                current_hash = "|".join(f.message for f in relevant)
-                if current_hash == self._last_audit_hash:
-                    return
-                self._last_audit_hash = current_hash
-                summary = "\n".join(f"[{f.severity.upper()}] {f.category}: {f.message}" for f in relevant)
-                self.audit_finding.emit(summary)
+            cycle = run_audit_cycle(config, self._last_audit_hash, renderer_present)
+            self._last_audit_hash = cycle.new_hash
+            if cycle.notification:
+                self.audit_finding.emit(cycle.notification)
         except Exception:  # noqa: BLE001
             pass
 

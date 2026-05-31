@@ -413,6 +413,65 @@ def fix_unused_plugins(config: MaintenanceConfig) -> int:
 # Gesamt-Audit
 # ---------------------------------------------------------------------------
 
+@dataclass(slots=True)
+class AuditCycleResult:
+    """Ergebnis eines Audit-Zyklus (fuer Watchdog-Integration)."""
+    new_hash: str = ""
+    notification: str | None = None
+    mcp_fixed: int = 0
+    plugins_fixed: int = 0
+
+
+def run_audit_cycle(
+    config: MaintenanceConfig,
+    last_hash: str,
+    renderer_present: bool,
+) -> AuditCycleResult:
+    """Reine Orchestrierungsfunktion fuer den periodischen Config-Audit.
+
+    - Auto-fix nur wenn renderer_present=False (Codex geschlossen).
+    - Notify entprellt via last_hash (nur bei neuem Befund).
+    - Per-Kategorie gefiltert (off-Modi werden ignoriert).
+    """
+    result = AuditCycleResult()
+
+    if config.audit_duplicate_mcp == "off" and config.audit_unused_plugins == "off":
+        return result
+
+    # Auto-Fix: nur wenn Codex geschlossen
+    if not renderer_present:
+        if config.audit_duplicate_mcp == "auto":
+            result.mcp_fixed = fix_duplicate_mcp(config)
+        if config.audit_unused_plugins == "auto":
+            result.plugins_fixed = fix_unused_plugins(config)
+
+    # Notify: entprellt, per-Kategorie gefiltert
+    notify_mcp = config.audit_duplicate_mcp == "notify"
+    notify_plugins = config.audit_unused_plugins == "notify"
+    if notify_mcp or notify_plugins:
+        report = audit_config_toml(config)
+        relevant = [
+            f for f in report.findings
+            if f.auto_fixable and (
+                (notify_mcp and f.category == "MCP-Duplikat")
+                or (notify_plugins and f.category == "Ungenutztes Plugin")
+            )
+        ]
+        if not relevant:
+            result.new_hash = ""
+            return result
+        current_hash = "|".join(f.message for f in relevant)
+        if current_hash == last_hash:
+            result.new_hash = last_hash
+            return result
+        result.new_hash = current_hash
+        result.notification = "\n".join(
+            f"[{f.severity.upper()}] {f.category}: {f.message}" for f in relevant
+        )
+
+    return result
+
+
 def run_full_audit(config: MaintenanceConfig) -> AuditReport:
     """Fuehrt alle Audits aus und kombiniert die Ergebnisse."""
     combined = AuditReport()
