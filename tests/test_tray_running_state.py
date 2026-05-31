@@ -43,6 +43,8 @@ def _mock_pyside6():
     qt_widgets = mocks["PySide6.QtWidgets"]
     qt_widgets.QApplication = MagicMock
     qt_widgets.QApplication.instance = MagicMock(return_value=MagicMock())
+    qt_widgets.QComboBox = MagicMock
+    qt_widgets.QGroupBox = MagicMock
     qt_widgets.QHBoxLayout = MagicMock
     qt_widgets.QLabel = MagicMock
     qt_widgets.QMenu = MagicMock

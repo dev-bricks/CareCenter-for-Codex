@@ -15,6 +15,8 @@ from codex_logdatenbank_wartung.config_audit import (
     audit_config_toml,
     audit_threads,
     find_empty_threads,
+    fix_duplicate_mcp,
+    fix_unused_plugins,
     run_full_audit,
     _parse_toml_sections,
     _extract_mcp_package,
@@ -147,6 +149,9 @@ def test_audit_detects_unused_windows_plugins():
 [plugins."build-ios-apps@openai-curated"]
 enabled = true
 
+[plugins."build-macos-apps@openai-curated"]
+enabled = true
+
 [plugins."browser@openai-bundled"]
 enabled = true
 """
@@ -154,8 +159,10 @@ enabled = true
         config = _make_config(Path(tmp), toml)
         report = audit_config_toml(config)
         unused = [f for f in report.findings if f.category == "Ungenutztes Plugin"]
-        assert len(unused) == 1
-        assert "build-ios-apps" in unused[0].message
+        assert len(unused) == 2
+        messages = " ".join(u.message for u in unused)
+        assert "build-ios-apps" in messages
+        assert "build-macos-apps" in messages
 
 
 def test_audit_ignores_disabled_plugins():
@@ -249,3 +256,152 @@ def test_full_audit_combines_all():
             report = run_full_audit(config)
         assert isinstance(report, AuditReport)
         assert len(report.findings) >= 1
+
+
+# ---------------------------------------------------------------------------
+# Auto-Fix: fix_duplicate_mcp
+# ---------------------------------------------------------------------------
+
+def test_fix_duplicate_mcp_removes_duplicate():
+    toml = """
+[mcp_servers.codecommander]
+command = "npx"
+args = ["-y", "ellmos-codecommander-mcp"]
+startup_timeout_sec = 120
+
+[mcp_servers.ellmos-codecommander]
+command = "node"
+args = ["C:/npm/node_modules/ellmos-codecommander-mcp/dist/index.js"]
+"""
+    with tempfile.TemporaryDirectory() as tmp:
+        config = _make_config(Path(tmp), toml)
+        removed = fix_duplicate_mcp(config)
+        assert removed == 1
+        # Datei wurde geschrieben — pruefen dass nur ein Server bleibt
+        new_text = config.config_toml_path.read_text(encoding="utf-8")
+        assert "ellmos-codecommander" in new_text
+        # npx-Eintrag ist weg (node_modules bevorzugt)
+        assert "codecommander]" in new_text
+        assert 'npx' not in new_text
+
+
+def test_fix_duplicate_mcp_preserves_rest_of_file():
+    toml = """approval_policy = "never"
+model = "gpt-5.5"
+
+[mcp_servers.cc1]
+command = "npx"
+args = ["-y", "ellmos-codecommander-mcp"]
+
+[mcp_servers.cc2]
+command = "node"
+args = ["C:/node_modules/ellmos-codecommander-mcp/dist/index.js"]
+
+[plugins."browser@openai-bundled"]
+enabled = true
+"""
+    with tempfile.TemporaryDirectory() as tmp:
+        config = _make_config(Path(tmp), toml)
+        fix_duplicate_mcp(config)
+        new_text = config.config_toml_path.read_text(encoding="utf-8")
+        # Restliche Sektionen bleiben erhalten
+        assert 'approval_policy = "never"' in new_text
+        assert 'model = "gpt-5.5"' in new_text
+        assert 'plugins."browser@openai-bundled"' in new_text
+        assert "enabled = true" in new_text
+
+
+def test_fix_duplicate_mcp_no_change_when_clean():
+    toml = """
+[mcp_servers.ellmos-codecommander]
+command = "node"
+args = ["C:/npm/node_modules/ellmos-codecommander-mcp/dist/index.js"]
+
+[mcp_servers.ellmos-filecommander]
+command = "node"
+args = ["C:/npm/node_modules/ellmos-filecommander-mcp/dist/index.js"]
+"""
+    with tempfile.TemporaryDirectory() as tmp:
+        config = _make_config(Path(tmp), toml)
+        removed = fix_duplicate_mcp(config)
+        assert removed == 0
+
+
+def test_fix_duplicate_mcp_creates_backup():
+    toml = """
+[mcp_servers.cc1]
+command = "npx"
+args = ["-y", "ellmos-codecommander-mcp"]
+
+[mcp_servers.cc2]
+command = "node"
+args = ["C:/node_modules/ellmos-codecommander-mcp/dist/index.js"]
+"""
+    with tempfile.TemporaryDirectory() as tmp:
+        config = _make_config(Path(tmp), toml)
+        fix_duplicate_mcp(config)
+        codex_home = Path(tmp) / ".codex"
+        backups = list(codex_home.glob("config.*.bak"))
+        assert len(backups) >= 1
+
+
+# ---------------------------------------------------------------------------
+# Auto-Fix: fix_unused_plugins
+# ---------------------------------------------------------------------------
+
+def test_fix_unused_plugins_disables_platform_locked():
+    toml = """
+[plugins."build-ios-apps@openai-curated"]
+enabled = true
+
+[plugins."build-macos-apps@openai-curated"]
+enabled = true
+
+[plugins."browser@openai-bundled"]
+enabled = true
+"""
+    with tempfile.TemporaryDirectory() as tmp:
+        config = _make_config(Path(tmp), toml)
+        fixed = fix_unused_plugins(config)
+        assert fixed == 2
+        new_text = config.config_toml_path.read_text(encoding="utf-8")
+        # browser bleibt enabled
+        assert "browser@openai-bundled" in new_text
+        # Plattform-locked sind jetzt false
+        import tomlkit
+        doc = tomlkit.parse(new_text)
+        assert doc["plugins"]["build-ios-apps@openai-curated"]["enabled"] is False
+        assert doc["plugins"]["build-macos-apps@openai-curated"]["enabled"] is False
+        assert doc["plugins"]["browser@openai-bundled"]["enabled"] is True
+
+
+def test_fix_unused_plugins_no_change_when_already_disabled():
+    toml = """
+[plugins."build-ios-apps@openai-curated"]
+enabled = false
+
+[plugins."build-macos-apps@openai-curated"]
+enabled = false
+"""
+    with tempfile.TemporaryDirectory() as tmp:
+        config = _make_config(Path(tmp), toml)
+        fixed = fix_unused_plugins(config)
+        assert fixed == 0
+
+
+def test_fix_unused_plugins_does_not_touch_cross_platform():
+    """Plugins wie slack, figma, circleci sind cross-platform und werden NICHT deaktiviert."""
+    toml = """
+[plugins."slack@openai-curated"]
+enabled = true
+
+[plugins."figma@openai-curated"]
+enabled = true
+
+[plugins."circleci@openai-curated"]
+enabled = true
+"""
+    with tempfile.TemporaryDirectory() as tmp:
+        config = _make_config(Path(tmp), toml)
+        fixed = fix_unused_plugins(config)
+        assert fixed == 0

@@ -25,6 +25,8 @@ from PySide6.QtCore import QObject, Qt, QThread, QTimer, Signal
 from PySide6.QtGui import QAction, QIcon
 from PySide6.QtWidgets import (
     QApplication,
+    QComboBox,
+    QGroupBox,
     QHBoxLayout,
     QLabel,
     QMenu,
@@ -289,6 +291,7 @@ class WatchdogWorker(QObject):
     """
 
     reaped = Signal(object)  # WatchdogTickResult.to_dict(), nur wenn wirklich aufgeraeumt wurde
+    audit_finding = Signal(str)  # Tray-Benachrichtigung bei notify-Modus (entprellt)
 
     def __init__(self, config_path: Path, is_busy: "Callable[[], bool]") -> None:
         super().__init__()
@@ -296,6 +299,7 @@ class WatchdogWorker(QObject):
         self._is_busy = is_busy
         self._timer: QTimer | None = None
         self._stopped = False
+        self._last_audit_hash: str = ""  # Dedup: nur bei neuem Befund melden
 
     def start(self) -> None:
         try:
@@ -327,6 +331,7 @@ class WatchdogWorker(QObject):
         self._audit(config, result)
         if result.action == "reaped":
             self.reaped.emit(result.to_dict())
+        self._run_config_audit(config)
 
     def _audit(self, config: MaintenanceConfig, result: object) -> None:
         """Lueckenloser Nachweis JEDES Ticks (auch 'nichts getan') in logs/watchdog.log.
@@ -352,6 +357,52 @@ class WatchdogWorker(QObject):
             with (logs / "watchdog.log").open("a", encoding="utf-8") as handle:
                 handle.write(line)
         except Exception:  # noqa: BLE001 -- Audit-Schreibfehler darf den Tick nie crashen
+            pass
+
+    def _run_config_audit(self, config: MaintenanceConfig) -> None:
+        """Config-Audit im Watchdog-Tick: auto-fix oder notify (entprellt).
+
+        Auto-fix schreibt nur wenn Codex NICHT laeuft (kein Renderer-Prozess),
+        um Races mit dem Codex-eigenen config-Writer zu vermeiden.
+        """
+        from .config_audit import audit_config_toml, fix_duplicate_mcp, fix_unused_plugins
+
+        try:
+            if config.audit_duplicate_mcp == "off" and config.audit_unused_plugins == "off":
+                return
+
+            # Auto-Fix: nur wenn Codex geschlossen (kein Renderer-Prozess)
+            if config.audit_duplicate_mcp == "auto" or config.audit_unused_plugins == "auto":
+                from .health import diagnose
+                report = diagnose(config)
+                if not report.renderer_present:
+                    if config.audit_duplicate_mcp == "auto":
+                        fix_duplicate_mcp(config)
+                    if config.audit_unused_plugins == "auto":
+                        fix_unused_plugins(config)
+
+            # Notify: entprellt, per-Kategorie gefiltert
+            notify_mcp = config.audit_duplicate_mcp == "notify"
+            notify_plugins = config.audit_unused_plugins == "notify"
+            if notify_mcp or notify_plugins:
+                audit_report = audit_config_toml(config)
+                relevant = [
+                    f for f in audit_report.findings
+                    if f.auto_fixable and (
+                        (notify_mcp and f.category == "MCP-Duplikat")
+                        or (notify_plugins and f.category == "Ungenutztes Plugin")
+                    )
+                ]
+                if not relevant:
+                    self._last_audit_hash = ""
+                    return
+                current_hash = "|".join(f.message for f in relevant)
+                if current_hash == self._last_audit_hash:
+                    return
+                self._last_audit_hash = current_hash
+                summary = "\n".join(f"[{f.severity.upper()}] {f.category}: {f.message}" for f in relevant)
+                self.audit_finding.emit(summary)
+        except Exception:  # noqa: BLE001
             pass
 
 
@@ -460,6 +511,9 @@ class StatusWindow(QWidget):
     request_codex_repair = Signal()
     request_store_repair = Signal()
     request_store_reinstall = Signal()
+    audit_requested = Signal()
+    mcp_mode_changed = Signal(str)
+    plugin_mode_changed = Signal(str)
 
     def __init__(self) -> None:
         super().__init__()
@@ -531,6 +585,42 @@ class StatusWindow(QWidget):
         store_row.addWidget(self.store_reinstall_button)
         layout.addLayout(store_row)
 
+        # Settings: Config-Audit (MCP-Duplikate, Plugins)
+        settings_group = QGroupBox("Einstellungen: Config-Audit")
+        settings_layout = QVBoxLayout(settings_group)
+
+        mcp_row = QHBoxLayout()
+        mcp_row.addWidget(QLabel("MCP-Duplikate:"))
+        self.mcp_combo = QComboBox()
+        self.mcp_combo.addItems(["off", "notify", "auto"])
+        self.mcp_combo.setToolTip(
+            "off = ignorieren, notify = bei Fund benachrichtigen, "
+            "auto = Duplikate automatisch entfernen"
+        )
+        mcp_row.addWidget(self.mcp_combo)
+        settings_layout.addLayout(mcp_row)
+
+        plugin_row = QHBoxLayout()
+        plugin_row.addWidget(QLabel("Ungenutzte Plugins:"))
+        self.plugin_combo = QComboBox()
+        self.plugin_combo.addItems(["off", "notify", "auto"])
+        self.plugin_combo.setToolTip(
+            "off = ignorieren, notify = bei Fund benachrichtigen, "
+            "auto = plattform-inkompatible Plugins automatisch deaktivieren"
+        )
+        plugin_row.addWidget(self.plugin_combo)
+        settings_layout.addLayout(plugin_row)
+
+        self.mcp_combo.currentTextChanged.connect(self.mcp_mode_changed.emit)
+        self.plugin_combo.currentTextChanged.connect(self.plugin_mode_changed.emit)
+
+        self.audit_button = QPushButton("Audit jetzt ausführen")
+        self.audit_button.setToolTip("Config-Audit sofort starten (prüft MCP + Plugins + CLI).")
+        self.audit_button.clicked.connect(self.request_audit)
+        settings_layout.addWidget(self.audit_button)
+
+        layout.addWidget(settings_group)
+
         self.close_button = QPushButton("Schließen (läuft im Hintergrund weiter)")
         self.close_button.setToolTip(
             "Schließt nur das Fenster. Eine laufende Reparatur läuft weiter; über das "
@@ -538,6 +628,22 @@ class StatusWindow(QWidget):
         )
         self.close_button.clicked.connect(self.hide)
         layout.addWidget(self.close_button)
+
+    def request_audit(self) -> None:
+        self.audit_requested.emit()
+
+    def set_audit_settings(self, mcp_mode: str, plugin_mode: str) -> None:
+        """Setzt die Combo-Werte ohne Signals auszuloesen."""
+        self.mcp_combo.blockSignals(True)
+        self.plugin_combo.blockSignals(True)
+        idx_mcp = self.mcp_combo.findText(mcp_mode)
+        if idx_mcp >= 0:
+            self.mcp_combo.setCurrentIndex(idx_mcp)
+        idx_plugin = self.plugin_combo.findText(plugin_mode)
+        if idx_plugin >= 0:
+            self.plugin_combo.setCurrentIndex(idx_plugin)
+        self.mcp_combo.blockSignals(False)
+        self.plugin_combo.blockSignals(False)
 
     def set_zombie_count(self, count: int) -> None:
         self.zombie_label.setText(_zombie_text(count))
@@ -599,6 +705,10 @@ class TrayController(QObject):
         self.window.request_codex_repair.connect(self.run_codex_repair)
         self.window.request_store_repair.connect(self.run_store_repair)
         self.window.request_store_reinstall.connect(self.open_store_reinstall)
+        self.window.mcp_mode_changed.connect(self.on_mcp_mode_changed)
+        self.window.plugin_mode_changed.connect(self.on_plugin_mode_changed)
+        self.window.audit_requested.connect(self.run_config_audit)
+        self.window.set_audit_settings(self.config.audit_duplicate_mcp, self.config.audit_unused_plugins)
 
         # Bewusst schlankes Tray-Menue: EIN Reparatur-Eintrag (Eskalation), der Rest
         # (Diagnose, Wartung, Store) liegt als Buttons im Status-Fenster.
@@ -1059,6 +1169,66 @@ class TrayController(QObject):
         self.full_repair_thread = None
         self.full_repair_worker = None
 
+    # -- Config-Audit Einstellungen + manueller Audit ----------------------
+
+    def on_mcp_mode_changed(self, mode: str) -> None:
+        if mode not in ("off", "notify", "auto"):
+            return
+        self.config.audit_duplicate_mcp = mode
+        try:
+            self.config.save(self.config_path)
+        except OSError:
+            pass
+
+    def on_plugin_mode_changed(self, mode: str) -> None:
+        if mode not in ("off", "notify", "auto"):
+            return
+        self.config.audit_unused_plugins = mode
+        try:
+            self.config.save(self.config_path)
+        except OSError:
+            pass
+
+    def run_config_audit(self) -> None:
+        """Fuehrt einen sofortigen Config-Audit aus und zeigt die Ergebnisse."""
+        from .config_audit import fix_duplicate_mcp, fix_unused_plugins, run_full_audit
+
+        config = MaintenanceConfig.load(self.config_path)
+        report = run_full_audit(config)
+
+        # Auto-Fix ausfuehren wenn entsprechend konfiguriert
+        fixed_mcp = 0
+        fixed_plugins = 0
+        if config.audit_duplicate_mcp == "auto":
+            fixed_mcp = fix_duplicate_mcp(config)
+        if config.audit_unused_plugins == "auto":
+            fixed_plugins = fix_unused_plugins(config)
+
+        lines = [report.summary()]
+        if fixed_mcp:
+            lines.append(f"\nAuto-Fix: {fixed_mcp} MCP-Duplikat(e) entfernt.")
+        if fixed_plugins:
+            lines.append(f"\nAuto-Fix: {fixed_plugins} Plugin(s) deaktiviert.")
+        result_text = "\n".join(lines)
+
+        self.window.set_state("Config-Audit abgeschlossen")
+        self.window.set_result(result_text)
+        self.show_window()
+
+        if report.has_warnings or fixed_mcp or fixed_plugins:
+            self.tray.showMessage(
+                "CareCenter – Config-Audit",
+                f"{len(report.findings)} Befund(e)"
+                + (f", {fixed_mcp + fixed_plugins} auto-korrigiert" if fixed_mcp + fixed_plugins else ""),
+                QSystemTrayIcon.MessageIcon.Warning, 6000,
+            )
+        else:
+            self.tray.showMessage(
+                "CareCenter – Config-Audit",
+                "Keine Auffälligkeiten.",
+                QSystemTrayIcon.MessageIcon.Information, 4000,
+            )
+
     # -- Hintergrund-Waechter (Start-Praevention) -------------------------
 
     def _start_watchdog(self) -> None:
@@ -1069,6 +1239,7 @@ class TrayController(QObject):
         self.watchdog_worker.moveToThread(self.watchdog_thread)
         self.watchdog_thread.started.connect(self.watchdog_worker.start)
         self.watchdog_worker.reaped.connect(self.on_watchdog_reaped)
+        self.watchdog_worker.audit_finding.connect(self.on_audit_finding)
         self.watchdog_thread.start()
 
     def _watchdog_busy(self) -> bool:
@@ -1090,6 +1261,14 @@ class TrayController(QObject):
             "CareCenter – Start-Prävention",
             message,
             QSystemTrayIcon.MessageIcon.Information, 8000,
+        )
+
+    def on_audit_finding(self, summary: str) -> None:
+        short = summary.split("\n")[0] if summary else "Config-Befund"
+        self.tray.showMessage(
+            "CareCenter – Config-Audit",
+            short,
+            QSystemTrayIcon.MessageIcon.Information, 6000,
         )
 
     def on_toggle_watchdog(self, checked: bool) -> None:

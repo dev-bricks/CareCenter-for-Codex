@@ -57,19 +57,12 @@ class AuditReport:
 # 6c: Config-TOML Audit (MCP-Duplikate + ungenutzte Plugins)
 # ---------------------------------------------------------------------------
 
-_KNOWN_WINDOWS_IRRELEVANT_PLUGINS = frozenset({
-    "biorender@openai-curated",
+_KNOWN_PLATFORM_LOCKED_PLUGINS = frozenset({
     "build-ios-apps@openai-curated",
     "build-macos-apps@openai-curated",
-    "test-android-apps@openai-curated",
-    "figma@openai-curated",
-    "game-studio@openai-curated",
-    "hyperframes@openai-curated",
-    "remotion@openai-curated",
-    "slack@openai-curated",
-    "temporal@openai-curated",
-    "circleci@openai-curated",
 })
+
+_KNOWN_WINDOWS_IRRELEVANT_PLUGINS = _KNOWN_PLATFORM_LOCKED_PLUGINS
 
 
 def _strip_inline_comment(value: str) -> str:
@@ -281,6 +274,139 @@ def audit_threads(config: MaintenanceConfig) -> AuditReport:
     else:
         report.add("Leere Threads", "info", "Keine leeren Threads gefunden.")
     return report
+
+
+# ---------------------------------------------------------------------------
+# Auto-Fix: Sichere TOML-Manipulation via tomlkit (formaterhaltend)
+# ---------------------------------------------------------------------------
+
+
+def _backup_config_toml(toml_path: Path) -> Path:
+    """Erstellt ein Zeitstempel-Backup von config.toml vor Mutation."""
+    from datetime import datetime
+
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup = toml_path.with_suffix(f".{stamp}.bak")
+    backup.write_bytes(toml_path.read_bytes())
+    return backup
+
+
+def _atomic_write_toml(toml_path: Path, content: str) -> None:
+    """Schreibt config.toml atomar (temp + os.replace, same-volume)."""
+    import os
+    import tempfile
+
+    fd, tmp_name = tempfile.mkstemp(
+        dir=str(toml_path.parent), prefix=".config_", suffix=".tmp"
+    )
+    closed = False
+    try:
+        os.write(fd, content.encode("utf-8"))
+        os.close(fd)
+        closed = True
+        os.replace(tmp_name, str(toml_path))
+    except BaseException:
+        if not closed:
+            os.close(fd)
+        try:
+            os.unlink(tmp_name)
+        except OSError:
+            pass
+        raise
+
+
+def fix_duplicate_mcp(config: MaintenanceConfig) -> int:
+    """Entfernt doppelte MCP-Server-Eintraege aus config.toml.
+
+    Bei gleichem Paket (npm-Name): behaelt den Eintrag mit dem laengeren/
+    expliziten Pfad (node_modules > npx). Gibt die Anzahl entfernter
+    Duplikate zurueck. Schreibt nur wenn etwas geaendert wurde.
+    """
+    import tomlkit
+
+    toml_path = config.config_toml_path
+    if not toml_path.exists():
+        return 0
+
+    text = toml_path.read_text(encoding="utf-8")
+    doc = tomlkit.parse(text)
+
+    mcp_table = doc.get("mcp_servers")
+    if not isinstance(mcp_table, dict) or not mcp_table:
+        return 0
+
+    # Paketnamen zuordnen
+    package_map: dict[str, list[str]] = {}
+    for server_name, server_data in mcp_table.items():
+        if not isinstance(server_data, dict):
+            continue
+        data_dict = {k: str(v) for k, v in server_data.items() if k != "env"}
+        package = _extract_mcp_package(data_dict)
+        if package:
+            package_map.setdefault(package, []).append(server_name)
+
+    to_remove: list[str] = []
+    for package, names in package_map.items():
+        if len(names) <= 1:
+            continue
+        # Behalte den Eintrag mit node_modules-Pfad (expliziter), entferne den Rest
+        keep = names[0]
+        for name in names:
+            data = mcp_table.get(name, {})
+            args_str = str(data.get("args", ""))
+            if "node_modules" in args_str:
+                keep = name
+                break
+        to_remove.extend(n for n in names if n != keep)
+
+    if not to_remove:
+        return 0
+
+    _backup_config_toml(toml_path)
+    for name in to_remove:
+        del mcp_table[name]
+
+    _atomic_write_toml(toml_path, tomlkit.dumps(doc))
+    return len(to_remove)
+
+
+def fix_unused_plugins(config: MaintenanceConfig) -> int:
+    """Deaktiviert plattform-inkompatible Plugins in config.toml.
+
+    Setzt enabled=false bei Plugins die auf Windows nicht nutzbar sind
+    (build-ios-apps, build-macos-apps, test-android-apps). Gibt die Anzahl
+    deaktivierter Plugins zurueck. Schreibt nur wenn etwas geaendert wurde.
+    """
+    import tomlkit
+
+    toml_path = config.config_toml_path
+    if not toml_path.exists():
+        return 0
+
+    text = toml_path.read_text(encoding="utf-8")
+    doc = tomlkit.parse(text)
+
+    plugins_table = doc.get("plugins")
+    if not isinstance(plugins_table, dict) or not plugins_table:
+        return 0
+
+    fixed = 0
+    for plugin_name, plugin_data in plugins_table.items():
+        if not isinstance(plugin_data, dict):
+            continue
+        if plugin_name not in _KNOWN_PLATFORM_LOCKED_PLUGINS:
+            continue
+        enabled = plugin_data.get("enabled")
+        if enabled is True:
+            plugin_data["enabled"] = False
+            fixed += 1
+
+    if fixed == 0:
+        return 0
+
+    _backup_config_toml(toml_path)
+    _atomic_write_toml(toml_path, tomlkit.dumps(doc))
+    return fixed
 
 
 # ---------------------------------------------------------------------------
