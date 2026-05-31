@@ -197,6 +197,62 @@ def find_codex_processes_by_executable(
     return sorted(matches, key=lambda item: item.pid)
 
 
+_NPM_CODEX_MARKER = r"\npm\node_modules\@openai\codex"
+_EMBEDDED_CODEX_MARKER = r"\appdata\local\openai\codex\bin"
+
+
+def is_companion_orphan(process: ProcessInfo, *, min_age_seconds: int = 300) -> bool:
+    """Erkennt verwaiste Companion-app-server-Prozesse (codex-plugin-cc #277).
+
+    Zwei Signaturen:
+    1. npm-global: Pfad enthaelt @openai/codex, CommandLine enthaelt 'app-server'
+       aber NICHT '--analytics-default-enabled' (das waere der Desktop-eigene).
+    2. embedded: Pfad enthaelt AppData/Local/OpenAI/Codex/bin/, CommandLine enthaelt
+       'app-server --listen stdio://'.
+    """
+    cmd = process.command_line.lower()
+    exe = (process.executable or "").lower()
+    full = f"{exe} {cmd}"
+
+    if "app-server" not in cmd:
+        return False
+    if "--analytics-default-enabled" in cmd:
+        return False
+
+    is_npm = _NPM_CODEX_MARKER.lower() in full
+    is_embedded = _EMBEDDED_CODEX_MARKER.lower() in full and "--listen stdio://" in cmd
+
+    if not (is_npm or is_embedded):
+        return False
+
+    if min_age_seconds > 0 and process.created_at:
+        from datetime import datetime
+
+        try:
+            created = datetime.fromisoformat(process.created_at)
+            age = (datetime.now() - created).total_seconds()
+            if age < min_age_seconds:
+                return False
+        except (ValueError, TypeError):
+            pass
+
+    return True
+
+
+def find_companion_orphans(
+    provider: ProcessProvider | None = None,
+    *,
+    min_age_seconds: int = 300,
+) -> list[ProcessInfo]:
+    """Finde alle verwaisten Companion-app-server-Prozesse."""
+    provider = provider or windows_processes
+    return [
+        p
+        for p in provider()
+        if is_companion_orphan(p, min_age_seconds=min_age_seconds)
+    ]
+
+
 def build_children_map(processes: Iterable[ProcessInfo]) -> dict[int, list[int]]:
     children: dict[int, list[int]] = {}
     for process in processes:

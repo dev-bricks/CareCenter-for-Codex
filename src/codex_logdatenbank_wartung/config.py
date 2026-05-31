@@ -97,6 +97,18 @@ class MaintenanceConfig:
     allow_repair_zombies: bool = True
     allow_clear_lockfile: bool = True
     zombie_min_age_seconds: int = 120
+    # state_5.sqlite Backup: bei jeder Wartung mitsichern (Automations-Schutz).
+    # KEIN VACUUM auf state_5 -- Korruption dort wedgt den Start (#21750).
+    backup_state_db: bool = True
+    # Companion-Orphan-Reaper: bereinigt verwaiste app-server-Prozesse die vom
+    # codex-companion.mjs (Claude-Code-Plugin codex-plugin-cc) zurueckbleiben (#277).
+    # Laeuft unabhaengig vom Desktop-Zustand bei jedem Watchdog-Tick.
+    reap_companion_orphans: bool = True
+    companion_orphan_min_age_seconds: int = 300  # 5 Minuten Karenzzeit nach Task-Ende
+    # Config-Audit: erkennt Duplikate und ungenutzte MCP-Server/Plugins in config.toml.
+    # Modus: "notify" = nur melden, "auto" = automatisch bereinigen/deaktivieren.
+    audit_duplicate_mcp: str = "notify"  # "off", "notify", "auto"
+    audit_unused_plugins: str = "off"  # "off", "notify", "auto"
     # Health-Schwellwerte fuer die Diagnose.
     wal_warn_mb: int = 64
     db_warn_mb: int = 2048
@@ -186,3 +198,13 @@ class MaintenanceConfig:
     def codex_home(self) -> Path:
         """Verzeichnis der Logdatenbank (dort liegen auch *.badstate-Dateien)."""
         return self.db_path.parent
+
+    @property
+    def state_db_path(self) -> Path:
+        """Pfad zu state_5.sqlite (Automations-/Thread-State)."""
+        return self.codex_home / "state_5.sqlite"
+
+    @property
+    def config_toml_path(self) -> Path:
+        """Pfad zu config.toml (MCP-Server, Plugins, Einstellungen)."""
+        return self.codex_home / "config.toml"

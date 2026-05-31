@@ -25,7 +25,7 @@ from typing import Callable, Literal
 
 from .config import MaintenanceConfig
 from .health import RepairResult, diagnose, repair_start
-from .processes import ProcessProvider
+from .processes import ProcessProvider, find_companion_orphans
 
 WatchdogAction = Literal["codex_active", "idle", "disabled", "busy", "failed", "reaped"]
 
@@ -40,9 +40,56 @@ class WatchdogTickResult:
     stale_lockfile: bool = False
     repair_status: str | None = None  # Status der repair_start-RepairResult, falls gereapt
     relaunched: bool = False
+    companion_orphans_reaped: int = 0
 
     def to_dict(self) -> dict[str, object]:
         return asdict(self)
+
+
+def _reap_companion_orphans(
+    config: MaintenanceConfig,
+    *,
+    execute: bool = True,
+    provider: ProcessProvider | None = None,
+    killer: Callable[[int], "tuple[bool, str]"] | None = None,
+) -> int:
+    """Bereinigt verwaiste Companion-app-server-Prozesse (codex-plugin-cc #277).
+
+    Laeuft unabhaengig vom Desktop-Zustand — Companion-Orphans koennen auch bei
+    aktivem Desktop existieren. Gibt die Anzahl erfolgreich beendeter Prozesse zurueck.
+    """
+    if not getattr(config, "reap_companion_orphans", True):
+        return 0
+
+    min_age = getattr(config, "companion_orphan_min_age_seconds", 300)
+    orphans = find_companion_orphans(provider=provider, min_age_seconds=min_age)
+    if not orphans:
+        return 0
+
+    if not execute:
+        return len(orphans)
+
+    from .processes import no_window_kwargs
+    import subprocess
+
+    reaped = 0
+    for orphan in orphans:
+        if killer:
+            ok, _ = killer(orphan.pid)
+            if ok:
+                reaped += 1
+        else:
+            try:
+                subprocess.run(
+                    ["taskkill", "/F", "/PID", str(orphan.pid)],
+                    check=True,
+                    capture_output=True,
+                    **no_window_kwargs(),
+                )
+                reaped += 1
+            except (subprocess.CalledProcessError, OSError):
+                pass
+    return reaped
 
 
 def run_watchdog_tick(
@@ -79,15 +126,25 @@ def run_watchdog_tick(
     report = diagnose_fn(config, provider)
 
     if getattr(report, "renderer_present", False):
-        return WatchdogTickResult(
-            "codex_active", "Codex aktiv (Renderer vorhanden) -- Waechter haelt sich raus."
-        )
+        companion_reaped = _reap_companion_orphans(config, execute=execute, provider=provider, killer=killer)
+        msg = "Codex aktiv (Renderer vorhanden) -- Waechter haelt sich raus."
+        if companion_reaped:
+            msg += f" {companion_reaped} Companion-Orphan(s) bereinigt."
+        result = WatchdogTickResult("codex_active", msg)
+        result.companion_orphans_reaped = companion_reaped
+        return result
 
     zombie_pids = list(getattr(report, "zombie_main_pids", []) or [])
     stale_lockfile = bool(getattr(report, "stale_lockfile", False))
 
     if not zombie_pids and not stale_lockfile:
-        return WatchdogTickResult("idle", "Codex zu, keine haengenden Reste.")
+        companion_reaped = _reap_companion_orphans(config, execute=execute, provider=provider, killer=killer)
+        msg = "Codex zu, keine haengenden Reste."
+        if companion_reaped:
+            msg += f" {companion_reaped} Companion-Orphan(s) bereinigt."
+        result = WatchdogTickResult("idle", msg)
+        result.companion_orphans_reaped = companion_reaped
+        return result
 
     if not config.watcher_enabled:
         return WatchdogTickResult(
@@ -155,6 +212,8 @@ def run_watchdog_tick(
     suffix = " Codex neu gestartet." if relaunched else " Du kannst Codex jetzt sauber starten."
     message = f"{detail}.{suffix}"
 
+    companion_reaped = _reap_companion_orphans(config, execute=execute, provider=provider, killer=killer)
+
     return WatchdogTickResult(
         "reaped",
         message,
@@ -162,4 +221,5 @@ def run_watchdog_tick(
         stale_lockfile=stale_lockfile,
         repair_status=result.status,
         relaunched=relaunched,
+        companion_orphans_reaped=companion_reaped,
     )

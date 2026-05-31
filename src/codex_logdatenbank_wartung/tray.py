@@ -962,6 +962,7 @@ class TrayController(QObject):
             )
             self.show_window()
             return
+        self.running = True
         self.window.set_running(True)
         self.window.set_state("Volle Reparatur läuft (elevated) …")
         self.window.set_progress(0, "UAC bestätigen — danach läuft die volle Eskalation …", True)
@@ -995,6 +996,7 @@ class TrayController(QObject):
         self.tray.setToolTip(f"Codex-Reparatur: {short}")
 
     def on_full_repair_finished(self, outcome: object) -> None:
+        self.running = False
         self.window.set_running(False)
         self.window.set_progress(100, "Fertig.", False)
         if not isinstance(outcome, dict):

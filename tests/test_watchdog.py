@@ -268,3 +268,94 @@ def test_nothing_to_do_reap_reported_as_idle() -> None:
         activity_fn=INACTIVE,
     )
     assert result.action == "idle"
+
+
+# ---------------------------------------------------------------------------
+# Companion-Orphan-Reaper (codex-plugin-cc #277)
+# ---------------------------------------------------------------------------
+
+
+def test_companion_orphans_reaped_when_idle() -> None:
+    """Companion-Orphans werden bereinigt auch wenn Codex geschlossen und kein Ghost da ist."""
+    from unittest.mock import patch
+    from codex_logdatenbank_wartung.processes import ProcessInfo
+
+    orphan = ProcessInfo(
+        pid=99999,
+        name="codex.exe",
+        executable=r"C:\Users\User\AppData\Roaming\npm\node_modules\@openai\codex\vendor\codex.exe",
+        command_line=r"codex.exe app-server",
+        created_at="2026-05-31T10:00:00",
+    )
+
+    repair, _calls = repair_recorder()
+    with patch(
+        "codex_logdatenbank_wartung.watchdog.find_companion_orphans",
+        return_value=[orphan],
+    ):
+        killed_pids: list[int] = []
+        result = run_watchdog_tick(
+            make_config(),
+            diagnose_fn=diagnose_returning(_Report()),
+            repair_fn=repair,
+            killer=lambda pid: (killed_pids.append(pid) or True, "ok"),
+        )
+    assert result.action == "idle"
+    assert result.companion_orphans_reaped == 1
+    assert 99999 in killed_pids
+
+
+def test_companion_orphans_reaped_when_codex_active() -> None:
+    """Companion-Orphans werden auch bei aktivem Codex bereinigt (unabhaengig)."""
+    from unittest.mock import patch
+    from codex_logdatenbank_wartung.processes import ProcessInfo
+
+    orphan = ProcessInfo(
+        pid=88888,
+        name="codex.exe",
+        executable=r"C:\Users\User\AppData\Local\OpenAI\Codex\bin\abc123\codex.exe",
+        command_line=r'"codex.exe" app-server --listen stdio://',
+        created_at="2026-05-31T10:00:00",
+    )
+
+    repair, _calls = repair_recorder()
+    with patch(
+        "codex_logdatenbank_wartung.watchdog.find_companion_orphans",
+        return_value=[orphan],
+    ):
+        killed_pids: list[int] = []
+        result = run_watchdog_tick(
+            make_config(),
+            diagnose_fn=diagnose_returning(_Report(renderer_present=True)),
+            repair_fn=repair,
+            killer=lambda pid: (killed_pids.append(pid) or True, "ok"),
+        )
+    assert result.action == "codex_active"
+    assert result.companion_orphans_reaped == 1
+    assert 88888 in killed_pids
+
+
+def test_companion_reaper_disabled_by_config() -> None:
+    """reap_companion_orphans=False deaktiviert den Reaper."""
+    from unittest.mock import patch
+    from codex_logdatenbank_wartung.processes import ProcessInfo
+
+    orphan = ProcessInfo(
+        pid=77777,
+        name="codex.exe",
+        executable=r"C:\Users\User\AppData\Roaming\npm\node_modules\@openai\codex\vendor\codex.exe",
+        command_line=r"codex.exe app-server",
+        created_at="2026-05-31T10:00:00",
+    )
+
+    repair, _calls = repair_recorder()
+    with patch(
+        "codex_logdatenbank_wartung.watchdog.find_companion_orphans",
+        return_value=[orphan],
+    ):
+        result = run_watchdog_tick(
+            make_config(reap_companion_orphans=False),
+            diagnose_fn=diagnose_returning(_Report()),
+            repair_fn=repair,
+        )
+    assert result.companion_orphans_reaped == 0

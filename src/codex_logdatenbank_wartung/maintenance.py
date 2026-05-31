@@ -240,6 +240,8 @@ class MaintenanceRunner:
 
         if result.dry_run:
             result.add("Backup", "planned", "Backup würde in einem Zeitstempelordner erstellt.")
+            if self.config.backup_state_db:
+                result.add("State-DB-Backup", "planned", "state_5.sqlite würde mitgesichert (kein VACUUM).")
             result.add("Integritätscheck", "planned", "Integritätscheck würde auf dem Backup laufen.")
             if self.config.allow_optimize:
                 result.add("Optimize", "planned", "PRAGMA optimize würde ausgeführt.")
@@ -263,6 +265,10 @@ class MaintenanceRunner:
             backup_dir = self.create_backup(existing_sidecars)
             result.backup_dir = str(backup_dir)
             result.add("Backup", "ok", f"Backup erstellt: {backup_dir}")
+
+            if self.config.backup_state_db:
+                self._backup_state_db(backup_dir, result)
+
             self.prune_backups(result)
 
             self._emit("integrity", "Integritätscheck auf der Sicherung …", 58, indeterminate=True)
@@ -276,6 +282,25 @@ class MaintenanceRunner:
 
             self.archive_old_logs(result)
             self.optimize_and_vacuum(db_path, result)
+
+    def _backup_state_db(self, backup_dir: Path, result: MaintenanceResult) -> None:
+        """Sichert state_5.sqlite (+ WAL/SHM) ins Backup-Verzeichnis. Kein VACUUM (#21750)."""
+        state_files = database_sidecars(self.config.state_db_path)
+        existing = [f for f in state_files if f.exists()]
+        if not existing:
+            result.add("State-DB-Backup", "skipped", "state_5.sqlite nicht gefunden.")
+            return
+        try:
+            for source in existing:
+                shutil.copy2(source, backup_dir / source.name)
+            total_mb = sum(f.stat().st_size for f in existing) / (1024 * 1024)
+            result.add(
+                "State-DB-Backup",
+                "ok",
+                f"state_5.sqlite gesichert ({total_mb:.1f} MB, {len(existing)} Datei(en)).",
+            )
+        except OSError as exc:
+            result.add("State-DB-Backup", "failed", f"Backup fehlgeschlagen: {exc}")
 
     def create_backup(self, files: list[Path]) -> Path:
         backup_dir = self.config.backup_path / f"logs_2-{timestamp()}"

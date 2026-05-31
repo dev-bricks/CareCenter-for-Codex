@@ -177,6 +177,15 @@ def cmd_repair(args: argparse.Namespace) -> int:
     return {"ok": 0, "blocked": 2, "failed": 1}.get(result.status, 1)
 
 
+def cmd_audit(args: argparse.Namespace) -> int:
+    from .config_audit import run_full_audit
+
+    config = load_config(args)
+    report = run_full_audit(config)
+    print(report.summary())
+    return 1 if report.has_warnings else 0
+
+
 def cmd_tray(args: argparse.Namespace) -> int:
     from .tray import run_tray
 
@@ -316,6 +325,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Ergebnis als JSON dorthin schreiben (bei --execute zusaetzlich pro Stufe eine JSON-Zeile).",
     )
     repair_parser.set_defaults(func=cmd_repair)
+
+    audit_parser = subparsers.add_parser(
+        "audit",
+        help="Config-Audit: MCP-Duplikate, ungenutzte Plugins, CLI-Status, leere Threads pruefen.",
+    )
+    audit_parser.set_defaults(func=cmd_audit)
 
     tray_parser = subparsers.add_parser("tray", help="Systemtray-App starten.")
     tray_parser.set_defaults(func=cmd_tray)
