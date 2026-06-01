@@ -60,7 +60,7 @@ def test_is_companion_orphan_npm_global() -> None:
     proc = ProcessInfo(
         pid=1234,
         name="codex.exe",
-        executable=r"C:\Users\User\AppData\Roaming\npm\node_modules\@openai\codex\node_modules\@openai\codex-win32-x64\vendor\x86_64-pc-windows-msvc\codex\codex.exe",
+        executable=r"C:\Users\Example\AppData\Roaming\npm\node_modules\@openai\codex\node_modules\@openai\codex-win32-x64\vendor\x86_64-pc-windows-msvc\codex\codex.exe",
         command_line=r"codex.exe app-server",
         created_at="2026-05-31T10:00:00",
     )
@@ -71,8 +71,8 @@ def test_is_companion_orphan_embedded_stdio() -> None:
     proc = ProcessInfo(
         pid=5678,
         name="codex.exe",
-        executable=r"C:\Users\User\AppData\Local\OpenAI\Codex\bin\7dea4a003bc76627\codex.exe",
-        command_line=r'"C:\Users\User\AppData\Local\OpenAI\Codex\bin\7dea4a003bc76627\codex.exe" app-server --listen stdio://',
+        executable=r"C:\Users\Example\AppData\Local\OpenAI\Codex\bin\7dea4a003bc76627\codex.exe",
+        command_line=r'"C:\Users\Example\AppData\Local\OpenAI\Codex\bin\7dea4a003bc76627\codex.exe" app-server --listen stdio://',
         created_at="2026-05-31T10:00:00",
     )
     assert is_companion_orphan(proc, min_age_seconds=0) is True
@@ -96,7 +96,7 @@ def test_is_companion_orphan_respects_min_age() -> None:
     proc = ProcessInfo(
         pid=1111,
         name="codex.exe",
-        executable=r"C:\Users\User\AppData\Roaming\npm\node_modules\@openai\codex\vendor\codex.exe",
+        executable=r"C:\Users\Example\AppData\Roaming\npm\node_modules\@openai\codex\vendor\codex.exe",
         command_line=r"codex.exe app-server",
         created_at=now,
     )
@@ -105,7 +105,7 @@ def test_is_companion_orphan_respects_min_age() -> None:
 
 def test_find_companion_orphans_filters_correctly() -> None:
     procs = [
-        ProcessInfo(1, "codex.exe", r"C:\Users\User\AppData\Roaming\npm\node_modules\@openai\codex\v\codex.exe", "codex.exe app-server", created_at="2026-05-31T10:00:00"),
+        ProcessInfo(1, "codex.exe", r"C:\Users\Example\AppData\Roaming\npm\node_modules\@openai\codex\v\codex.exe", "codex.exe app-server", created_at="2026-05-31T10:00:00"),
         ProcessInfo(2, "Codex.exe", r"C:\Program Files\WindowsApps\OpenAI.Codex\app\Codex.exe", "Codex.exe", created_at="2026-05-31T10:00:00"),
         ProcessInfo(3, "node.exe", r"C:\Program Files\nodejs\node.exe", "node index.js", created_at="2026-05-31T10:00:00"),
     ]

@@ -283,7 +283,7 @@ def test_companion_orphans_reaped_when_idle() -> None:
     orphan = ProcessInfo(
         pid=99999,
         name="codex.exe",
-        executable=r"C:\Users\User\AppData\Roaming\npm\node_modules\@openai\codex\vendor\codex.exe",
+        executable=r"C:\Users\Example\AppData\Roaming\npm\node_modules\@openai\codex\vendor\codex.exe",
         command_line=r"codex.exe app-server",
         created_at="2026-05-31T10:00:00",
     )
@@ -313,7 +313,7 @@ def test_companion_orphans_reaped_when_codex_active() -> None:
     orphan = ProcessInfo(
         pid=88888,
         name="codex.exe",
-        executable=r"C:\Users\User\AppData\Local\OpenAI\Codex\bin\abc123\codex.exe",
+        executable=r"C:\Users\Example\AppData\Local\OpenAI\Codex\bin\abc123\codex.exe",
         command_line=r'"codex.exe" app-server --listen stdio://',
         created_at="2026-05-31T10:00:00",
     )
@@ -343,7 +343,7 @@ def test_companion_reaper_disabled_by_config() -> None:
     orphan = ProcessInfo(
         pid=77777,
         name="codex.exe",
-        executable=r"C:\Users\User\AppData\Roaming\npm\node_modules\@openai\codex\vendor\codex.exe",
+        executable=r"C:\Users\Example\AppData\Roaming\npm\node_modules\@openai\codex\vendor\codex.exe",
         command_line=r"codex.exe app-server",
         created_at="2026-05-31T10:00:00",
     )
