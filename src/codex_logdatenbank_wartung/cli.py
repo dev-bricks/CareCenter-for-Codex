@@ -138,11 +138,12 @@ def _persist_repair_log(config: MaintenanceConfig, result: object) -> Path | Non
 
 
 def cmd_repair(args: argparse.Namespace) -> int:
-    """Volle, hang-sichere Codex-Start-Reparatur (Eskalation S1-S7).
+    """Begrenzte, hang-sichere Codex-Start-Reparatur (S1+S2+S3+1 Fallback, KEIN UAC).
 
-    ``--dry-run`` (oder kein ``--execute``) plant nur und ruft KEIN mutierendes Dep auf
-    -- keine Elevation noetig. ``--execute`` fuehrt den echten Lauf aus und braucht Admin
-    (wird vom Tray genau einmal elevated gestartet, kein UAC pro Op).
+    ``--dry-run`` (oder kein ``--execute``) plant nur und ruft KEIN mutierendes Dep auf.
+    ``--execute`` fuehrt den echten Lauf aus -- mit den Rechten des aktuellen Prozesses;
+    es wird NIE selbst elevated. Scheitert eine Deploy-Op an fehlenden Rechten, meldet das
+    Ergebnis ``needs_admin`` (-> als Administrator neu starten), statt UAC auszuloesen.
 
     Mit ``--out`` wird das Ergebnis als JSON geschrieben. Laeuft ``progress`` (bei
     ``--execute``), wird jede Stufe sofort als eigene JSON-Zeile angehaengt (Live-Tailing);
@@ -335,15 +336,15 @@ def build_parser() -> argparse.ArgumentParser:
 
     repair_parser = subparsers.add_parser(
         "repair",
-        help="Volle, hang-sichere Codex-Start-Reparatur (Eskalation S1-S7, voll ausgeschoepft).",
+        help="Begrenzte, hang-sichere Codex-Start-Reparatur (S1+S2+S3+1 Fallback, kein UAC).",
     )
     repair_parser.add_argument(
         "--dry-run", action="store_true",
-        help="Nur planen (kein mutierendes Dep, keine Elevation noetig).",
+        help="Nur planen (kein mutierendes Dep).",
     )
     repair_parser.add_argument(
         "--execute", action="store_true",
-        help="Echter Lauf (braucht Admin -- wird vom Tray elevated gestartet).",
+        help="Echter Lauf mit den Rechten des aktuellen Prozesses (kein UAC; meldet ggf. needs_admin).",
     )
     repair_parser.add_argument(
         "--out", default=None,

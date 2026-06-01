@@ -19,6 +19,7 @@ from codex_logdatenbank_wartung.repair_live import (
     parse_codex_packages,
     parse_package_absence,
 )
+from codex_logdatenbank_wartung.repair_workflow import AdminRequired, DeployTimeout
 
 
 CODEX_EXE = r"C:\Users\dev\AppData\Local\Programs\Codex\Codex.exe"
@@ -334,6 +335,119 @@ def test_observe_runner_failure_falls_back_safely(tmp_path: Path, monkeypatch) -
     assert state.staged_update is False
     assert state.package_user_registered is True
     assert state.clipsvc_running is True
+
+
+# ---------------------------------------------------------------------------
+# Fehlerart-Klassifikation der Deploy-Ops (intelligenter Prozess, 2026-06-01)
+# ---------------------------------------------------------------------------
+
+def test_classify_ps_outcome_timeout() -> None:
+    assert repair_live.classify_ps_outcome(124, "PowerShell-Timeout") == "timeout"
+
+
+def test_classify_ps_outcome_ok() -> None:
+    assert repair_live.classify_ps_outcome(0, "") == "ok"
+    assert repair_live.classify_ps_outcome(0, "Deployment operation completed") == "ok"
+
+
+def test_classify_ps_outcome_admin_de_en_hresult() -> None:
+    # Eindeutige Access-Denied-Signale (DE/EN/HRESULT) -> needs_admin.
+    assert repair_live.classify_ps_outcome(1, "Access is denied.") == "needs_admin"
+    assert repair_live.classify_ps_outcome(1, "Zugriff verweigert") == "needs_admin"
+    assert repair_live.classify_ps_outcome(1, "Add-AppxPackage : Fehler 0x80070005") == "needs_admin"
+    assert repair_live.classify_ps_outcome(1, "This operation requires elevation.") == "needs_admin"
+
+
+def test_classify_ps_outcome_corruption_is_failed_not_admin() -> None:
+    # 0x80073CF9 'package could not be registered' = Korruption, NICHT Admin -> failed -> Fallback.
+    assert (
+        repair_live.classify_ps_outcome(1, "error 0x80073CF9: package could not be registered")
+        == "failed"
+    )
+    assert repair_live.classify_ps_outcome(1, "irgendein unklarer Fehler") == "failed"
+
+
+def test_raise_for_deploy_admin_timeout_and_clean() -> None:
+    import pytest
+
+    with pytest.raises(DeployTimeout):
+        repair_live._raise_for_deploy(124, "PowerShell-Timeout")
+    with pytest.raises(AdminRequired):
+        repair_live._raise_for_deploy(1, "Access is denied")
+    # ok/failed (unklar) -> KEIN raise (Fallback bleibt moeglich).
+    repair_live._raise_for_deploy(0, "ok")
+    repair_live._raise_for_deploy(1, "0x80073CF9 corruption")
+
+
+def test_complete_staged_update_raises_admin_on_access_denied(tmp_path: Path, monkeypatch) -> None:
+    """Die LIVE-Deploy-Op wirft AdminRequired, wenn der mutierende Befehl Access Denied liefert."""
+    import pytest
+
+    def run(command: str) -> tuple[int, str]:
+        if "RegisterByFamilyName" in command:
+            return 1, "Add-AppxPackage : Access is denied"
+        return 0, ""
+
+    monkeypatch.setattr(
+        "codex_logdatenbank_wartung.health.diagnose", lambda _cfg: _Report()
+    )
+    deps = build_live_deps(make_config(tmp_path), runner=run)
+    with pytest.raises(AdminRequired):
+        deps.complete_staged_update()
+
+
+def test_reset_package_raises_timeout_on_rc124(tmp_path: Path, monkeypatch) -> None:
+    """reset_package wirft DeployTimeout, wenn der Runner den Timeout-Sentinel (124) liefert."""
+    import pytest
+
+    def run(_command: str) -> tuple[int, str]:
+        return 124, "PowerShell-Timeout"
+
+    monkeypatch.setattr(
+        "codex_logdatenbank_wartung.health.diagnose", lambda _cfg: _Report()
+    )
+    deps = build_live_deps(make_config(tmp_path), runner=run)
+    with pytest.raises(DeployTimeout):
+        deps.reset_package()
+
+
+# ---------------------------------------------------------------------------
+# default_ps_runner: hang-hart (Tree-Kill bei Timeout, rc=124-Vertrag)
+# ---------------------------------------------------------------------------
+
+def test_default_ps_runner_timeout_returns_124_and_tree_kills(monkeypatch) -> None:
+    import subprocess as sp
+
+    killed: list[int] = []
+
+    class FakeProc:
+        pid = 4321
+
+        def communicate(self, timeout=None):
+            raise sp.TimeoutExpired(cmd="powershell", timeout=timeout)
+
+    monkeypatch.setattr(sp, "Popen", lambda *a, **k: FakeProc())
+    monkeypatch.setattr(repair_live, "_tree_kill", lambda pid: killed.append(pid))
+
+    rc, out = repair_live.default_ps_runner("Start-Sleep 999", timeout=0.01)
+    assert rc == 124
+    assert killed == [4321]  # ganzer Prozessbaum hart beendet
+
+
+def test_default_ps_runner_success_returns_rc_and_output(monkeypatch) -> None:
+    import subprocess as sp
+
+    class FakeProc:
+        pid = 1
+        returncode = 0
+
+        def communicate(self, timeout=None):
+            return ("hello", "")
+
+    monkeypatch.setattr(sp, "Popen", lambda *a, **k: FakeProc())
+    rc, out = repair_live.default_ps_runner("Write-Output hi")
+    assert rc == 0
+    assert out == "hello"
 
 
 # ---------------------------------------------------------------------------

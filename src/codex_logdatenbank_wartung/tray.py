@@ -254,8 +254,9 @@ class StartRepairWorker(QObject):
     Klassifiziert die Lage (Renderer da? Codex ueberhaupt installiert? haengende Reste?)
     und behandelt die billigen Faelle selbst: haengende Reste entfernen (`repair_start`,
     nicht-elevated taskkill), Codex starten, auf Renderer warten. Reicht das nicht und ist
-    Codex installiert, signalisiert sie ``escalate`` -> der Controller startet die elevated
-    Vollstufe. Ist gar kein Codex installiert, signalisiert sie ``needs_store_reinstall``.
+    Codex installiert, signalisiert sie ``escalate`` -> der Controller startet die volle
+    Reparatur (``run_full_repair``, ebenfalls OHNE UAC). Ist gar kein Codex installiert,
+    signalisiert sie ``needs_store_reinstall``.
     """
 
     progress = Signal(str)
@@ -336,12 +337,12 @@ class StartRepairWorker(QObject):
                 return
             self.finished.emit({
                 "outcome": "escalate", "reaped": reaped,
-                "message": "Leichte Stufe genügte nicht — eskaliere (Admin nötig) …",
+                "message": "Leichte Stufe genügte nicht — volle Reparatur folgt …",
             })
             return
 
         # decision == "needs_escalation": installiert, aber Start scheitert ohne offensichtliche Reste.
-        self.finished.emit({"outcome": "escalate", "reaped": 0, "message": "Tiefer eskalieren nötig (Admin) …"})
+        self.finished.emit({"outcome": "escalate", "reaped": 0, "message": "Volle Reparatur nötig …"})
 
 
 class StatusWindow(QWidget):
@@ -390,9 +391,9 @@ class StatusWindow(QWidget):
         repair_row = QHBoxLayout()
         self.repair_button = QPushButton("Codex reparieren")
         self.repair_button.setToolTip(
-            "Eskalationskette: hängende Reste entfernen, Store-Update, Reset, Reinstall. "
-            "Stoppt, sobald Codex startet. Schlägt bei Bedarf Reboot oder "
-            "Store-Neuinstallation vor."
+            "Begrenzte Reparatur (ohne Admin): hängende Reste entfernen, ClipSVC, sanftes "
+            "Re-Register, ein Reset-Fallback. Stoppt, sobald Codex startet. Schlägt bei Bedarf "
+            "Reboot, Neustart als Administrator oder Store-Neuinstallation vor."
         )
         self.repair_button.clicked.connect(self.request_codex_repair)
         self.diagnose_button = QPushButton("Diagnose")
@@ -568,9 +569,9 @@ class TrayController(QObject):
         self.maintenance_action.triggered.connect(self.show_window)
         self.repair_action = QAction("Codex reparieren")
         self.repair_action.setToolTip(
-            "Eskalationskette: hängende Reste entfernen, Store-Update, Reset, Reinstall. "
-            "Stopp sobald Codex startet. Schlägt bei Bedarf Reboot oder "
-            "Store-Neuinstallation vor."
+            "Begrenzte Reparatur (ohne Admin): hängende Reste entfernen, ClipSVC, sanftes "
+            "Re-Register, ein Reset-Fallback. Stopp sobald Codex startet. Schlägt bei Bedarf "
+            "Reboot, Neustart als Administrator oder Store-Neuinstallation vor."
         )
         self.repair_action.triggered.connect(self.run_codex_repair)
         self.watchdog_action = QAction("Auto-Wächter: Start-Reste entfernen")
@@ -719,7 +720,8 @@ class TrayController(QObject):
         auf Renderer prüfen. Erscheint ein Fenster, sind wir fertig. Ist gar kein Codex
         installiert, wird die Store-Neuinstallation vorgeschlagen. Genügt Stufe A nicht
         (Codex installiert, Start scheitert weiter), eskaliert der Controller automatisch
-        auf die elevated Vollstufe (``run_full_repair``).
+        auf die volle Reparatur (``run_full_repair``, ebenfalls OHNE UAC -- bei einem klaren
+        Admin-Fehler meldet sie nur 'als Administrator neu starten', elevatet aber NIE selbst).
         """
         if self.start_repair_thread is not None or self.full_repair_thread is not None:
             self.tray.showMessage(
@@ -758,7 +760,7 @@ class TrayController(QObject):
         message = str(data.get("message") or "")
 
         if outcome == "escalate":
-            # Leichte Stufe genügte nicht -> elevated Vollstufe automatisch anschließen.
+            # Leichte Stufe genügte nicht -> volle Reparatur anschließen (ebenfalls ohne UAC).
             self.running = False  # run_full_repair verwaltet seinen eigenen Lauf-Zustand
             self.window.set_state("Eskaliere zur vollen Reparatur …")
             self.window.set_result(message)
@@ -904,7 +906,7 @@ class TrayController(QObject):
                 QSystemTrayIcon.MessageIcon.Warning, 8000,
             )
 
-    # -- Volle Codex-Start-Reparatur (elevated, voll ausgeschoepft) -------
+    # -- Volle Codex-Start-Reparatur (OHNE UAC, begrenzt: 1 sanfter Versuch + 1 Fallback) --
 
     def run_full_repair(self) -> None:
         if self.full_repair_thread is not None:
@@ -968,8 +970,14 @@ class TrayController(QObject):
         reached = bool(outcome.get("reached_window"))
         reboot = bool(outcome.get("recommend_reboot"))
         needs_reinstall = bool(outcome.get("needs_store_reinstall"))
+        needs_admin = bool(outcome.get("needs_admin"))
         steps = outcome.get("steps") or []
-        if needs_reinstall:
+        if needs_admin:
+            # Eine Deploy-Op scheiterte EINDEUTIG an fehlenden Admin-Rechten. KEINE Selbst-Elevation
+            # (der fruehere UAC-Selbstaufruf verklemmte den Appinfo-Dienst) -- der User startet bewusst
+            # neu mit Admin-Rechten. Ein Reboot hilft hier NICHT.
+            summary = "CareCenter braucht für die Reparatur Admin-Rechte. Starte die App neu mit Admin-Rechten."
+        elif needs_reinstall:
             # Store-Paket vollstaendig weg -> Reparatur kann nichts registrieren.
             # Ehrliche Botschaft + Hinweis aufs Menue (KEIN Auto-Install -- der User
             # entscheidet, wann er neu installiert).
@@ -978,7 +986,7 @@ class TrayController(QObject):
             summary = {
                 "ok": "Codex-Start repariert — Fenster erschienen.",
                 "blocked": "Gestoppt — AppX-Engine verklemmt. Reboot empfohlen.",
-                "failed": "Alle Stufen erschöpft. Reboot empfohlen.",
+                "failed": "Reparatur erschöpft (sanftes Re-Register + Reset). Reboot empfohlen.",
             }.get(status, f"Beendet: {status}")
         self.window.set_state(summary)
         lines = [
@@ -986,7 +994,9 @@ class TrayController(QObject):
             for step in steps
             if isinstance(step, dict)
         ]
-        if needs_reinstall:
+        if needs_admin:
+            lines.append("→ App als Administrator neu starten (Rechtsklick → 'Als Administrator ausführen').")
+        elif needs_reinstall:
             lines.append("→ Knopf 'Codex neu installieren' im Fenster (öffnet die Store-Seite). Nur ein Vorschlag.")
         elif reboot:
             lines.append("→ Reboot empfohlen (nur ein Vorschlag).")
@@ -998,14 +1008,16 @@ class TrayController(QObject):
             if status == "ok"
             else QSystemTrayIcon.MessageIcon.Warning
         )
-        if needs_reinstall:
+        if needs_admin:
+            tip = "Admin-Rechte nötig — App als Administrator neu starten."
+        elif needs_reinstall:
             tip = "Store-Paket fehlt — Knopf 'Codex neu installieren' im Fenster."
         elif reboot:
             tip = "Reparatur gestoppt — Reboot empfohlen."
         else:
             tip = summary
         self.tray.setToolTip(f"CareCenter: {tip}")
-        self.tray.showMessage("CareCenter – Codex reparieren (Vollstufe)", summary, icon, 9000)
+        self.tray.showMessage("CareCenter – Codex reparieren", summary, icon, 9000)
 
     def clear_full_repair_thread(self) -> None:
         self.full_repair_thread = None

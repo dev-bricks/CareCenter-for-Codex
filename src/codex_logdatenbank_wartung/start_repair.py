@@ -9,8 +9,9 @@ Codex startet (siehe CODEX-AUTO-DEBUG-DESIGN.md). Reihenfolge der Idee:
      "Codex startet nicht" -- nur eben die Wurzel "es ist keins mehr da").
   3. Haengende Reste (Ghost/Lockfile)?            -> leichte Stufe OHNE UAC: reapen,
      starten, auf Renderer pruefen.
-  4. sonst (installiert, aber Start scheitert)    -> eskalieren (elevated: ClipSVC,
-     staged Update, reset, reinstall; am Ende ggf. Reboot-Vorschlag).
+  4. sonst (installiert, aber Start scheitert)    -> begrenzte Reparatur OHNE UAC: ClipSVC,
+     sanftes Re-Register (S3) + EIN Reset-Fallback; am Ende ggf. Reboot-, Admin- oder
+     Store-Neuinstallations-Vorschlag (NIE Selbst-Elevation).
 
 Diese Datei haelt die *reine*, testbare Entscheidung; die Tray-Schicht fuehrt sie aus.
 """

@@ -7,9 +7,13 @@ Engine (``repair_workflow.py``) und der Windows-Wirklichkeit.
 
 Wichtige Annahmen (siehe CODEX-AUTO-DEBUG-DESIGN.md):
 
-* **EINE Elevation pro Lauf, kein UAC pro Op.** Der ganze ``repair --execute``-Lauf
-  wird vom Tray genau einmal elevated gestartet; Admin ist hier also bereits da.
-  Die einzelnen Deploy-Ops loesen daher KEIN eigenes UAC aus.
+* **KEINE Elevation, NIEMALS Selbst-UAC.** Die App elevatet sich NIE selbst. Der fruehere
+  UAC-Selbstaufruf verklemmte den Appinfo-Dienst (Application Information / Elevation) dauerhaft
+  ('kein Fenster geoeffnet, dann nicht bestaetigt' -> Dienst haengt bis Reboot bei ~99% CPU).
+  >>> WARNUNG: Hier KEINE Elevation (runas / ShellExecute -Verb / requireAdministrator-Manifest)
+  wieder einbauen. <<< Reparaturen laufen mit den Rechten des aktuellen Prozesses. Scheitert eine
+  Deploy-Op EINDEUTIG an fehlenden Rechten (Access Denied), bricht die Engine ab und meldet dem
+  User 'als Administrator neu starten' (``needs_admin``) -- statt selbst zu elevaten.
 * **Akkurate Beobachtung statt Datei-Glob.** ``observe()`` erhebt den staged-Wedge
   getreu ueber ``Get-AppxPackage -AllUsers OpenAI.Codex`` (Staged fuer S-1-5-18 neben
   einer aelteren Installed-Version fuer den aktuellen User) und ``Get-Service ClipSVC``.
@@ -34,7 +38,14 @@ from .processes import (
     no_window_kwargs,
     process_type,
 )
-from .repair_workflow import RepairDeps, RepairOutcome, RepairState, run_repair
+from .repair_workflow import (
+    AdminRequired,
+    DeployTimeout,
+    RepairDeps,
+    RepairOutcome,
+    RepairState,
+    run_repair,
+)
 
 # Runner fuehrt einen PowerShell-Befehl aus und liefert (returncode, ausgabe).
 PowerShellRunner = Callable[[str], "tuple[int, str]"]
@@ -45,28 +56,117 @@ CODEX_PACKAGE = "OpenAI.Codex"
 SYSTEM_SID = "S-1-5-18"
 
 
-def default_ps_runner(command: str, *, timeout: float = 30.0) -> tuple[int, str]:
-    """Fuehre einen PowerShell-Befehl ohne Konsolenfenster aus, mit hartem Timeout.
+def _tree_kill(pid: int) -> None:
+    """Beende den Prozessbaum (powershell.exe + Kinder) hart -- ohne je zu haengen/crashen.
 
-    Der Timeout ist Teil der Hang-Sicherheit: eine verklemmte AppX-Engine darf den
-    beobachtenden Aufruf nicht ewig blockieren. Bei Timeout wird der Prozess beendet
-    und ein eindeutiger Fehlercode (124) zurueckgegeben.
+    Vorbild: watchdog Companion-Orphan-Reaper. ``taskkill /T`` killt den Baum, ``/F`` erzwingt.
+    Eigener kurzer Timeout, alle Fehler geschluckt (Best-Effort-Aufraeumen).
     """
     try:
-        completed = subprocess.run(
-            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", command],
+        subprocess.run(
+            ["taskkill", "/T", "/F", "/PID", str(pid)],
             check=False,
             capture_output=True,
+            timeout=10,
+            **no_window_kwargs(),
+        )
+    except Exception:  # noqa: BLE001 -- Aufraeumen darf den Lauf nie crashen
+        pass
+
+
+def default_ps_runner(command: str, *, timeout: float = 30.0) -> tuple[int, str]:
+    """Fuehre einen PowerShell-Befehl ohne Konsolenfenster aus, mit hartem Timeout + Tree-Kill.
+
+    Der Timeout ist Teil der Hang-Sicherheit: eine verklemmte AppX-Engine darf den
+    aufrufenden Lauf nicht ewig blockieren. Reisst der Timeout, wird NICHT nur der direkte
+    ``powershell.exe`` beendet (das tat ``subprocess.run(timeout=)`` frueher), sondern der
+    ganze **Prozessbaum** (``taskkill /T /F``) -- so bleiben keine vom Deploy gestarteten
+    Kindprozesse als Zombies zurueck (genau diese stapelten sich frueher bei voller Eskalation).
+
+    EHRLICHE GRENZE: Der Tree-Kill verhindert NEUE Orphan-Kinder, HEILT aber keine bereits
+    verklemmte AppX-Engine -- die laeuft im Dienst ``AppXSVC``, nicht als Kind von powershell.exe.
+    Dafuer hilft nur ein Reboot (darum meldet die Engine bei Timeout ``recommend_reboot``).
+
+    Rueckgabecode **124** signalisiert den Timeout (stabiler Vertrag mit ``classify_ps_outcome``
+    -> ``DeployTimeout`` in der Engine). Nie eine Exception nach aussen.
+    """
+    try:
+        proc = subprocess.Popen(
+            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", command],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
             encoding="utf-8",
             errors="replace",
-            timeout=timeout,
             **no_window_kwargs(),
         )
+    except OSError as exc:
+        # PowerShell nicht startbar -> sauberer Fehlschlag (kein Timeout, kein Crash).
+        return 1, f"PowerShell-Start fehlgeschlagen: {exc}"
+    try:
+        stdout, stderr = proc.communicate(timeout=timeout)
     except subprocess.TimeoutExpired:
+        _tree_kill(proc.pid)  # ganzen Baum hart beenden -> keine Zombie-PowerShell
+        try:
+            stdout, stderr = proc.communicate(timeout=5)  # Pipes leeren, Handles freigeben
+        except Exception:  # noqa: BLE001 -- Prozess ist tot; Reste ignorieren
+            stdout, stderr = "", ""
         return 124, "PowerShell-Timeout"
-    output = ((completed.stdout or "") + (completed.stderr or "")).strip()
-    return completed.returncode, output
+    output = ((stdout or "") + (stderr or "")).strip()
+    return proc.returncode, output
+
+
+# Eindeutige Access-Denied-Signale (DE+EN + HRESULT) -> Admin noetig.
+# BEWUSST ENG gehalten: Korruptions-/Konflikt-Fehler (z.B. 0x80073CF9 'package could not be
+# registered', 0x80073D02 'resources are currently in use') sind NICHT Admin -> 'unklar' ->
+# Fallback. Lieber einmal zu wenig Admin melden (dann laeuft der Fallback) als faelschlich
+# (dann falsche 'als Admin neu starten'-Meldung + uebersprungener, funktionierender Fallback).
+_ACCESS_DENIED_MARKERS = (
+    "access is denied",
+    "zugriff verweigert",
+    "requires elevation",
+    "requires administrator",
+    "run as administrator",
+    "als administrator",
+    "administratorrechte",
+    "elevated permissions",
+    "unauthorizedaccess",
+    "0x80070005",  # E_ACCESSDENIED
+)
+
+
+def classify_ps_outcome(rc: int, output: str) -> str:
+    """Klassifiziere ein PowerShell-Deploy-Ergebnis (reine, testbare Funktion).
+
+    Rueckgabe: ``"ok" | "timeout" | "needs_admin" | "failed"``.
+      * ``"timeout"``     -> rc == 124 (Timeout-Sentinel aus ``default_ps_runner``).
+      * ``"needs_admin"`` -> Ausgabe enthaelt ein EINDEUTIGES Access-Denied-Signal (DE/EN/HRESULT).
+      * ``"ok"``          -> rc == 0 und kein Admin-Signal.
+      * ``"failed"``      -> alles andere (rc != 0, unklarer Fehler -> Fallback erlaubt).
+    """
+    if rc == 124:
+        return "timeout"
+    low = (output or "").lower()
+    if any(marker in low for marker in _ACCESS_DENIED_MARKERS):
+        return "needs_admin"
+    if rc == 0:
+        return "ok"
+    return "failed"
+
+
+def _raise_for_deploy(rc: int, output: str) -> None:
+    """Wirf die passende Engine-Exception fuer ein klassifiziertes Deploy-Ergebnis.
+
+    NUR auf das Ergebnis des *mutierenden* Befehls anwenden -- nicht auf interne
+    observe-Reads (sonst wuerde eine reine Beobachtung faelschlich abbrechen).
+    Bei "ok"/"failed" wird NICHT geworfen: ein sauberer, unklarer Fehlschlag bleibt 'failed'
+    und erlaubt der Engine den einen Fallback.
+    """
+    verdict = classify_ps_outcome(rc, output)
+    if verdict == "timeout":
+        raise DeployTimeout(output or "PowerShell-Timeout")
+    if verdict == "needs_admin":
+        raise AdminRequired(output or "Zugriff verweigert")
 
 
 def _coerce_list(raw: object) -> list[dict[str, object]]:
@@ -243,7 +343,9 @@ def build_live_deps(
     und leiten ihr jeweiliges Ziel selbst aus der aktuellen Lage ab -- ``RepairState``
     transportiert bewusst keine PIDs/PackageFullNames.
 
-    Es wird KEIN UAC pro Op ausgeloest: der ganze Lauf laeuft bereits elevated.
+    Es wird NIE eine Elevation/UAC ausgeloest: der Lauf nutzt die Rechte des aktuellen
+    Prozesses. Scheitert eine Deploy-Op an fehlenden Rechten, signalisiert sie das ueber
+    ``AdminRequired`` an die Engine (-> ``needs_admin`` -> 'als Administrator neu starten').
     """
     from .health import default_tree_killer, diagnose
     from .orchestrator import default_launcher
@@ -318,6 +420,8 @@ def build_live_deps(
         rc, out = runner(
             f"Add-AppxPackage -RegisterByFamilyName -MainPackage \"{family}\""
         )
+        # Fehlerart des MUTIERENDEN Befehls an die Engine durchreichen (Timeout/Admin).
+        _raise_for_deploy(rc, out)
         return out or f"RegisterByFamilyName rc={rc}"
 
     def remove_staged_version() -> str:
@@ -331,6 +435,8 @@ def build_live_deps(
 
     def reset_package() -> str:
         rc, out = runner(f"Get-AppxPackage {CODEX_PACKAGE} | Reset-AppxPackage")
+        # Fehlerart des MUTIERENDEN Befehls an die Engine durchreichen (Timeout/Admin).
+        _raise_for_deploy(rc, out)
         return out or f"Reset-AppxPackage rc={rc}"
 
     def reinstall_package() -> str:

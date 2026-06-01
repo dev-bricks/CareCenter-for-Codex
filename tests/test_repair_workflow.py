@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from codex_logdatenbank_wartung.config import MaintenanceConfig
 from codex_logdatenbank_wartung.repair_workflow import (
+    AdminRequired,
+    DeployTimeout,
     RepairDeps,
     RepairOutcome,
     RepairState,
@@ -136,8 +138,8 @@ def test_deploy_timeout_blocks_and_stops_no_further_deploy() -> None:
     assert any(step.status == "timeout" for step in out.steps)
 
 
-def test_deploy_timeout_at_late_stage_stops_immediately() -> None:
-    """STOPP-nach-Timeout gilt unabhaengig von der Stufe: Timeout bei S5 -> kein S6."""
+def test_fallback_timeout_blocks_and_stops_after_clean_s3_failure() -> None:
+    """S3 sauberer Fehlschlag -> EIN Fallback (reset); reisst der den Timeout -> blocked, STOPP."""
     deploy_calls: list[str] = []
 
     def tag(name):
@@ -149,14 +151,15 @@ def test_deploy_timeout_at_late_stage_stops_immediately() -> None:
     def rwt(fn, _secs):
         name = getattr(fn, "_tag", "?")
         deploy_calls.append(name)
-        # S3 + S4 schlagen sauber fehl (kein Stopp), S5 reisst den Timeout.
-        return ("timeout", None) if name == "S5" else ("failed", None)
+        # S3 schlaegt sauber fehl (kein Stopp) -> Fallback (reset); der reisst den Timeout.
+        return ("timeout", None) if name == "reset" else ("failed", None)
 
     deps = RepairDeps(
         observe=observe_const(RepairState(staged_update=True)),
         complete_staged_update=tag("S3"),
+        reset_package=tag("reset"),
+        # diese werden vom begrenzten Workflow NICHT mehr aufgerufen:
         remove_staged_version=tag("S4"),
-        reset_package=tag("S5"),
         reinstall_package=tag("S6"),
         launch_codex=lambda: None,
         renderer_appears=lambda _t: False,
@@ -165,21 +168,31 @@ def test_deploy_timeout_at_late_stage_stops_immediately() -> None:
     out = run_repair(make_config(), deps)
     assert out.status == "blocked"
     assert out.recommend_reboot is True
-    # S6 darf nach dem S5-Timeout NICHT mehr feuern.
-    assert deploy_calls == ["S3", "S4", "S5"]
+    # Genau S3 dann EIN Fallback -- KEINE weitere Deploy-Op (S4/S6 entfallen).
+    assert deploy_calls == ["S3", "reset"]
     assert out.steps[-1].status == "timeout"
 
 
-def test_clean_failures_cascade_to_s7_reboot() -> None:
-    deploy_calls: list[object] = []
+def test_clean_failures_s3_and_fallback_then_abort_reboot() -> None:
+    deploy_calls: list[str] = []
+
+    def tag(name):
+        def f():
+            return None
+        f._tag = name  # type: ignore[attr-defined]
+        return f
 
     def rwt_fail(fn, _secs):
-        deploy_calls.append(fn)
+        deploy_calls.append(getattr(fn, "_tag", "?"))
         return ("failed", RuntimeError("kein timeout"))
 
     deps = RepairDeps(
-        observe=observe_const(RepairState(staged_update=True, clipsvc_running=False)),
+        observe=observe_const(RepairState(clipsvc_running=False)),
         ensure_clipsvc=lambda: None,
+        complete_staged_update=tag("S3"),
+        reset_package=tag("reset"),
+        remove_staged_version=tag("S4"),
+        reinstall_package=tag("S6"),
         launch_codex=lambda: None,
         renderer_appears=lambda _t: False,
         run_with_timeout=rwt_fail,
@@ -187,13 +200,14 @@ def test_clean_failures_cascade_to_s7_reboot() -> None:
     out = run_repair(make_config(), deps)
     assert out.status == "failed"
     assert out.recommend_reboot is True
-    # Saubere Fehlschlaege sind KEIN Stopp: S3, S4, S5, S6 werden alle versucht.
-    assert len(deploy_calls) == 4
-    assert out.steps[-1].name == "S7"
+    assert out.needs_admin is False
+    # Saubere Fehlschlaege: genau S3 + EIN Fallback (reset), dann Abbruch -- KEINE Volleskalation.
+    assert deploy_calls == ["S3", "reset"]
+    assert out.steps[-1].name == "Abschluss"
 
 
-def test_s5_reset_succeeds_after_clean_failures() -> None:
-    appears = iter_appears([False, True])  # S1-Check fail, danach S5-Start gelingt
+def test_s3_clean_success_launches() -> None:
+    appears = iter_appears([False, True])  # S1-Check fail, danach S3-Start gelingt
 
     def rwt_ok(fn, _secs):
         return ("ok", "done")
@@ -209,11 +223,99 @@ def test_s5_reset_succeeds_after_clean_failures() -> None:
     assert out.reached_window is True
 
 
+def test_fallback_reset_succeeds_after_clean_s3_failure() -> None:
+    """S3 sauberer Fehlschlag, Codex startet nicht -> Fallback reset -> Renderer -> ok."""
+    appears = iter_appears([False, False, True])  # S1-Check, S3-Check fail; Fallback-Check ok
+
+    def tag(name):
+        def f():
+            return None
+        f._tag = name  # type: ignore[attr-defined]
+        return f
+
+    def rwt(fn, _secs):
+        name = getattr(fn, "_tag", "?")
+        return ("ok", "reset done") if name == "reset" else ("failed", None)
+
+    deps = RepairDeps(
+        observe=observe_const(RepairState()),
+        complete_staged_update=tag("S3"),
+        reset_package=tag("reset"),
+        launch_codex=lambda: None,
+        renderer_appears=appears,
+        run_with_timeout=rwt,
+    )
+    out = run_repair(make_config(), deps)
+    assert out.status == "ok"
+    assert out.reached_window is True
+
+
+def test_s3_access_denied_aborts_with_needs_admin_no_fallback() -> None:
+    """Access Denied bei S3 -> sofort needs_admin, KEIN Fallback (scheitert aus demselben Grund).
+
+    Der gefakte run_with_timeout faengt NICHT (nur das echte _default_run_with_timeout tut das)
+    -> Admin-Fehler als Exception-INSTANZ im ('failed', exc)-Kanal liefern (advisor-Konvention).
+    """
+    deploy_calls: list[str] = []
+
+    def tag(name):
+        def f():
+            return None
+        f._tag = name  # type: ignore[attr-defined]
+        return f
+
+    def rwt(fn, _secs):
+        deploy_calls.append(getattr(fn, "_tag", "?"))
+        return ("failed", AdminRequired("Add-AppxPackage: Access is denied"))
+
+    deps = RepairDeps(
+        observe=observe_const(RepairState()),
+        complete_staged_update=tag("S3"),
+        reset_package=tag("reset"),
+        launch_codex=lambda: None,
+        renderer_appears=lambda _t: False,
+        run_with_timeout=rwt,
+    )
+    out = run_repair(make_config(), deps)
+    assert out.status == "failed"
+    assert out.needs_admin is True
+    assert out.recommend_reboot is False  # Reboot hilft bei Admin-Problem NICHT
+    assert deploy_calls == ["S3"]  # KEIN Fallback nach Admin-Fehler
+
+
+def test_s3_deploy_timeout_instance_blocks_no_fallback() -> None:
+    """rc=124 kommt als DeployTimeout-Instanz durch den ('failed', exc)-Kanal -> blocked, kein Fallback."""
+    deploy_calls: list[str] = []
+
+    def rwt(fn, _secs):
+        deploy_calls.append("call")
+        return ("failed", DeployTimeout("PowerShell-Timeout"))
+
+    deps = RepairDeps(
+        observe=observe_const(RepairState()),
+        complete_staged_update=lambda: None,
+        reset_package=lambda: None,
+        launch_codex=lambda: None,
+        renderer_appears=lambda _t: False,
+        run_with_timeout=rwt,
+    )
+    out = run_repair(make_config(), deps)
+    assert out.status == "blocked"
+    assert out.recommend_reboot is True
+    assert out.needs_admin is False
+    assert deploy_calls == ["call"]  # kein Fallback nach Timeout
+
+
 # ---------------------------------------------------------------------------
-# Gating der gezielten Deploy-Ops
+# Begrenzte Eskalation: destruktive/aggressive Ops entfallen ganz
 # ---------------------------------------------------------------------------
 
-def test_targeted_deploys_skipped_when_no_staged_update() -> None:
+def test_remove_and_reinstall_are_never_called() -> None:
+    """S4 (remove, destruktiv) + S6 (reinstall) werden vom begrenzten Workflow NIE aufgerufen.
+
+    Frueher loesten staged_update bzw. die Catch-all-Stufen diese aus -- genau sie stapelten
+    weitere haengende PowerShell-Deploy-Ops. Jetzt: nur S3 + EIN Fallback (reset).
+    """
     deploy_calls: list[str] = []
 
     def rwt(fn, _secs):
@@ -227,21 +329,20 @@ def test_targeted_deploys_skipped_when_no_staged_update() -> None:
         return f
 
     deps = RepairDeps(
-        observe=observe_const(RepairState()),  # nichts gestaged
+        observe=observe_const(RepairState(staged_update=True)),  # frueher haette das S4 getriggert
         complete_staged_update=tag("S3"),
         remove_staged_version=tag("S4"),
-        reset_package=tag("S5"),
+        reset_package=tag("reset"),
         reinstall_package=tag("S6"),
         launch_codex=lambda: None,
         renderer_appears=lambda _t: False,
         run_with_timeout=rwt,
     )
     out = run_repair(make_config(), deps)
-    # S3 ist bewusst UNGATED (sanfter Register-Versuch immer) und steht vor jedem Reset;
-    # S4 ist nicht anwendbar (kein staged Update); S5/S6 sind Catch-all.
-    assert deploy_calls == ["S3", "S5", "S6"]
-    skipped = {s.name for s in out.steps if s.status == "skipped"}
-    assert "S4 Ueberschuss-Version entfernen" in skipped
+    assert "S4" not in deploy_calls
+    assert "S6" not in deploy_calls
+    assert deploy_calls == ["S3", "reset"]
+    assert out.status == "failed"
 
 
 # ---------------------------------------------------------------------------

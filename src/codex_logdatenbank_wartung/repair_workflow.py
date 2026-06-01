@@ -51,6 +51,37 @@ TimeoutStatus = Literal["ok", "timeout", "failed"]
 ProgressFn = Callable[["RepairStepResult"], None]
 
 
+# ---------------------------------------------------------------------------
+# Fehlerart-Signale der Deploy-Ops
+#
+# Die LIVE-Deploy-Callables (repair_live) klassifizieren das Ergebnis ihres
+# *mutierenden* PowerShell-Befehls und werfen bei eindeutiger Fehlerart eine dieser
+# Exceptions. Sie reisen durch ``_default_run_with_timeout`` (das jeden Fehler zu
+# ('failed', exc) faengt) und werden in ``run_deploy`` per ``isinstance`` ausgewertet.
+# So bleibt die Engine PowerShell-unwissend und trotzdem "intelligent" gegenueber der
+# Fehlerart (User-Wunsch 2026-06-01: erkennt Fehlerart -> klar Admin -> Admin-Meldung,
+# unklar -> ein Fallback).
+# ---------------------------------------------------------------------------
+
+class DeployTimeout(Exception):
+    """Eine Deploy-Op riss den (PowerShell-)Timeout -> AppX-Engine gilt als verklemmt.
+
+    Folge in der Engine: sofortiger Abbruch, ``status='blocked'``, ``recommend_reboot``.
+    Ein Tree-Kill (repair_live) verhindert neue Orphan-Kinder, HEILT aber keine verklemmte
+    AppX-Engine (die delegiert an den AppXSVC-Dienst) -- nur ein Reboot tut das.
+    """
+
+
+class AdminRequired(Exception):
+    """Eine Deploy-Op scheiterte EINDEUTIG an fehlenden Admin-Rechten (Access Denied).
+
+    Folge in der Engine: sofortiger Abbruch, ``status='failed'`` + ``needs_admin=True``.
+    KEIN Fallback -- der wuerde aus demselben Grund scheitern (User-Logik 2026-06-01).
+    Es wird NIE eine Selbst-Elevation (UAC) ausgeloest; stattdessen meldet der Aufrufer
+    dem User: 'als Administrator neu starten'.
+    """
+
+
 class CodexState(Protocol):
     """Beobachteter Codex-Zustand (read-only Momentaufnahme).
 
@@ -114,6 +145,11 @@ class RepairOutcome:
     # nichts registrieren/zuruecksetzen kann -> Neuinstallation aus dem Microsoft Store
     # noetig (ein Reboot hilft NICHT). Der Tray bietet daraufhin die Store-Reinstallation an.
     needs_store_reinstall: bool = False
+    # True, wenn eine Deploy-Op EINDEUTIG an fehlenden Admin-Rechten scheiterte (Access Denied).
+    # Die App elevatet sich NIE selbst (kaputter UAC-Pfad verklemmte frueher den Appinfo-Dienst);
+    # stattdessen meldet der Tray: 'CareCenter braucht fuer die Reparatur Admin-Rechte -- starte
+    # die App neu mit Admin-Rechten.' Ein Reboot hilft hier NICHT (recommend_reboot bleibt False).
+    needs_admin: bool = False
 
     def add(self, name: str, status: StepStatus, message: str) -> RepairStepResult:
         step = RepairStepResult(name, status, message)
@@ -131,6 +167,8 @@ class RepairOutcome:
         ]
         if self.needs_store_reinstall:
             lines.append("Store-Neuinstallation noetig: True (Paket abwesend -- Reboot hilft NICHT)")
+        if self.needs_admin:
+            lines.append("Admin-Rechte noetig: True (App als Administrator neu starten -- Reboot hilft NICHT)")
         lines.append("Schritte:")
         if self.steps:
             for step in self.steps:
@@ -265,23 +303,36 @@ def run_repair(
     dry_run: bool = False,
     progress: ProgressFn | None = None,
 ) -> RepairOutcome:
-    """Volle, hang-sichere Eskalation, bis ein Codex-Renderer erscheint.
+    """Begrenzte, hang-sichere Reparatur: 1 sanfter Kern-Versuch + maximal 1 Fallback.
 
-    Reihenfolge (billig+sicher zuerst, aggressiv spaet):
-      S1  Ghosts beenden + verwaistes Lockfile entfernen        (sofort/sicher)
-      S2  ClipSVC sicherstellen
-      S3  staged Update abschliessen (sanft, IMMER)  [Deploy-Op -> run_with_timeout]
-      S4  Ueberschuss-Version entfernen (nur bei staged) [Deploy-Op -> run_with_timeout]
-      S5  reset_package (aggressiv)                  [Deploy-Op -> run_with_timeout]
-      S6  reinstall_package (aggressivste)           [Deploy-Op -> run_with_timeout]
-      S7  alles erschoepft -> recommend_reboot
+    Bewusste UMKEHR der frueheren 'voll ausschoepfen S1-S7'-Philosophie (User 2026-06-01):
+    KEINE endlose Eskalation mehr, die bei verklemmter AppX-Engine reihenweise haengende
+    PowerShell-Deploy-Ops stapelte.
 
-    Nach jeder fixenden Stufe wird ``launch_codex()`` ausgeloest und
-    ``renderer_appears(renderer_timeout)`` geprueft; bei Erfolg sofort ``status='ok'``.
+    Reihenfolge:
+      S1  Ghosts beenden + verwaistes Lockfile entfernen   (sofort/sicher, KEIN Admin)
+      S2  ClipSVC sicherstellen                            (best effort -- bricht NIE ab)
+      S3  staged Update abschliessen (RegisterByFamilyName, sanft)  [Deploy-Op, timeboxed]
+      FB  genau EIN Fallback = reset_package                        [Deploy-Op, timeboxed]
+          -- nur wenn S3 sauber durchlief, aber Codex trotzdem nicht startet.
 
-    Reisst eine Deploy-Op den Timeout -> ``status='blocked'``, ``recommend_reboot=True``,
-    sofortiger Abbruch, KEINE weitere Deploy-Op (iatrogener Wedge-Schutz).
-    Ein sauberer Fehlschlag (kein Timeout) ist KEIN Stopp -> naechste Stufe.
+    Nach S1/S2/S3/FB wird ``launch_codex()`` ausgeloest und ``renderer_appears`` geprueft;
+    bei Erfolg sofort ``status='ok'``.
+
+    INTELLIGENTE Fehlerart-Behandlung pro Deploy-Op (siehe ``run_deploy``):
+      * Timeout/Hang  -> AppX-Engine verklemmt -> ``status='blocked'``, ``recommend_reboot``,
+                         sofortiger Abbruch (keine weitere Deploy-Op -- auch kein Fallback,
+                         der wuerde genauso haengen).
+      * Access Denied -> ``status='failed'`` + ``needs_admin`` -> sofortiger Abbruch, KEIN
+                         Fallback (scheitert aus demselben Grund). Es wird NIE selbst elevated;
+                         der Aufrufer meldet 'als Administrator neu starten'.
+      * sauberer Fehlschlag / Op-ok-aber-kein-Renderer -> EIN Fallback (reset_package).
+    Schlaegt auch der Fallback fehl (ohne Timeout/Admin) -> ``status='failed'``,
+    ``recommend_reboot`` -> ehrlicher Abbruch.
+
+    S4 (remove_staged_version, destruktiv) und S6 (reinstall_package) werden NICHT mehr
+    automatisch durchlaufen -- genau diese stapelten frueher weitere Zombie-PowerShells.
+    Die Deps bleiben fuer gezielte/manuelle Nutzung erhalten.
 
     Planungsmodus (``dry_run=True`` ODER ``execute=False``): jede Stufe wird nur
     aufgelistet, kein Dep ausser ``observe`` wird aufgerufen.
@@ -343,12 +394,19 @@ def run_repair(
             return True
         return False
 
-    # Eine Deploy-Op timeboxed ausfuehren. Rueckgabe:
-    #   True  -> Timeout gerissen (Engine verklemmt) -> Aufrufer MUSS sofort returnen.
-    #   False -> sauberer Erfolg ODER sauberer Fehlschlag -> naechste Stufe erlaubt.
-    def run_deploy(stage: str, fn: Callable[[], object]) -> bool:
+    # Eine Deploy-Op timeboxed ausfuehren UND die Fehlerart klassifizieren.
+    # Rueckgabe (vom Aufrufer ausgewertet):
+    #   "ok"          -> Op lief sauber durch -> Renderer pruefen, sonst Fallback erlaubt.
+    #   "timeout"     -> Hang (aeusserer Thread-Timeout ODER DeployTimeout aus rc=124):
+    #                    Engine verklemmt -> outcome.blocked + recommend_reboot -> SOFORT returnen.
+    #   "needs_admin" -> AdminRequired (Access Denied): outcome.failed + needs_admin
+    #                    -> SOFORT returnen, KEIN Fallback (scheitert aus demselben Grund).
+    #   "failed"      -> sauberer, unklarer Fehlschlag -> Renderer pruefen, sonst Fallback erlaubt.
+    def run_deploy(stage: str, fn: Callable[[], object]) -> str:
         status, result = deps.run_with_timeout(fn, deploy_timeout)
-        if status == "timeout":
+        # Hang: aeusserer Thread-Timeout ('timeout', None) ODER innerer PS-Timeout, der als
+        # DeployTimeout-Instanz durch den ('failed', exc)-Kanal kam.
+        if status == "timeout" or isinstance(result, DeployTimeout):
             record(
                 stage,
                 "timeout",
@@ -357,13 +415,23 @@ def run_repair(
             )
             outcome.status = "blocked"
             outcome.recommend_reboot = True
-            return True
+            return "timeout"
+        if isinstance(result, AdminRequired):
+            record(
+                stage,
+                "failed",
+                "Deploy-Op scheiterte an fehlenden Admin-Rechten (Zugriff verweigert). STOPP: "
+                "kein Fallback -- App als Administrator neu starten.",
+            )
+            outcome.status = "failed"
+            outcome.needs_admin = True
+            return "needs_admin"
         if status == "ok":
             detail = f" {result}" if result else ""
             record(stage, "ok", f"Deploy-Op abgeschlossen.{detail}".rstrip())
-        else:
-            record(stage, "failed", f"Deploy-Op fehlgeschlagen (kein Timeout): {result}")
-        return False
+            return "ok"
+        record(stage, "failed", f"Deploy-Op fehlgeschlagen (kein Timeout): {result}")
+        return "failed"
 
     # --- S1: Ghosts beenden + verwaistes Lockfile (sofort/sicher) -----------
     did_s1 = False
@@ -390,46 +458,33 @@ def run_repair(
     else:
         record("S2 ClipSVC", "skipped", "ClipSVC laeuft bereits.")
 
-    # --- S3: staged Update abschliessen [DEPLOY-OP] ------------------------
-    # Bewusst UNGATED (immer versucht, timeboxed): RegisterByFamilyName ist die
-    # *sanfte*, historisch korrekte Behebung des staged-Wedge -- sie registriert nur
-    # neu, setzt nichts zurueck. Sie steht VOR jedem reset_package (S5). Damit ist die
-    # Engine robust gegen einen mis-detektierenden Observer (der den staged-Wedge ggf.
-    # nicht erkennt): die gefaehrliche Reset-Stufe wird nie erreicht, ohne dass zuvor
-    # der gefahrlose Register-Versuch lief.
-    if run_deploy("S3 staged Update abschliessen", deps.complete_staged_update):
-        return outcome  # Timeout -> Engine verklemmt -> STOPP
+    # --- S3: sanftes RegisterByFamilyName (Kern-Deploy, immer timeboxed) ----
+    # RegisterByFamilyName registriert nur neu, setzt nichts zurueck -- die sanfte,
+    # historisch korrekte Behebung des staged-Wedge. Bewusst UNGATED (auch ohne erkannten
+    # staged-Wedge versucht): robust gegen einen mis-detektierenden Observer.
+    s3 = run_deploy("S3 staged Update abschliessen", deps.complete_staged_update)
+    if s3 in ("timeout", "needs_admin"):
+        return outcome  # Engine verklemmt bzw. Admin noetig -> Abbruch (KEIN Fallback)
     if launched_ok("S3 Start-Check"):
         return outcome
 
-    # --- S4: gestagte Ueberschuss-Version entfernen [DEPLOY-OP] -------------
-    state = deps.observe()
-    if state.staged_update:
-        if run_deploy("S4 Ueberschuss-Version entfernen", deps.remove_staged_version):
-            return outcome
-        if launched_ok("S4 Start-Check"):
-            return outcome
-    else:
-        record("S4 Ueberschuss-Version entfernen", "skipped", "Keine gestagte Ueberschuss-Version.")
-
-    # --- S5: reset_package [DEPLOY-OP, aggressiv -> spaet] ------------------
-    # Catch-all: Vorbedingung ist nur "Renderer erschien bis hier nicht".
-    if run_deploy("S5 reset_package", deps.reset_package):
+    # --- Fallback: genau EINE andere Methode = reset_package [DEPLOY-OP] -----
+    # Nur erreicht, wenn S3 sauber durchlief/fehlschlug (KEIN Timeout, KEIN Admin-Problem),
+    # Codex aber trotzdem nicht startet. Reset-AppxPackage ist die 'andere Methode'
+    # (setzt das Paket auf einen sauberen Zustand zurueck). Reisst sie den Timeout oder
+    # scheitert sie an Admin -> Abbruch mit passender Meldung (kein weiterer Versuch).
+    fb = run_deploy("Fallback reset_package", deps.reset_package)
+    if fb in ("timeout", "needs_admin"):
         return outcome
-    if launched_ok("S5 Start-Check"):
+    if launched_ok("Fallback Start-Check"):
         return outcome
 
-    # --- S6: reinstall_package [DEPLOY-OP, aggressivste Stufe] --------------
-    if run_deploy("S6 reinstall_package", deps.reinstall_package):
-        return outcome
-    if launched_ok("S6 Start-Check"):
-        return outcome
-
-    # --- S7: alles erschoepft, ohne Timeout -> Reboot empfehlen -------------
+    # --- Erschoepft (ohne Timeout/Admin): ehrlicher Abbruch, Reboot empfehlen --
     record(
-        "S7",
+        "Abschluss",
         "failed",
-        "Alle Eskalationsstufen erschoepft, Codex-Renderer erschien nicht. Reboot empfohlen.",
+        "S3 (sanftes Re-Register) und Fallback (reset_package) erschoepft, Codex-Renderer "
+        "erschien nicht. Reboot empfohlen (bei wiederkehrendem Problem: Store-Neuinstallation).",
     )
     outcome.status = "failed"
     outcome.recommend_reboot = True
@@ -453,16 +508,18 @@ def _plan_only(
         s1_needed,
         f"Ghosts {state.ghost_pids or 'keine'}, verwaistes Lockfile={state.stale_lockfile}.",
     )
-    plan("S2 ClipSVC", not state.clipsvc_running, "ClipSVC sicherstellen.")
+    plan("S2 ClipSVC", not state.clipsvc_running, "ClipSVC sicherstellen (best effort, bricht nie ab).")
     plan("S3 staged Update abschliessen", True, "RegisterByFamilyName (sanft, immer, timeboxed).")
     plan(
-        "S4 Ueberschuss-Version entfernen",
-        state.staged_update,
-        "Ueberschuss-Staged entfernen (timeboxed).",
+        "Fallback reset_package",
+        True,
+        "Reset-AppxPackage -- genau EIN Fallback, nur falls S3 sauber durchlief, aber Codex nicht startet (timeboxed).",
     )
-    plan("S5 reset_package", True, "Reset-AppxPackage (timeboxed, aggressiv -> spaet).")
-    plan("S6 reinstall_package", True, "Neuinstallation (timeboxed, aggressivste Stufe).")
-    plan("S7 Reboot", True, "Falls alles erschoepft: Reboot empfehlen.")
+    plan(
+        "Abschluss",
+        True,
+        "Falls S3 + Fallback erschoepft: Reboot empfehlen. Bei Timeout -> Reboot, bei Access Denied -> als Admin neu starten.",
+    )
     outcome.status = "ok"  # Planung selbst ist erfolgreich (nichts ausgefuehrt).
     return outcome
 
