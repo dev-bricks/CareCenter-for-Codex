@@ -14,11 +14,8 @@ Zwei Modi (ein Tray):
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
-import subprocess
 import sys
-import tempfile
 from typing import Callable
 
 from PySide6.QtCore import QObject, Qt, QThread, QTimer, Signal
@@ -41,7 +38,6 @@ from PySide6.QtWidgets import (
 from .config import MaintenanceConfig
 from .health import RepairResult, diagnose, repair_start
 from .orchestrator import AutoMaintainResult, AutoProgress, auto_maintain
-from .processes import no_window_kwargs
 from .single_instance import SingleInstanceGuard
 from .store_repair import StoreRepairResult, open_store_page, repair_store_codex
 from .watchdog import run_watchdog_tick
@@ -120,164 +116,35 @@ class StoreRepairWorker(QObject):
         self.finished.emit(result)
 
 
-def _resolve_python_and_src() -> Path | None:
-    """Ermittle das ``src``-Verzeichnis fuer die elevated CLI-Ausfuehrung.
-
-    Im Dev-Layout liegt ``src`` als ``parents[1]`` zu dieser Datei. In der gefrorenen
-    PyInstaller-EXE zeigt ``__file__`` aber in den fluechtigen ``_MEIPASS``-Tempordner --
-    dort gibt es kein nutzbares ``src``. Dann wird der echte Quellbaum neben der EXE bzw.
-    am bekannten Projektpfad gesucht. Rueckgabe ``None``, wenn kein gueltiges ``src``
-    (mit dem Paketordner) gefunden wird -- der Aufrufer meldet das sauber, statt zu crashen.
-    """
-    import os
-
-    candidates: list[Path] = []
-    if getattr(sys, "frozen", False):
-        # Gefrorene EXE: echtes src NICHT im _MEIPASS, sondern im Projektbaum suchen.
-        exe_dir = Path(sys.executable).resolve().parent
-        candidates.append(exe_dir / "src")
-        candidates.append(exe_dir.parent / "src")
-        # Optionaler Override fuer beliebige Installationsorte (kein hartcodierter Pfad im Code).
-        env_src = os.environ.get("CARECENTER_SRC_DIR")
-        if env_src:
-            candidates.append(Path(env_src))
-    else:
-        candidates.append(Path(__file__).resolve().parents[1])
-
-    for candidate in candidates:
-        if (candidate / "codex_logdatenbank_wartung" / "cli.py").exists():
-            return candidate
-    return None
-
-
-def _write_elevation_script(script_path: Path, src_dir: Path, config_path: Path, out_path: Path) -> None:
-    """Schreibe ein eigenstaendiges .ps1, das die volle Reparatur elevated ausfuehrt.
-
-    Bewusst eine separate Skript-Datei statt verschachtelter ``-Command``-Strings: so
-    gibt es nur EINE Ausfuehrungsebene und KEINE doppelte ``$``-Expansion (die Variante
-    mit verschachteltem ``& { ... }`` im ``-ArgumentList`` expandiert ``$env:PYTHONPATH``
-    bereits im aeusseren Shell und zerbricht). Einfachquotes um Windows-Pfade sind literal.
-    """
-    content = (
-        f"$env:PYTHONPATH = '{src_dir}'\n"
-        f"& python -m codex_logdatenbank_wartung.cli "
-        f"--config '{config_path}' repair --execute --out '{out_path}'\n"
-    )
-    script_path.write_text(content, encoding="utf-8")
-
-
-def _elevation_launch_args(script_path: Path) -> list[str]:
-    """Argumente fuer das aeussere PowerShell, das das .ps1 mit EINEM UAC elevated startet."""
-    return [
-        "-NoProfile",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-Command",
-        (
-            "Start-Process powershell -Verb RunAs -Wait -WindowStyle Hidden "
-            f"-ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File','{script_path}')"
-        ),
-    ]
-
-
-def _parse_repair_out(out_path: Path) -> dict[str, object] | None:
-    """Lies die JSONL-Out-Datei und liefere das vollstaendige Ergebnis (letzte Zeile).
-
-    Die letzte Zeile MUSS das vollstaendige Outcome (mit ``status`` und ``steps``) sein.
-    Ist die Datei leer oder die letzte Zeile nur ein Einzelschritt (UAC abgelehnt /
-    elevated Prozess vorzeitig beendet), wird ``None`` zurueckgegeben -> 'unterbrochen'.
-    """
-    try:
-        lines = [line for line in out_path.read_text(encoding="utf-8").splitlines() if line.strip()]
-    except OSError:
-        return None
-    if not lines:
-        return None
-    try:
-        data = json.loads(lines[-1])
-    except json.JSONDecodeError:
-        return None
-    if isinstance(data, dict) and "status" in data and "steps" in data:
-        return data
-    return None
-
-
 class FullRepairWorker(QObject):
-    """Startet die volle Reparatur ELEVATED (ein UAC) und tailt die Out-Datei live."""
+    """Volle Reparatur direkt im Prozess — keine Elevation nötig."""
 
-    progress = Signal(str)  # Stufentext (eine Zeile pro neuer Stufe)
-    finished = Signal(object)  # dict (Outcome) oder None (unterbrochen)
+    progress = Signal(str)
+    finished = Signal(object)
 
     def __init__(self, config_path: Path) -> None:
         super().__init__()
         self.config_path = config_path
-        self._stop = False
 
     def run(self) -> None:
-        import os
-        from time import sleep
+        from .repair_live import run_live_repair
 
-        # Voraussetzung: nutzbares src-Verzeichnis (Dev oder echter Quellbaum neben der EXE).
-        src_dir = _resolve_python_and_src()
-        if src_dir is None:
-            self.progress.emit(
-                "[failed] Voraussetzung: Quellverzeichnis (src) der Reparatur-CLI nicht gefunden."
-            )
+        try:
+            config = MaintenanceConfig.load(self.config_path)
+        except Exception as exc:  # noqa: BLE001
+            self.progress.emit(f"[failed] Config: {exc}")
             self.finished.emit(None)
             return
 
-        # mkstemp legt eine leere Datei an; sie dient als Out-Pfad fuers Tailing.
-        out_fd, out_name = tempfile.mkstemp(prefix="codex-repair-", suffix=".jsonl")
-        os.close(out_fd)
-        out_path = Path(out_name)
+        def on_step(step: object) -> None:
+            self.progress.emit(f"[{step.status}] {step.name}: {step.message}")
 
-        # Eigenstaendiges Elevation-Skript schreiben (keine verschachtelte $-Expansion).
-        script_fd, script_name = tempfile.mkstemp(prefix="codex-repair-", suffix=".ps1")
-        os.close(script_fd)
-        script_path = Path(script_name)
-        _write_elevation_script(script_path, src_dir, self.config_path, out_path)
-
-        args = _elevation_launch_args(script_path)
         try:
-            # Elevated-Lauf starten; parallel die Out-Datei tailen.
-            proc = subprocess.Popen(
-                ["powershell", *args],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                **no_window_kwargs(),
-            )
-
-            seen = 0
-            while proc.poll() is None:
-                seen = self._emit_new_steps(out_path, seen)
-                sleep(1.0)
-            # Letzte Stufen nach Prozessende noch einsammeln.
-            self._emit_new_steps(out_path, seen)
-
-            outcome = _parse_repair_out(out_path)
-        finally:
-            for path in (out_path, script_path):
-                try:
-                    path.unlink()
-                except OSError:
-                    pass
-        self.finished.emit(outcome)
-
-    def _emit_new_steps(self, out_path: Path, seen: int) -> int:
-        """Neue, noch nicht gemeldete Zeilen als Stufentext emittieren. Gibt neuen Stand zurueck."""
-        try:
-            lines = [line for line in out_path.read_text(encoding="utf-8").splitlines() if line.strip()]
-        except OSError:
-            return seen
-        for line in lines[seen:]:
-            try:
-                payload = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            # Outcome-Zeile (status+steps) NICHT als Einzelstufe melden.
-            if isinstance(payload, dict) and "name" in payload and "status" in payload and "steps" not in payload:
-                self.progress.emit(f"[{payload.get('status')}] {payload.get('name')}: {payload.get('message')}")
-        return len(lines)
+            outcome = run_live_repair(config, execute=True, progress=on_step)
+            self.finished.emit(outcome.to_dict())
+        except Exception as exc:  # noqa: BLE001
+            self.progress.emit(f"[failed] Reparatur: {exc}")
+            self.finished.emit(None)
 
 
 class WatchdogWorker(QObject):
@@ -523,9 +390,9 @@ class StatusWindow(QWidget):
         repair_row = QHBoxLayout()
         self.repair_button = QPushButton("Codex reparieren")
         self.repair_button.setToolTip(
-            "Eskalationskette: erst hängende Reste entfernen (ohne Admin), nur wenn nötig "
-            "elevated weiter (ClipSVC, Store-Update, Reset, Reinstall). Stoppt, sobald Codex "
-            "startet. Schlägt bei Bedarf Reboot oder Store-Neuinstallation vor."
+            "Eskalationskette: hängende Reste entfernen, Store-Update, Reset, Reinstall. "
+            "Stoppt, sobald Codex startet. Schlägt bei Bedarf Reboot oder "
+            "Store-Neuinstallation vor."
         )
         self.repair_button.clicked.connect(self.request_codex_repair)
         self.diagnose_button = QPushButton("Diagnose")
@@ -701,8 +568,8 @@ class TrayController(QObject):
         self.maintenance_action.triggered.connect(self.show_window)
         self.repair_action = QAction("Codex reparieren")
         self.repair_action.setToolTip(
-            "Eine Eskalationskette: erst hängende Reste entfernen (ohne Admin), nur wenn nötig "
-            "elevated weiter, Stopp sobald Codex startet. Schlägt bei Bedarf Reboot oder "
+            "Eskalationskette: hängende Reste entfernen, Store-Update, Reset, Reinstall. "
+            "Stopp sobald Codex startet. Schlägt bei Bedarf Reboot oder "
             "Store-Neuinstallation vor."
         )
         self.repair_action.triggered.connect(self.run_codex_repair)
@@ -893,7 +760,7 @@ class TrayController(QObject):
         if outcome == "escalate":
             # Leichte Stufe genügte nicht -> elevated Vollstufe automatisch anschließen.
             self.running = False  # run_full_repair verwaltet seinen eigenen Lauf-Zustand
-            self.window.set_state("Eskaliere — bitte UAC bestätigen …")
+            self.window.set_state("Eskaliere zur vollen Reparatur …")
             self.window.set_result(message)
             self.run_full_repair()
             return
@@ -1049,13 +916,13 @@ class TrayController(QObject):
             return
         self.running = True
         self.window.set_running(True)
-        self.window.set_state("Volle Reparatur läuft (elevated) …")
-        self.window.set_progress(0, "UAC bestätigen — danach läuft die volle Eskalation …", True)
+        self.window.set_state("Volle Reparatur läuft …")
+        self.window.set_progress(0, "Volle Eskalation läuft …", True)
         self.window.set_result("")
         self.show_window()
         self.tray.showMessage(
             "Codex-Start-Reparatur (voll)",
-            "Bitte den UAC-Prompt bestätigen. Danach läuft die volle Eskalation automatisch.",
+            "Volle Eskalation gestartet.",
             QSystemTrayIcon.MessageIcon.Information, 5000,
         )
 
@@ -1087,13 +954,13 @@ class TrayController(QObject):
         if not isinstance(outcome, dict):
             self.window.set_state("Reparatur unterbrochen")
             self.window.set_result(
-                "Die Reparatur wurde unterbrochen (UAC abgelehnt oder vorzeitig beendet). "
+                "Die Reparatur wurde unterbrochen oder ist fehlgeschlagen. "
                 "Bitte erneut versuchen."
             )
             self.tray.setToolTip("CareCenter: Reparatur unterbrochen")
             self.tray.showMessage(
                 "Codex-Start-Reparatur (voll)",
-                "Reparatur unterbrochen (UAC abgelehnt oder vorzeitig beendet).",
+                "Reparatur unterbrochen.",
                 QSystemTrayIcon.MessageIcon.Warning, 7000,
             )
             return
