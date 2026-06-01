@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.1 - 2026-06-01
+
+- Added a project-local **Windows Store groundwork** path: new `PORTIERUNGSPLAN.md`,
+  `store_package.json`, `STORE_LISTING.md`, `PRIVACY_POLICY.md`, and `SUPPORT.md`.
+- Added `store_release.py` plus CLI command
+  `python -m codex_logdatenbank_wartung.cli store-materials` to validate Store
+  materials, expected EXE naming, and missing public URLs before MSIX/WACK work.
+- Added regression tests for Store material validation (`tests/test_store_release.py`)
+  and CLI coverage for the new command.
+
 ## 0.6.0 - 2026-05-30
 
 - **Renamed to "CareCenter for Codex"** (brand-first; "Codex" used only as a nominative

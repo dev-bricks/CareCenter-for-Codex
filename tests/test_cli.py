@@ -48,3 +48,22 @@ def test_main_sets_language_from_config(tmp_path: Path) -> None:
 
     assert get_language() == "en"
     set_language("de")
+
+
+def test_store_materials_command_returns_warning_for_missing_files(tmp_path: Path, capsys) -> None:
+    cfg = tmp_path / "config.json"
+    cfg.write_text("{}", encoding="utf-8")
+
+    rc = main(
+        [
+            "--config",
+            str(cfg),
+            "store-materials",
+            "--project-root",
+            str(tmp_path),
+        ]
+    )
+
+    assert rc == 1
+    out = capsys.readouterr().out
+    assert "Store-Materialien" in out

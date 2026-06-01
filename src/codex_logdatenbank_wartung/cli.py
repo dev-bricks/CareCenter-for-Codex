@@ -102,6 +102,15 @@ def cmd_store_repair(args: argparse.Namespace) -> int:
     return {"ok": 0, "dry-run": 0, "failed": 1}.get(result.status, 0)
 
 
+def cmd_store_materials(args: argparse.Namespace) -> int:
+    from .store_release import validate_store_materials
+
+    exe_path = Path(args.exe_path) if args.exe_path else None
+    report = validate_store_materials(project_root=Path(args.project_root), exe_path=exe_path)
+    print(report.to_text())
+    return {"ok": 0, "warning": 2, "failed": 1}[report.status]
+
+
 def _persist_repair_log(config: MaintenanceConfig, result: object) -> Path | None:
     """Schreibe das Reparatur-Ergebnis dauerhaft nach ``log_dir`` (JSON + Text).
 
@@ -307,6 +316,22 @@ def build_parser() -> argparse.ArgumentParser:
     store_parser.add_argument("--execute", action="store_true", help="Wirklich ausführen (sonst Dry-Run).")
     store_parser.add_argument("--status", action="store_true", help="Nur Paket-Status anzeigen (read-only).")
     store_parser.set_defaults(func=cmd_store_repair)
+
+    store_materials_parser = subparsers.add_parser(
+        "store-materials",
+        help="Windows-Store-Materialien im Projekt pruefen (store_package.json, Doku, EXE-Name).",
+    )
+    store_materials_parser.add_argument(
+        "--project-root",
+        default=str(Path(__file__).resolve().parents[2]),
+        help="Projektwurzel mit den Store-Dateien.",
+    )
+    store_materials_parser.add_argument(
+        "--exe-path",
+        default=None,
+        help="Optionaler Pfad zur gebauten EXE fuer einen konkreten Existenzcheck.",
+    )
+    store_materials_parser.set_defaults(func=cmd_store_materials)
 
     repair_parser = subparsers.add_parser(
         "repair",

@@ -90,8 +90,19 @@ python -m codex_logdatenbank_wartung.cli dry-run                # DB maintenance
 python -m codex_logdatenbank_wartung.cli maintain --execute     # DB maintenance (blocks if Codex runs)
 python -m codex_logdatenbank_wartung.cli auto-maintain --mode safe --execute
 python -m codex_logdatenbank_wartung.cli store-repair --level repair --execute
+python -m codex_logdatenbank_wartung.cli store-materials        # check project-local Store materials
 python -m codex_logdatenbank_wartung.cli schedule install --interval-minutes 180
 ```
+
+## Windows Store path
+
+The project now carries its own Windows Store groundwork:
+
+- `PORTIERUNGSPLAN.md` documents why **Windows Store** is the only active platform track.
+- `store_package.json`, `STORE_LISTING.md`, `PRIVACY_POLICY.md`, and `SUPPORT.md` hold the
+  project-local Store materials.
+- `python -m codex_logdatenbank_wartung.cli store-materials` validates those materials and can
+  optionally check a built `CareCenterForCodex.exe` via `--exe-path`.
 
 ## Configuration
 
