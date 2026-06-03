@@ -1,6 +1,6 @@
 [project]
 name = "carecenter-for-codex"
-version = "0.6.0"
+version = "0.6.2"
 description = "Unofficial local Windows tray + CLI to repair, clean up and maintain the OpenAI Codex desktop app"
 readme = "README.md"
 requires-python = ">=3.12"

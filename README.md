@@ -1,5 +1,7 @@
 # CareCenter for Codex
 
+[![CareCenter tests](https://github.com/dev-bricks/CareCenter-for-Codex/actions/workflows/tests.yml/badge.svg)](https://github.com/dev-bricks/CareCenter-for-Codex/actions/workflows/tests.yml)
+
 A local Windows tray + CLI utility that keeps the **OpenAI Codex desktop app** healthy:
 it repairs failed starts, cleans up hung leftover processes, and safely maintains Codex's
 local SQLite log database — all offline, with no telemetry.
@@ -60,7 +62,7 @@ will be added here (`README/screenshots/main.png`).
 ## Requirements
 
 - Windows 10/11
-- Python 3.10+ (for running from source) — packaged EXE has no Python requirement
+- Python 3.12+ (for running from source) — packaged EXE has no Python requirement
 - [PySide6](https://pypi.org/project/PySide6/) (LGPL) for the tray GUI
 
 ## Install / Run
@@ -103,6 +105,11 @@ The project now carries its own Windows Store groundwork:
   project-local Store materials.
 - `python -m codex_logdatenbank_wartung.cli store-materials` validates those materials and can
   optionally check a built `CareCenterForCodex.exe` via `--exe-path`.
+
+## LLM context and tests
+
+- `llms.txt` provides a machine-readable project summary, safety boundaries, and verification commands.
+- Local verification currently covers 179 pytest tests plus `compileall` on `src` and `tests`.
 
 ## Configuration
 

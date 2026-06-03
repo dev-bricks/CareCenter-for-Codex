@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.2 - 2026-06-03
+
+- Added a Windows GitHub Actions workflow for Python 3.12 and 3.13.
+- Added `llms.txt` with machine-readable project context, safety boundaries, and verification commands.
+- Synchronized package metadata with the current release line and documented the 179-test local verification path.
+
 ## 0.6.1 - 2026-06-01
 
 - Added a project-local **Windows Store groundwork** path: new `PORTIERUNGSPLAN.md`,

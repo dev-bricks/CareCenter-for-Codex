@@ -1,0 +1,45 @@
+# CareCenter for Codex
+
+CareCenter for Codex is an unofficial local Windows tray and CLI utility for
+maintaining the OpenAI Codex desktop app installation. It repairs failed
+starts, cleans up inactive leftover desktop processes, checks Microsoft Store
+package state, and maintains the local Codex SQLite log database without
+telemetry or cloud uploads.
+
+Canonical repository: https://github.com/dev-bricks/CareCenter-for-Codex
+Default branch: main
+Package name: carecenter-for-codex
+Python package: codex_logdatenbank_wartung
+CLI script: codex-logwartung
+
+Important boundaries:
+- This project is unofficial and is not affiliated with, endorsed by, or
+  sponsored by OpenAI.
+- It targets Windows 10/11 and the Codex desktop app.
+- It never runs database maintenance while Codex processes are detected.
+- It stores config, logs, locks, and backups locally under
+  C:\_Local_DEV\codex-maintenance by default.
+- It should not manipulate the node-based Codex CLI except through explicit
+  read-only/audit paths.
+
+Primary commands:
+- python -m codex_logdatenbank_wartung.cli status
+- python -m codex_logdatenbank_wartung.cli doctor
+- python -m codex_logdatenbank_wartung.cli dry-run
+- python -m codex_logdatenbank_wartung.cli maintain --execute
+- python -m codex_logdatenbank_wartung.cli repair --dry-run
+- python -m codex_logdatenbank_wartung.cli repair --execute
+- python -m codex_logdatenbank_wartung.cli auto-maintain --mode safe --execute
+- python -m codex_logdatenbank_wartung.cli store-repair --level repair --execute
+- python -m codex_logdatenbank_wartung.cli store-materials
+
+Verification:
+- python -m compileall -q src tests
+- python -m pytest -q
+
+Public documentation:
+- README.md: overview, install, usage, safety boundaries
+- ARCHITECTURE.md: module structure and safety model
+- CHANGELOG.md: release history
+- STORE_LISTING.md, PRIVACY_POLICY.md, SUPPORT.md: Store release materials
+- SECURITY.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md: community health files
