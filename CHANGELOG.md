@@ -5,6 +5,7 @@
 - Added a Windows GitHub Actions workflow for Python 3.12 and 3.13.
 - Added `llms.txt` with machine-readable project context, safety boundaries, and verification commands.
 - Synchronized package metadata with the current release line and documented the 179-test local verification path.
+- Declared `tomlkit` as a runtime dependency and made the live repair runner injectable for hermetic CI tests.
 
 ## 0.6.1 - 2026-06-01
 

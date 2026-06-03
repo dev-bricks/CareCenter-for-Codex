@@ -335,7 +335,7 @@ def _family_name(aumid: str) -> str:
 def build_live_deps(
     config: MaintenanceConfig,
     *,
-    runner: PowerShellRunner = default_ps_runner,
+    runner: PowerShellRunner | None = None,
 ) -> RepairDeps:
     """Erzeuge ``RepairDeps`` mit ECHTEN Windows-Implementierungen.
 
@@ -350,6 +350,7 @@ def build_live_deps(
     from .health import default_tree_killer, diagnose
     from .orchestrator import default_launcher
 
+    runner = runner or default_ps_runner
     family = _family_name(getattr(config, "codex_store_aumid", "") or "")
     launcher = default_launcher(config)
 
