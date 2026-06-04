@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.1 - 2026-06-05
+
+- Fixed Safe Start snapshot fallback typing so the new adapter passes isolated Mypy checks.
+- Cleaned the new Safe Start status text path to keep German umlauts intact.
+
 ## 0.7.0 - 2026-06-04
 
 - Added optional Safe Start for Codex integration: CareCenter can now read Safe Start snapshots,

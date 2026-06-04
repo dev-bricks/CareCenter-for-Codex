@@ -1,16 +1,16 @@
-"""Optionale Safe-Start-Integration fuer CareCenter."""
+"""Optionale Safe-Start-Integration für CareCenter."""
 
 from __future__ import annotations
 
-from contextlib import contextmanager
-from dataclasses import asdict, dataclass
-from datetime import datetime, timedelta
 import importlib
 import json
 import os
+from collections.abc import Iterator
+from contextlib import contextmanager
+from dataclasses import asdict, dataclass
+from datetime import datetime, timedelta
 from pathlib import Path
 from types import ModuleType
-from typing import Iterator
 
 from .config import MaintenanceConfig
 
@@ -114,6 +114,16 @@ def _load_json(path: Path) -> dict[str, object] | None:
     return data if isinstance(data, dict) else None
 
 
+def _string_list(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value if item]
+
+
+def _list_count(value: object) -> int:
+    return len(value) if isinstance(value, list) else 0
+
+
 def detect_safe_start_storm(
     config: MaintenanceConfig,
     *,
@@ -180,10 +190,8 @@ def build_safe_start_status(config: MaintenanceConfig) -> SafeStartStatus:
     if safe_start is None:
         notes.append("Safe-Start-Paket nicht importierbar; nutze vorhandene Snapshots.")
         if latest_catchup:
-            raw_ids = latest_catchup.get("eligible_ids") or []
-            eligible_ids = [str(item) for item in raw_ids if item]
-            raw_candidates = latest_catchup.get("candidates") or []
-            candidate_count = len(raw_candidates) if isinstance(raw_candidates, list) else 0
+            eligible_ids = _string_list(latest_catchup.get("eligible_ids"))
+            candidate_count = _list_count(latest_catchup.get("candidates"))
     else:
         available = True
         try:
@@ -200,10 +208,8 @@ def build_safe_start_status(config: MaintenanceConfig) -> SafeStartStatus:
         except (Exception, SystemExit) as exc:
             notes.append(f"Safe-Start-Catch-up-Plan konnte nicht erstellt werden: {exc}")
             if latest_catchup:
-                raw_ids = latest_catchup.get("eligible_ids") or []
-                eligible_ids = [str(item) for item in raw_ids if item]
-                raw_candidates = latest_catchup.get("candidates") or []
-                candidate_count = len(raw_candidates) if isinstance(raw_candidates, list) else 0
+                eligible_ids = _string_list(latest_catchup.get("eligible_ids"))
+                candidate_count = _list_count(latest_catchup.get("candidates"))
 
     if storm_status == "release_burst":
         notes.append("Start-Storm erkannt: CareCenter sollte keine zusätzliche Start-Reparatur anstoßen.")
