@@ -31,8 +31,8 @@ or a local Windows repair command, but the tool itself does not upload data.
 
 ### Contact
 
-Until the public release endpoints are fixed, support and privacy contact paths
-are documented in `SUPPORT.md`.
+Support and privacy contact paths are documented in `SUPPORT.md` and published
+through the project's GitHub repository.
 
 ---
 
@@ -67,5 +67,5 @@ keine Daten hoch.
 
 ### Kontakt
 
-Bis die öffentlichen Release-URLs feststehen, sind Support- und
-Datenschutzkontakte in `SUPPORT.md` dokumentiert.
+Support- und Datenschutzkontakte sind in `SUPPORT.md` dokumentiert und über das
+GitHub-Repository des Projekts veröffentlicht.

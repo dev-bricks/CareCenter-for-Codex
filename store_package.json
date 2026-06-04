@@ -9,6 +9,6 @@
   "capabilities": "runFullTrust",
   "category": "Developer Tools",
   "age_rating": "3+",
-  "privacy_url": "",
-  "support_url": ""
+  "privacy_url": "https://github.com/dev-bricks/CareCenter-for-Codex/blob/main/PRIVACY_POLICY.md",
+  "support_url": "https://github.com/dev-bricks/CareCenter-for-Codex/blob/main/SUPPORT.md"
 }

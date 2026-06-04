@@ -5,24 +5,25 @@ Stand: 2026-06-01
 ## Zweck
 
 Diese Datei hält den aktuellen Supportpfad für den geplanten Windows-Store- und
-GitHub-Release fest, solange noch keine endgültigen öffentlichen URLs in
-`store_package.json` eingetragen sind.
+GitHub-Release fest. Die öffentlichen URLs sind in `store_package.json`
+eingetragen.
 
 ## Aktueller Status
 
-- Das Projekt ist lokal entwickelt und noch nicht öffentlich eingereicht.
-- `privacy_url` und `support_url` in `store_package.json` bleiben bewusst leer,
-  bis der reale Veröffentlichungsort feststeht.
-- Der neue Check `python -m codex_logdatenbank_wartung.cli store-materials`
-  meldet diesen Zustand als Warnung statt als stillen Fehler.
+- Das Projekt wird im öffentlichen GitHub-Repository gepflegt:
+  `https://github.com/dev-bricks/CareCenter-for-Codex`
+- `privacy_url` und `support_url` in `store_package.json` zeigen auf die
+  veröffentlichten Projektdateien.
+- Der Check `python -m codex_logdatenbank_wartung.cli store-materials` prüft
+  diesen Stand vor einer Store-Einreichung.
 
-## Geplanter öffentlicher Supportpfad
+## Öffentlicher Supportpfad
 
-Vor einer echten Windows-Store-Einreichung müssen diese Punkte ergänzt werden:
+- Support: `https://github.com/dev-bricks/CareCenter-for-Codex/blob/main/SUPPORT.md`
+- Datenschutz: `https://github.com/dev-bricks/CareCenter-for-Codex/blob/main/PRIVACY_POLICY.md`
 
-1. Öffentliche Support-URL festlegen.
-2. Öffentliche Datenschutz-URL festlegen.
-3. Store-Listing, Screenshot und MSIX/WACK-Stand auf dieselben URLs beziehen.
+Vor einer Windows-Store-Einreichung müssen Store-Listing, Screenshot und
+MSIX/WACK-Stand auf dieselben URLs bezogen bleiben.
 
 ## Interner Support bis dahin
 
