@@ -204,6 +204,20 @@ def cmd_audit(args: argparse.Namespace) -> int:
     return 1 if report.has_warnings else 0
 
 
+def cmd_safe_start_report(args: argparse.Namespace) -> int:
+    import json as _json
+
+    from .safe_start_integration import build_safe_start_status
+
+    config = load_config(args)
+    status = build_safe_start_status(config)
+    if args.json:
+        print(_json.dumps(status.to_dict(), ensure_ascii=False, indent=2))
+    else:
+        print(status.to_text())
+    return 0
+
+
 def cmd_tray(args: argparse.Namespace) -> int:
     from .tray import run_tray
 
@@ -376,6 +390,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="Config-Audit: MCP-Duplikate, ungenutzte Plugins, CLI-Status, leere Threads pruefen.",
     )
     audit_parser.set_defaults(func=cmd_audit)
+
+    safe_start_parser = subparsers.add_parser(
+        "safe-start-report",
+        help="Safe-Start-Status, Start-Storm und seltene Catch-up-Kandidaten prüfen.",
+    )
+    safe_start_parser.add_argument("--json", action="store_true", help="Status als JSON ausgeben.")
+    safe_start_parser.set_defaults(func=cmd_safe_start_report)
 
     tray_parser = subparsers.add_parser("tray", help="Systemtray-App starten.")
     tray_parser.set_defaults(func=cmd_tray)

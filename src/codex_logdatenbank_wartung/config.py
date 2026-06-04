@@ -85,7 +85,6 @@ class MaintenanceConfig:
     # Dominostein der gesamten Fehlerkette. Beendet NIE eine aktive Sitzung (Renderer da)
     # und nie einen frischen Start (Altersschwelle zombie_min_age_seconds).
     watcher_enabled: bool = True
-    watcher_terminate_user_starts: bool = False
     watcher_interval_seconds: int = 60  # Poll-Intervall des Hintergrund-Waechters
     # Nach erfolgreichem Reapen Codex automatisch neu starten? Default AUS (User-Wahl
     # 2026-05-30): nur aufraeumen + benachrichtigen, der User startet selbst -- so wird
@@ -105,6 +104,16 @@ class MaintenanceConfig:
     # Laeuft unabhaengig vom Desktop-Zustand bei jedem Watchdog-Tick.
     reap_companion_orphans: bool = True
     companion_orphan_min_age_seconds: int = 300  # 5 Minuten Karenzzeit nach Task-Ende
+    # Safe Start for Codex bleibt ein eigenständiges Werkzeug. CareCenter liest dessen
+    # Config/Snapshots optional aus und zeigt Start-Storm- sowie Catch-up-Hinweise an.
+    safe_start_config_path: str = field(
+        default_factory=lambda: str(default_codex_home() / "automation-safe-start" / "config.json")
+    )
+    safe_start_catchup_lookback_days: int = 30
+    safe_start_catchup_max_per_start: int = 1
+    safe_start_catchup_min_period_hours: int = 24
+    safe_start_storm_window_minutes: int = 10
+    safe_start_storm_release_threshold: int = 3
     # Config-Audit: erkennt Duplikate und ungenutzte MCP-Server/Plugins in config.toml.
     # Modus: "notify" = nur melden, "auto" = automatisch bereinigen/deaktivieren.
     audit_duplicate_mcp: str = "notify"  # "off", "notify", "auto"
@@ -203,6 +212,16 @@ class MaintenanceConfig:
     def state_db_path(self) -> Path:
         """Pfad zu state_5.sqlite (Automations-/Thread-State)."""
         return self.codex_home / "state_5.sqlite"
+
+    @property
+    def safe_start_state_dir(self) -> Path:
+        """Safe-Start-Arbeitsverzeichnis unterhalb von CODEX_HOME."""
+        return self.codex_home / "automation-safe-start"
+
+    @property
+    def safe_start_config_file(self) -> Path:
+        """Pfad zur Safe-Start-Konfiguration."""
+        return Path(self.safe_start_config_path).expanduser()
 
     @property
     def config_toml_path(self) -> Path:

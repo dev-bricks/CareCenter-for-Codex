@@ -32,6 +32,9 @@ deeper breakage. CareCenter removes that first domino automatically and keeps th
   removes them so the next start is clean, and notifies you. It **never** touches an active
   session, **never** the node-based Codex CLI, and **never** a process tree that is still busy
   (CPU activity gate). A 🧟 counter shows how many leftovers were cleared since start.
+- **Safe Start integration** - reads optional Safe Start for Codex snapshots, detects release
+  bursts/start storms, and reports rare automations that should be prioritized for catch-up. If
+  Safe Start is actively gating releases, the watcher defers its own start-counteractions.
 - **One-click "Repair Codex"** — a single escalation that stops as soon as Codex starts: first a
   light, no-admin step (remove leftovers → launch → check for a window); only if needed it
   escalates (elevated: ClipSVC, complete a staged Store update, reset, re-register). If the
@@ -101,6 +104,7 @@ python -m codex_logdatenbank_wartung.cli maintain --execute     # DB maintenance
 python -m codex_logdatenbank_wartung.cli auto-maintain --mode safe --execute
 python -m codex_logdatenbank_wartung.cli store-repair --level repair --execute
 python -m codex_logdatenbank_wartung.cli store-materials        # check project-local Store materials
+python -m codex_logdatenbank_wartung.cli safe-start-report      # Safe Start, start storm, catch-up
 python -m codex_logdatenbank_wartung.cli schedule install --interval-minutes 180
 ```
 
@@ -119,7 +123,7 @@ The project now carries its own Windows Store groundwork:
 ## LLM context and tests
 
 - `llms.txt` provides a machine-readable project summary, safety boundaries, and verification commands.
-- Local verification currently covers 179 pytest tests plus `compileall` on `src` and `tests`.
+- Local verification currently covers 185 pytest tests plus `compileall` on `src` and `tests`.
 
 ## Configuration
 
@@ -156,6 +160,8 @@ database: ~\.codex\logs_2.sqlite   (override via CODEX_HOME or config)
   Paket Reinstall-Vorschlag, bei Erschöpfung Reboot-Vorschlag.
 - **Wartung Safe/Fast**, **Store-Reparatur/-Neuinstallation**, **konservative DB-Wartung**
   (Backup → Integrität → WAL-Checkpoint → optimize → VACUUM; blockiert bei laufendem Codex).
+- **Safe-Start-Integration:** erkennt aktive Safe-Start-Gates und Start-Storms, hält den Wächter
+  zurück und zeigt seltene Catch-up-Kandidaten an.
 - **Status-Fenster mit Fortschrittsbalken** (öffnet bei jeder manuellen Aktion, schließbar, läuft
   im Hintergrund weiter), Live-Tooltip, **Audit-Log** (`logs/watchdog.log`).
 

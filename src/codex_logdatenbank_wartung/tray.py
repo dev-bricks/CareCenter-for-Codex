@@ -192,6 +192,9 @@ class WatchdogWorker(QObject):
             config = MaintenanceConfig.load(self.config_path)
             if not config.watcher_enabled:
                 return  # global aus -> still (kein diagnose-Aufruf, schont CPU)
+            from .safe_start_integration import should_defer_for_safe_start
+            if should_defer_for_safe_start(config):
+                return  # Safe Start staffelt gerade Freigaben; keine zusaetzliche Gegenaktion.
             result = run_watchdog_tick(config, execute=True)
         except Exception:  # noqa: BLE001 -- ein Tick darf den Waechter nie crashen
             return
@@ -574,6 +577,11 @@ class TrayController(QObject):
             "Reboot, Neustart als Administrator oder Store-Neuinstallation vor."
         )
         self.repair_action.triggered.connect(self.run_codex_repair)
+        self.safe_start_action = QAction("Safe Start prüfen")
+        self.safe_start_action.setToolTip(
+            "Zeigt Safe-Start-Snapshots, Start-Storm-Signale und seltene Catch-up-Kandidaten."
+        )
+        self.safe_start_action.triggered.connect(self.show_safe_start_report)
         self.watchdog_action = QAction("Auto-Wächter: Start-Reste entfernen")
         self.watchdog_action.setCheckable(True)
         self.watchdog_action.setChecked(bool(self.config.watcher_enabled))
@@ -591,6 +599,7 @@ class TrayController(QObject):
         self.menu.addAction(self.maintenance_action)
         self.menu.addSeparator()
         self.menu.addAction(self.repair_action)
+        self.menu.addAction(self.safe_start_action)
         self.menu.addSeparator()
         self.menu.addAction(self.watchdog_action)
         self.menu.addSeparator()
@@ -787,6 +796,24 @@ class TrayController(QObject):
     def clear_start_repair_thread(self) -> None:
         self.start_repair_thread = None
         self.start_repair_worker = None
+
+    def show_safe_start_report(self) -> None:
+        from .safe_start_integration import build_safe_start_status
+
+        status = build_safe_start_status(MaintenanceConfig.load(self.config_path))
+        self.window.set_state("Safe Start")
+        self.window.set_result(status.to_text())
+        self.show_window()
+        if status.storm_status in {"release_burst", "gate_active"}:
+            message = "Safe Start ist aktiv; CareCenter hält Start-Gegenaktionen zurück."
+            icon = QSystemTrayIcon.MessageIcon.Warning
+        elif status.eligible_count:
+            message = f"{status.eligible_count} seltene Automation(en) für Catch-up priorisieren."
+            icon = QSystemTrayIcon.MessageIcon.Information
+        else:
+            message = "Keine Safe-Start-Auffälligkeiten."
+            icon = QSystemTrayIcon.MessageIcon.Information
+        self.tray.showMessage("CareCenter - Safe Start", message, icon, 7000)
 
     def show_diagnosis(self) -> None:
         report = diagnose(MaintenanceConfig.load(self.config_path))

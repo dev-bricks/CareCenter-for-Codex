@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.7.0 - 2026-06-04
+
+- Added optional Safe Start for Codex integration: CareCenter can now read Safe Start snapshots,
+  detect release bursts/start storms, and show rare catch-up candidates.
+- Added CLI command `safe-start-report` with text and JSON output.
+- The tray now includes "Safe Start prüfen" and shows Safe Start status in the existing status window.
+- The background watcher defers its own start-counteractions while Safe Start is actively gating or
+  releasing automations, so both tools do not work against each other.
+- Added Safe Start config fields to CareCenter for catch-up lookback, catch-up limits, and storm thresholds.
+
+## 0.6.3 - 2026-06-03
+
+- Removed the dead legacy config flag `watcher_terminate_user_starts`, which was still loaded and
+  written back although no runtime path consumed it.
+- Added a regression test for config roundtrips so legacy watcher flags are dropped instead of being
+  re-emitted into `config.json`.
+
 ## 0.6.2 - 2026-06-03
 
 - Added a Windows GitHub Actions workflow for Python 3.12 and 3.13.
