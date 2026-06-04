@@ -55,9 +55,17 @@ deeper breakage. CareCenter removes that first domino automatically and keeps th
 
 ## Screenshot
 
-The tray's status window shows the current state, a 🧟 leftovers-cleared counter, a progress bar,
-and one-click buttons (Repair Codex, Diagnose, Safe/Fast maintenance, Store tools). A screenshot
-will be added here (`README/screenshots/main.png`).
+The tray's status window shows the current state, a leftovers-cleared counter, a progress bar,
+and one-click buttons (Repair Codex, Diagnose, Safe/Fast maintenance, Store tools).
+
+![CareCenter status window](README/screenshots/main.png)
+
+The image is generated reproducibly from the real PySide6 status window:
+
+```powershell
+$env:PYTHONPATH="src"
+python -m codex_logdatenbank_wartung.cli store-screenshot
+```
 
 ## Requirements
 
@@ -105,6 +113,8 @@ The project now carries its own Windows Store groundwork:
   project-local Store materials.
 - `python -m codex_logdatenbank_wartung.cli store-materials` validates those materials and can
   optionally check a built `CareCenterForCodex.exe` via `--exe-path`.
+- `python -m codex_logdatenbank_wartung.cli store-screenshot` regenerates
+  `README/screenshots/main.png` for README and Store visuals.
 
 ## LLM context and tests
 

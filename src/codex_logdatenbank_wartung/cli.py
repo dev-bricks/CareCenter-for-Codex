@@ -111,6 +111,14 @@ def cmd_store_materials(args: argparse.Namespace) -> int:
     return {"ok": 0, "warning": 2, "failed": 1}[report.status]
 
 
+def cmd_store_screenshot(args: argparse.Namespace) -> int:
+    from .store_screenshot import render_store_screenshot
+
+    output_path = render_store_screenshot(Path(args.output))
+    print(f"Store-Screenshot geschrieben: {output_path}")
+    return 0
+
+
 def _persist_repair_log(config: MaintenanceConfig, result: object) -> Path | None:
     """Schreibe das Reparatur-Ergebnis dauerhaft nach ``log_dir`` (JSON + Text).
 
@@ -333,6 +341,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optionaler Pfad zur gebauten EXE fuer einen konkreten Existenzcheck.",
     )
     store_materials_parser.set_defaults(func=cmd_store_materials)
+
+    store_screenshot_parser = subparsers.add_parser(
+        "store-screenshot",
+        help="Reproduzierbaren README-/Store-Screenshot des Statusfensters erzeugen.",
+    )
+    store_screenshot_parser.add_argument(
+        "--output",
+        default=str(Path(__file__).resolve().parents[2] / "README" / "screenshots" / "main.png"),
+        help="Zielpfad fuer den PNG-Screenshot.",
+    )
+    store_screenshot_parser.set_defaults(func=cmd_store_screenshot)
 
     repair_parser = subparsers.add_parser(
         "repair",

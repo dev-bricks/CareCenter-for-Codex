@@ -67,3 +67,25 @@ def test_store_materials_command_returns_warning_for_missing_files(tmp_path: Pat
     assert rc == 1
     out = capsys.readouterr().out
     assert "Store-Materialien" in out
+
+
+def test_store_screenshot_command_writes_png(tmp_path: Path, capsys, monkeypatch) -> None:
+    cfg = tmp_path / "config.json"
+    cfg.write_text("{}", encoding="utf-8")
+    output = tmp_path / "README" / "screenshots" / "main.png"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+
+    rc = main(
+        [
+            "--config",
+            str(cfg),
+            "store-screenshot",
+            "--output",
+            str(output),
+        ]
+    )
+
+    assert rc == 0
+    assert output.exists()
+    assert output.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
+    assert "Store-Screenshot geschrieben" in capsys.readouterr().out
