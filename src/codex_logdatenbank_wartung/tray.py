@@ -14,9 +14,11 @@ Zwei Modi (ein Tray):
 
 from __future__ import annotations
 
-from pathlib import Path
+import contextlib
 import sys
-from typing import Callable
+from collections.abc import Callable
+from pathlib import Path
+from typing import cast
 
 from PySide6.QtCore import QObject, Qt, QThread, QTimer, Signal
 from PySide6.QtGui import QAction, QIcon
@@ -37,7 +39,7 @@ from PySide6.QtWidgets import (
 
 from .config import MaintenanceConfig
 from .health import RepairResult, diagnose, repair_start
-from .orchestrator import AutoMaintainResult, AutoProgress, auto_maintain
+from .orchestrator import AutoMaintainResult, AutoProgress, Mode, auto_maintain
 from .single_instance import SingleInstanceGuard
 from .store_repair import StoreRepairResult, open_store_page, repair_store_codex
 from .watchdog import run_watchdog_tick
@@ -70,7 +72,7 @@ def _app_icon() -> QIcon:
                 return icon
     app = QApplication.instance()
     if app is not None:
-        return app.style().standardIcon(QStyle.StandardPixmap.SP_DriveHDIcon)
+        return cast(QApplication, app).style().standardIcon(QStyle.StandardPixmap.SP_DriveHDIcon)
     return QIcon()
 
 
@@ -78,7 +80,7 @@ class AutoMaintainWorker(QObject):
     progress = Signal(object)  # AutoProgress
     finished = Signal(object)  # AutoMaintainResult
 
-    def __init__(self, config: MaintenanceConfig, mode: str) -> None:
+    def __init__(self, config: MaintenanceConfig, mode: Mode) -> None:
         super().__init__()
         self.config = config
         self.mode = mode
@@ -136,8 +138,13 @@ class FullRepairWorker(QObject):
             self.finished.emit(None)
             return
 
+        from .repair_workflow import RepairStepResult
+
         def on_step(step: object) -> None:
-            self.progress.emit(f"[{step.status}] {step.name}: {step.message}")
+            step_result = cast(RepairStepResult, step)
+            self.progress.emit(
+                f"[{step_result.status}] {step_result.name}: {step_result.message}"
+            )
 
         try:
             outcome = run_live_repair(config, execute=True, progress=on_step)
@@ -160,7 +167,7 @@ class WatchdogWorker(QObject):
     reaped = Signal(object)  # WatchdogTickResult.to_dict(), nur wenn wirklich aufgeraeumt wurde
     audit_finding = Signal(str)  # Tray-Benachrichtigung bei notify-Modus (entprellt)
 
-    def __init__(self, config_path: Path, is_busy: "Callable[[], bool]") -> None:
+    def __init__(self, config_path: Path, is_busy: Callable[[], bool]) -> None:
         super().__init__()
         self.config_path = config_path
         self._is_busy = is_busy
@@ -315,10 +322,8 @@ class StartRepairWorker(QObject):
                 return
 
             self.progress.emit("Codex starten und auf Fenster warten …")
-            try:
+            with contextlib.suppress(Exception):  # noqa: BLE001 -- Startfehler eskalieren bei der naechsten Pruefung
                 default_launcher(config)()
-            except Exception:  # noqa: BLE001 -- Start kann scheitern, dann eskaliert die naechste Pruefung
-                pass
 
             deadline = time.monotonic() + max(10.0, float(config.renderer_timeout_seconds) / 4.0)
             appeared = False
@@ -649,7 +654,7 @@ class TrayController(QObject):
 
     # -- Autonome Wartung (Safe/Fast) -------------------------------------
 
-    def run_auto(self, mode: str) -> None:
+    def run_auto(self, mode: Mode) -> None:
         if self.running:
             self.tray.showMessage(
                 "CareCenter", "Eine Wartung läuft bereits.",
@@ -1056,19 +1061,15 @@ class TrayController(QObject):
         if mode not in ("off", "notify", "auto"):
             return
         self.config.audit_duplicate_mcp = mode
-        try:
+        with contextlib.suppress(OSError):
             self.config.save(self.config_path)
-        except OSError:
-            pass
 
     def on_plugin_mode_changed(self, mode: str) -> None:
         if mode not in ("off", "notify", "auto"):
             return
         self.config.audit_unused_plugins = mode
-        try:
+        with contextlib.suppress(OSError):
             self.config.save(self.config_path)
-        except OSError:
-            pass
 
     def run_config_audit(self) -> None:
         """Fuehrt einen sofortigen Config-Audit aus und zeigt die Ergebnisse."""
@@ -1154,10 +1155,8 @@ class TrayController(QObject):
 
     def on_toggle_watchdog(self, checked: bool) -> None:
         self.config.watcher_enabled = bool(checked)
-        try:
+        with contextlib.suppress(OSError):
             self.config.save(self.config_path)
-        except OSError:
-            pass
         if checked and self.watchdog_thread is None:
             self._start_watchdog()
         self.tray.showMessage(
@@ -1190,8 +1189,14 @@ def run_tray(config_path: Path) -> int:
 
     config = MaintenanceConfig.load(config_path)
 
-    from .i18n import detect_language, set_language
-    set_language(config.language if config.language in ("de", "en") else detect_language())
+    from .i18n import Language, detect_language, set_language
+
+    language = (
+        cast(Language, config.language)
+        if config.language in ("de", "en")
+        else detect_language()
+    )
+    set_language(language)
 
     guard = SingleInstanceGuard(
         "Global\\CareCenterForCodex",

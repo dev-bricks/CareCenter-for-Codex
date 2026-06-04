@@ -11,7 +11,6 @@ from codex_logdatenbank_wartung.processes import (
     tree_pids,
 )
 
-
 CODEX_EXE = r"C:\Users\dev\AppData\Local\Programs\Codex\Codex.exe"
 
 

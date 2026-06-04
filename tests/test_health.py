@@ -7,7 +7,6 @@ from codex_logdatenbank_wartung.config import MaintenanceConfig
 from codex_logdatenbank_wartung.health import diagnose, repair_start
 from codex_logdatenbank_wartung.processes import ProcessInfo
 
-
 CODEX_EXE = r"C:\Users\dev\AppData\Local\Programs\Codex\Codex.exe"
 
 
@@ -47,6 +46,14 @@ def zombie_tree() -> list[ProcessInfo]:
     ]
 
 
+def recording_killer(killed: list[int]):
+    def killer(pid: int) -> tuple[bool, str]:
+        killed.append(pid)
+        return True, "ok"
+
+    return killer
+
+
 def test_diagnose_healthy_when_renderer_present(tmp_path: Path) -> None:
     config = make_config(tmp_path)
     report = diagnose(config, lambda: healthy_tree())
@@ -80,7 +87,7 @@ def test_repair_kills_only_zombies_via_injected_killer(tmp_path: Path) -> None:
     result = repair_start(
         config,
         provider=lambda: zombie_tree(),
-        killer=lambda pid: (killed.append(pid) or (True, "ok")),
+        killer=recording_killer(killed),
         execute=True,
     )
     assert killed == [200]
@@ -94,7 +101,7 @@ def test_repair_never_kills_active_codex_with_renderer(tmp_path: Path) -> None:
     result = repair_start(
         config,
         provider=lambda: healthy_tree(),
-        killer=lambda pid: (killed.append(pid) or (True, "ok")),
+        killer=recording_killer(killed),
         execute=True,
     )
     assert killed == []
@@ -108,7 +115,7 @@ def test_repair_dry_run_does_not_kill(tmp_path: Path) -> None:
     result = repair_start(
         config,
         provider=lambda: zombie_tree(),
-        killer=lambda pid: (killed.append(pid) or (True, "ok")),
+        killer=recording_killer(killed),
         execute=False,
     )
     assert killed == []
@@ -178,7 +185,7 @@ def test_repair_clears_lockfile_after_zombie_kill_same_pass(tmp_path: Path) -> N
     result = repair_start(
         config,
         provider=lambda: zombie_tree(),
-        killer=lambda pid: (killed.append(pid) or (True, "ok")),
+        killer=recording_killer(killed),
         execute=True,
     )
     assert killed == [200]

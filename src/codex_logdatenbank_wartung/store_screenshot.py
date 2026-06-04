@@ -8,7 +8,6 @@ from PySide6.QtWidgets import QApplication
 
 from .tray import StatusWindow
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_SCREENSHOT_PATH = PROJECT_ROOT / "README" / "screenshots" / "main.png"
 

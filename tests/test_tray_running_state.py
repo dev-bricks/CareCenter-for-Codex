@@ -7,10 +7,10 @@ Patcht PySide6 so, dass QObject eine echte Basisklasse ist (kein MagicMock als E
 from __future__ import annotations
 
 import sys
+import tempfile
 from pathlib import Path
 from types import ModuleType
 from unittest.mock import MagicMock, patch
-import tempfile
 
 
 class _FakeQObject:

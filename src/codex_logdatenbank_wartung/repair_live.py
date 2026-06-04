@@ -27,10 +27,11 @@ Wichtige Annahmen (siehe CODEX-AUTO-DEBUG-DESIGN.md):
 
 from __future__ import annotations
 
+import contextlib
 import json
 import subprocess
 import time as _time
-from typing import Callable
+from collections.abc import Callable
 
 from .config import MaintenanceConfig
 from .processes import (
@@ -62,7 +63,7 @@ def _tree_kill(pid: int) -> None:
     Vorbild: watchdog Companion-Orphan-Reaper. ``taskkill /T`` killt den Baum, ``/F`` erzwingt.
     Eigener kurzer Timeout, alle Fehler geschluckt (Best-Effort-Aufraeumen).
     """
-    try:
+    with contextlib.suppress(Exception):  # noqa: BLE001 -- Aufraeumen darf den Lauf nie crashen
         subprocess.run(
             ["taskkill", "/T", "/F", "/PID", str(pid)],
             check=False,
@@ -70,8 +71,6 @@ def _tree_kill(pid: int) -> None:
             timeout=10,
             **no_window_kwargs(),
         )
-    except Exception:  # noqa: BLE001 -- Aufraeumen darf den Lauf nie crashen
-        pass
 
 
 def default_ps_runner(command: str, *, timeout: float = 30.0) -> tuple[int, str]:

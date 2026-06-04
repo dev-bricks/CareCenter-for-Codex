@@ -31,7 +31,8 @@ def test_dry_run_blocks_when_codex_desktop_is_running(tmp_path: Path) -> None:
     db_path = tmp_path / "logs_2.sqlite"
     make_db(db_path)
     config = make_config(tmp_path, db_path)
-    provider = lambda: [ProcessInfo(123, "Codex.exe", CODEX_EXE, f'"{CODEX_EXE}"')]
+    def provider():
+        return [ProcessInfo(123, "Codex.exe", CODEX_EXE, f'"{CODEX_EXE}"')]
 
     result = MaintenanceRunner(config, provider).run(dry_run=True)
 
@@ -44,11 +45,12 @@ def test_cli_codex_does_not_block_maintenance(tmp_path: Path) -> None:
     db_path = tmp_path / "logs_2.sqlite"
     make_db(db_path)
     config = make_config(tmp_path, db_path)
-    provider = lambda: [
-        ProcessInfo(500, "node.exe", r"C:\Program Files\nodejs\node.exe",
-                    r"node C:\Users\dev\.codex\run.js"),
-        ProcessInfo(501, "node_repl.exe", r"C:\tools\node_repl.exe", ""),
-    ]
+    def provider():
+        return [
+            ProcessInfo(500, "node.exe", r"C:\Program Files\nodejs\node.exe",
+                        r"node C:\Users\dev\.codex\run.js"),
+            ProcessInfo(501, "node_repl.exe", r"C:\tools\node_repl.exe", ""),
+        ]
 
     result = MaintenanceRunner(config, provider).run(dry_run=False)
 

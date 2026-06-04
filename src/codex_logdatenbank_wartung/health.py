@@ -13,13 +13,14 @@ Sicherheitsgarantie: Reparatur beendet ausschliesslich Hauptprozesse OHNE Render
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
-from datetime import datetime
+import contextlib
 import json
-from pathlib import Path
 import shutil
 import subprocess
-from typing import Callable
+from collections.abc import Callable
+from dataclasses import asdict, dataclass, field
+from datetime import datetime
+from pathlib import Path
 
 from .config import MaintenanceConfig
 from .processes import (
@@ -179,10 +180,8 @@ def diagnose(
         disk_free_gb = 0.0
 
     badstate_files: list[str] = []
-    try:
+    with contextlib.suppress(OSError):
         badstate_files = sorted(p.name for p in config.codex_home.glob("*.badstate"))
-    except OSError:
-        pass
 
     # Update-Health: ein fehlgeschlagenes Auto-Update kann die Codex.exe entfernen
     # oder Update-Reste hinterlassen, die den Start blockieren ("Aktualisierungen").

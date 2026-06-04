@@ -13,7 +13,6 @@ from pathlib import Path
 from codex_logdatenbank_wartung.config import MaintenanceConfig
 from codex_logdatenbank_wartung.config_audit import (
     fix_duplicate_mcp,
-    fix_unused_plugins,
     run_audit_cycle,
 )
 

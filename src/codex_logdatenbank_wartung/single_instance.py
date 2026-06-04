@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+import contextlib
 import ctypes
 import os
 from pathlib import Path
-
 
 ERROR_ALREADY_EXISTS = 183
 
@@ -51,12 +51,10 @@ class SingleInstanceGuard:
         if self._lock_fd is not None:
             os.close(self._lock_fd)
             self._lock_fd = None
-            try:
+            with contextlib.suppress(FileNotFoundError):
                 self.fallback_path.unlink()
-            except FileNotFoundError:
-                pass
 
-    def __enter__(self) -> "SingleInstanceGuard":
+    def __enter__(self) -> SingleInstanceGuard:
         self.acquire()
         return self
 

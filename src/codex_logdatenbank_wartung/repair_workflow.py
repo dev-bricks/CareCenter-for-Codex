@@ -34,12 +34,12 @@ Bausteine in ``RepairDeps``. Nur deren Default-Implementierungen duerfen real se
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
-from typing import Callable, Literal, Protocol
+from typing import Literal, Protocol
 
 from .config import MaintenanceConfig
-
 
 # Status eines Einzelschrittes der Reparatur.
 StepStatus = Literal["ok", "failed", "timeout", "skipped", "blocked"]
@@ -290,7 +290,7 @@ class RepairDeps:
     clock: Callable[[], datetime] = datetime.now
 
     @classmethod
-    def with_defaults(cls, config: MaintenanceConfig) -> "RepairDeps":
+    def with_defaults(cls, config: MaintenanceConfig) -> RepairDeps:
         """Erzeuge Deps mit dem read-only Default-Observer (keine mutierenden Ops)."""
         return cls(observe=_default_observe(config))
 

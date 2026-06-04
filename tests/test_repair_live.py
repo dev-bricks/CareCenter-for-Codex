@@ -21,7 +21,6 @@ from codex_logdatenbank_wartung.repair_live import (
 )
 from codex_logdatenbank_wartung.repair_workflow import AdminRequired, DeployTimeout
 
-
 CODEX_EXE = r"C:\Users\dev\AppData\Local\Programs\Codex\Codex.exe"
 USER_SID = "S-1-5-21-111-222-333-1001"
 
@@ -479,9 +478,13 @@ def test_cli_repair_dry_run_plans_without_mutation(tmp_path: Path, monkeypatch) 
     monkeypatch.setattr(repair_live, "default_ps_runner", run)
 
     # Falls trotz Dry-Run ein mutierendes Dep liefe, wuerde es hier auffallen.
+    def record_mutation(pid: int) -> tuple[bool, str]:
+        mutated.append(f"kill:{pid}")
+        return True, "x"
+
     monkeypatch.setattr(
         "codex_logdatenbank_wartung.health.default_tree_killer",
-        lambda pid: mutated.append(f"kill:{pid}") or (True, "x"),
+        record_mutation,
     )
 
     out_file = tmp_path / "repair-out.json"

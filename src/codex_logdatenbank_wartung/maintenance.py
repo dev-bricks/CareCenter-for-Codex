@@ -2,20 +2,21 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
-from datetime import datetime
+import contextlib
 import json
-from pathlib import Path
 import shutil
 import sqlite3
 import time
 import traceback
-from typing import Callable, Literal
+from collections.abc import Callable
+from dataclasses import asdict, dataclass, field
+from datetime import datetime
+from pathlib import Path
+from typing import Literal
 
 from .config import MaintenanceConfig
 from .i18n import t
 from .processes import (
-    ProcessInfo,
     ProcessProvider,
     find_codex_processes_by_executable,
     windows_processes,
@@ -126,13 +127,11 @@ class MaintenanceLock:
 
     def release(self) -> None:
         if self.acquired:
-            try:
+            with contextlib.suppress(FileNotFoundError):
                 self.path.unlink()
-            except FileNotFoundError:
-                pass
             self.acquired = False
 
-    def __enter__(self) -> "MaintenanceLock":
+    def __enter__(self) -> MaintenanceLock:
         self.acquire()
         return self
 
@@ -216,7 +215,8 @@ class MaintenanceRunner:
                     t("process_check_fail_closed"),
                 )
                 return
-            provider = lambda: all_processes
+            def provider():
+                return all_processes
         else:
             provider = self.process_provider
 

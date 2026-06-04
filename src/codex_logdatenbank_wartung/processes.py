@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import json
 import os
 import re
 import subprocess
-from typing import Callable, Iterable
+from collections.abc import Callable, Iterable
+from dataclasses import dataclass
+from typing import Any
 
 from .config import MaintenanceConfig
 
@@ -34,7 +35,7 @@ _TYPE_PATTERN = re.compile(r"--type=([a-z0-9-]+)")
 CREATE_NO_WINDOW = 0x08000000
 
 
-def no_window_kwargs() -> dict[str, object]:
+def no_window_kwargs() -> dict[str, Any]:
     if os.name == "nt":
         return {"creationflags": CREATE_NO_WINDOW}
     return {}
@@ -48,6 +49,15 @@ def _as_process_list(raw: object) -> list[dict[str, object]]:
     if isinstance(raw, dict):
         return [raw]
     return []
+
+
+def _int_value(value: object, default: int = 0) -> int:
+    if value is None or value == "":
+        return default
+    try:
+        return int(str(value))
+    except (TypeError, ValueError):
+        return default
 
 
 def windows_processes() -> list[ProcessInfo]:
@@ -85,28 +95,20 @@ def windows_processes() -> list[ProcessInfo]:
 
     processes: list[ProcessInfo] = []
     for row in rows:
-        try:
-            pid = int(row.get("ProcessId") or 0)
-        except (TypeError, ValueError):
+        pid = _int_value(row.get("ProcessId"))
+        if not pid:
             continue
         name = str(row.get("Name") or "")
         executable = str(row.get("ExecutablePath") or "")
         command_line = str(row.get("CommandLine") or "")
-        try:
-            parent_pid = int(row.get("ParentProcessId") or 0)
-        except (TypeError, ValueError):
-            parent_pid = 0
+        parent_pid = _int_value(row.get("ParentProcessId"))
         created_at = str(row.get("CreationDate") or "")
-        try:
-            cpu_ticks = int(row.get("CpuTicks") or 0)
-        except (TypeError, ValueError):
-            cpu_ticks = 0
-        if pid:
-            processes.append(
-                ProcessInfo(
-                    pid, name, executable, command_line, parent_pid, created_at, cpu_ticks
-                )
+        cpu_ticks = _int_value(row.get("CpuTicks"))
+        processes.append(
+            ProcessInfo(
+                pid, name, executable, command_line, parent_pid, created_at, cpu_ticks
             )
+        )
     return processes
 
 
@@ -174,9 +176,7 @@ def matches_codex_executable(process: ProcessInfo, config: MaintenanceConfig) ->
     cmd = _normalise_path(process.command_line)
     if target and (cmd == target or cmd.startswith(target + " ")):
         return True
-    if marker and marker in cmd and "codex.exe" in cmd:
-        return True
-    return False
+    return bool(marker and marker in cmd and "codex.exe" in cmd)
 
 
 def find_codex_processes_by_executable(

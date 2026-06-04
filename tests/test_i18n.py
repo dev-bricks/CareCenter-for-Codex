@@ -86,6 +86,7 @@ def test_language_switch_is_consistent() -> None:
 def test_maintenance_runner_uses_i18n_english(tmp_path) -> None:
     """MaintenanceRunner gibt englische Meldungen aus, wenn language=en gesetzt ist."""
     import sqlite3
+
     from codex_logdatenbank_wartung.config import MaintenanceConfig
     from codex_logdatenbank_wartung.maintenance import MaintenanceRunner
     from codex_logdatenbank_wartung.processes import ProcessInfo
@@ -106,7 +107,8 @@ def test_maintenance_runner_uses_i18n_english(tmp_path) -> None:
             maintenance_lock_path=str(tmp_path / "maintenance.lock"),
         )
 
-        provider = lambda: [ProcessInfo(99, "Codex.exe", CODEX_EXE, f'"{CODEX_EXE}"')]
+        def provider():
+            return [ProcessInfo(99, "Codex.exe", CODEX_EXE, f'"{CODEX_EXE}"')]
         result = MaintenanceRunner(config, provider).run(dry_run=True)
 
         assert result.status == "blocked"
@@ -119,6 +121,7 @@ def test_maintenance_runner_uses_i18n_english(tmp_path) -> None:
 def test_maintenance_runner_uses_i18n_german(tmp_path) -> None:
     """MaintenanceRunner gibt deutsche Meldungen aus, wenn language=de gesetzt ist."""
     import sqlite3
+
     from codex_logdatenbank_wartung.config import MaintenanceConfig
     from codex_logdatenbank_wartung.maintenance import MaintenanceRunner
 

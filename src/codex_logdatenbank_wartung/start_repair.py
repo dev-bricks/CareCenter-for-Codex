@@ -18,8 +18,9 @@ Diese Datei haelt die *reine*, testbare Entscheidung; die Tray-Schicht fuehrt si
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, Literal
+from typing import Literal
 
 from .config import MaintenanceConfig
 

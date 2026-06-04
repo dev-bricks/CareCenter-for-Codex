@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import json
-from pathlib import Path
 import re
+from dataclasses import dataclass
+from pathlib import Path
 from urllib.parse import urlparse
-
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 STORE_PACKAGE_PATH = PROJECT_ROOT / "store_package.json"

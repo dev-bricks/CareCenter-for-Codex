@@ -18,9 +18,10 @@ injizierbaren Runner testbar (keine echten Store-Eingriffe im Test).
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
 import subprocess
-from typing import Callable, Literal
+from collections.abc import Callable
+from dataclasses import asdict, dataclass, field
+from typing import Literal
 
 from .processes import no_window_kwargs
 

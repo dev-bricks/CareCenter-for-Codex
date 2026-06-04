@@ -278,6 +278,7 @@ def test_nothing_to_do_reap_reported_as_idle() -> None:
 def test_companion_orphans_reaped_when_idle() -> None:
     """Companion-Orphans werden bereinigt auch wenn Codex geschlossen und kein Ghost da ist."""
     from unittest.mock import patch
+
     from codex_logdatenbank_wartung.processes import ProcessInfo
 
     orphan = ProcessInfo(
@@ -294,11 +295,16 @@ def test_companion_orphans_reaped_when_idle() -> None:
         return_value=[orphan],
     ):
         killed_pids: list[int] = []
+
+        def killer(pid: int) -> tuple[bool, str]:
+            killed_pids.append(pid)
+            return True, "ok"
+
         result = run_watchdog_tick(
             make_config(),
             diagnose_fn=diagnose_returning(_Report()),
             repair_fn=repair,
-            killer=lambda pid: (killed_pids.append(pid) or True, "ok"),
+            killer=killer,
         )
     assert result.action == "idle"
     assert result.companion_orphans_reaped == 1
@@ -308,6 +314,7 @@ def test_companion_orphans_reaped_when_idle() -> None:
 def test_companion_orphans_reaped_when_codex_active() -> None:
     """Companion-Orphans werden auch bei aktivem Codex bereinigt (unabhaengig)."""
     from unittest.mock import patch
+
     from codex_logdatenbank_wartung.processes import ProcessInfo
 
     orphan = ProcessInfo(
@@ -324,11 +331,16 @@ def test_companion_orphans_reaped_when_codex_active() -> None:
         return_value=[orphan],
     ):
         killed_pids: list[int] = []
+
+        def killer(pid: int) -> tuple[bool, str]:
+            killed_pids.append(pid)
+            return True, "ok"
+
         result = run_watchdog_tick(
             make_config(),
             diagnose_fn=diagnose_returning(_Report(renderer_present=True)),
             repair_fn=repair,
-            killer=lambda pid: (killed_pids.append(pid) or True, "ok"),
+            killer=killer,
         )
     assert result.action == "codex_active"
     assert result.companion_orphans_reaped == 1
@@ -338,6 +350,7 @@ def test_companion_orphans_reaped_when_codex_active() -> None:
 def test_companion_reaper_disabled_by_config() -> None:
     """reap_companion_orphans=False deaktiviert den Reaper."""
     from unittest.mock import patch
+
     from codex_logdatenbank_wartung.processes import ProcessInfo
 
     orphan = ProcessInfo(

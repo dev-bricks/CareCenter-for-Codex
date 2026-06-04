@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
 import json
 import os
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
-
 
 LOCAL_ROOT = Path(r"C:\_Local_DEV\codex-maintenance")
 DEFAULT_CONFIG_PATH = LOCAL_ROOT / "config.json"
@@ -153,14 +152,14 @@ class MaintenanceConfig:
     activity_sample_seconds: float = 2.0  # Messfenster fuer die CPU-Stichprobe
 
     @classmethod
-    def load(cls, path: Path = DEFAULT_CONFIG_PATH) -> "MaintenanceConfig":
+    def load(cls, path: Path = DEFAULT_CONFIG_PATH) -> MaintenanceConfig:
         if not path.exists():
             config = cls()
             config.save(path)
             return config
 
         data = json.loads(path.read_text(encoding="utf-8"))
-        known = {field_name for field_name in cls.__dataclass_fields__}
+        known = set(cls.__dataclass_fields__)
         filtered = {key: value for key, value in data.items() if key in known}
         return cls(**filtered)
 

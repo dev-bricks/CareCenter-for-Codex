@@ -21,11 +21,12 @@ im Test).
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
-from datetime import datetime, timedelta
 import subprocess
 import time as _time
-from typing import Callable, Literal
+from collections.abc import Callable
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timedelta
+from typing import Literal
 
 from .config import MaintenanceConfig
 from .maintenance import MaintenanceResult, MaintenanceRunner, ProgressUpdate

@@ -10,7 +10,9 @@ from unittest.mock import patch
 from codex_logdatenbank_wartung.config import MaintenanceConfig
 from codex_logdatenbank_wartung.config_audit import (
     AuditReport,
-    EmptyThread,
+    _extract_mcp_package,
+    _parse_toml_sections,
+    _strip_inline_comment,
     audit_cli_installation,
     audit_config_toml,
     audit_threads,
@@ -18,9 +20,6 @@ from codex_logdatenbank_wartung.config_audit import (
     fix_duplicate_mcp,
     fix_unused_plugins,
     run_full_audit,
-    _parse_toml_sections,
-    _extract_mcp_package,
-    _strip_inline_comment,
 )
 
 

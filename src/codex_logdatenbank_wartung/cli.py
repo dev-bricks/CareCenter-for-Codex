@@ -3,12 +3,19 @@
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 import sys
+from pathlib import Path
+from typing import Protocol, cast
 
 from .config import DEFAULT_CONFIG_PATH, MaintenanceConfig
 from .maintenance import MaintenanceRunner
 from .processes import describe_processes, find_codex_processes
+
+
+class _RepairLogResult(Protocol):
+    def to_dict(self) -> dict[str, object]: ...
+
+    def to_text(self) -> str: ...
 
 
 def load_config(args: argparse.Namespace) -> MaintenanceConfig:
@@ -119,7 +126,7 @@ def cmd_store_screenshot(args: argparse.Namespace) -> int:
     return 0
 
 
-def _persist_repair_log(config: MaintenanceConfig, result: object) -> Path | None:
+def _persist_repair_log(config: MaintenanceConfig, result: _RepairLogResult) -> Path | None:
     """Schreibe das Reparatur-Ergebnis dauerhaft nach ``log_dir`` (JSON + Text).
 
     Blind-Spot-Fix (30.05): Der Tray-Volllauf schrieb bisher nur in eine temporaere
@@ -445,12 +452,18 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
-    from .i18n import detect_language, set_language
+    from .i18n import Language, detect_language, set_language
+
     config_path = Path(args.config)
     if config_path.exists():
         try:
             config = MaintenanceConfig.load(config_path)
-            set_language(config.language if config.language in ("de", "en") else detect_language())
+            language = (
+                cast(Language, config.language)
+                if config.language in ("de", "en")
+                else detect_language()
+            )
+            set_language(language)
         except (ValueError, OSError):
             pass
 

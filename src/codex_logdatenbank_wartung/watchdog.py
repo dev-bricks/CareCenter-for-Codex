@@ -20,8 +20,9 @@ einem Worker-Thread + Benachrichtigung) liegt in `tray.py`.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
-from typing import Callable, Literal
+from typing import Literal
 
 from .config import MaintenanceConfig
 from .health import RepairResult, diagnose, repair_start
@@ -51,7 +52,7 @@ def _reap_companion_orphans(
     *,
     execute: bool = True,
     provider: ProcessProvider | None = None,
-    killer: Callable[[int], "tuple[bool, str]"] | None = None,
+    killer: Callable[[int], tuple[bool, str]] | None = None,
 ) -> int:
     """Bereinigt verwaiste Companion-app-server-Prozesse (codex-plugin-cc #277).
 
@@ -69,8 +70,9 @@ def _reap_companion_orphans(
     if not execute:
         return len(orphans)
 
-    from .processes import no_window_kwargs
     import subprocess
+
+    from .processes import no_window_kwargs
 
     reaped = 0
     for orphan in orphans:
@@ -97,7 +99,7 @@ def run_watchdog_tick(
     *,
     execute: bool = True,
     provider: ProcessProvider | None = None,
-    killer: Callable[[int], "tuple[bool, str]"] | None = None,
+    killer: Callable[[int], tuple[bool, str]] | None = None,
     relauncher: Callable[[], object] | None = None,
     diagnose_fn: Callable[..., object] | None = None,
     repair_fn: Callable[..., RepairResult] | None = None,
@@ -158,10 +160,15 @@ def run_watchdog_tick(
     # keinen laufenden Baum). Beim echten Kill (execute) messen wir die CPU des Codex-Baums;
     # arbeitet er, halten wir uns raus, um keinen Hintergrundlauf abzubrechen.
     if execute and zombie_pids:
+        resolved_activity_fn: Callable[..., object]
         if activity_fn is None:
-            from .orchestrator import observe_activity as activity_fn  # lazy: vermeidet Zyklen
+            from .orchestrator import observe_activity
+
+            resolved_activity_fn = observe_activity
+        else:
+            resolved_activity_fn = activity_fn
         try:
-            activity = activity_fn(config)
+            activity = resolved_activity_fn(config)
             busy = bool(getattr(activity, "active", False))
         except Exception:  # noqa: BLE001 -- im Zweifel NICHT killen (konservativ)
             busy = True
@@ -175,25 +182,25 @@ def run_watchdog_tick(
             )
 
     # Reap: genau der getestete, sichere S1-Schritt (nur Ghosts ohne Renderer + verwaistes Lockfile).
-    result = repair_fn(
+    repair_result = repair_fn(
         config, provider, killer, execute=execute, trigger="watchdog", write_log=execute
     )
 
     # Nur echtes Aufraeumen gilt als 'reaped' (sonst Falschmeldung + Zaehler-Spam alle 60 s).
-    if execute and result.status != "repaired":
-        action: WatchdogAction = "idle" if result.status == "nothing-to-do" else "failed"
+    if execute and repair_result.status != "repaired":
+        action: WatchdogAction = "idle" if repair_result.status == "nothing-to-do" else "failed"
         return WatchdogTickResult(
             action,
-            f"Kein Reap durchgefuehrt (Status: {result.status}).",
+            f"Kein Reap durchgefuehrt (Status: {repair_result.status}).",
             zombie_pids=zombie_pids,
             stale_lockfile=stale_lockfile,
-            repair_status=result.status,
+            repair_status=repair_result.status,
         )
 
     relaunched = False
     if (
         execute
-        and result.status == "repaired"
+        and repair_result.status == "repaired"
         and getattr(config, "watcher_relaunch_after_reap", False)
         and relauncher is not None
     ):
@@ -219,7 +226,7 @@ def run_watchdog_tick(
         message,
         zombie_pids=zombie_pids,
         stale_lockfile=stale_lockfile,
-        repair_status=result.status,
+        repair_status=repair_result.status,
         relaunched=relaunched,
         companion_orphans_reaped=companion_reaped,
     )

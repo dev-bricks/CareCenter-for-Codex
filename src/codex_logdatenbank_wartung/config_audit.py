@@ -9,11 +9,12 @@ Erkennt:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from pathlib import Path
+import contextlib
 import re
 import shutil
 import sqlite3
+from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Literal
 
 from .config import MaintenanceConfig
@@ -34,8 +35,18 @@ class AuditFinding:
 class AuditReport:
     findings: list[AuditFinding] = field(default_factory=list)
 
-    def add(self, category: str, severity: AuditSeverity, message: str, **kw: object) -> None:
-        self.findings.append(AuditFinding(category, severity, message, **kw))
+    def add(
+        self,
+        category: str,
+        severity: AuditSeverity,
+        message: str,
+        *,
+        detail: str = "",
+        auto_fixable: bool = False,
+    ) -> None:
+        self.findings.append(
+            AuditFinding(category, severity, message, detail, auto_fixable)
+        )
 
     @property
     def has_warnings(self) -> bool:
@@ -308,10 +319,8 @@ def _atomic_write_toml(toml_path: Path, content: str) -> None:
     except BaseException:
         if not closed:
             os.close(fd)
-        try:
+        with contextlib.suppress(OSError):
             os.unlink(tmp_name)
-        except OSError:
-            pass
         raise
 
 
@@ -346,7 +355,7 @@ def fix_duplicate_mcp(config: MaintenanceConfig) -> int:
             package_map.setdefault(package, []).append(server_name)
 
     to_remove: list[str] = []
-    for package, names in package_map.items():
+    for _package, names in package_map.items():
         if len(names) <= 1:
             continue
         # Behalte den Eintrag mit node_modules-Pfad (expliziter), entferne den Rest

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from datetime import datetime, timedelta
+from typing import Any
 
 from codex_logdatenbank_wartung.config import MaintenanceConfig
-from codex_logdatenbank_wartung.maintenance import MaintenanceResult
+from codex_logdatenbank_wartung.maintenance import MaintenanceResult, ResultStatus
 from codex_logdatenbank_wartung.orchestrator import (
     CodexActivity,
     auto_maintain,
@@ -11,17 +13,20 @@ from codex_logdatenbank_wartung.orchestrator import (
 )
 from codex_logdatenbank_wartung.processes import ProcessInfo
 
-
 CODEX_EXE = r"C:\Users\dev\AppData\Local\Programs\Codex\Codex.exe"
 
 
-def make_config(**kw) -> MaintenanceConfig:
-    base = dict(codex_executable=CODEX_EXE, idle_cpu_percent=10.0, idle_quiet_seconds=180)
+def make_config(**kw: Any) -> MaintenanceConfig:
+    base: dict[str, Any] = {
+        "codex_executable": CODEX_EXE,
+        "idle_cpu_percent": 10.0,
+        "idle_quiet_seconds": 180,
+    }
     base.update(kw)
     return MaintenanceConfig(**base)
 
 
-def fake_maintain(status: str = "ok"):
+def fake_maintain(status: ResultStatus = "ok"):
     calls = []
 
     def fn() -> MaintenanceResult:
@@ -59,7 +64,7 @@ def test_observe_active_when_child_worker_burns_cpu() -> None:
     # python-Worker als Kind des Codex-Hauptprozesses (anderer Name!)
     worker0 = ProcessInfo(200, "python.exe", r"C:\py\python.exe", "python run.py", parent_pid=100, cpu_ticks=5000)
     worker1 = ProcessInfo(200, "python.exe", r"C:\py\python.exe", "python run.py", parent_pid=100, cpu_ticks=5000 + 50_000_000)
-    snaps = iter([[main, worker0], [main, worker1]])
+    snaps: Iterator[list[ProcessInfo]] = iter([[main, worker0], [main, worker1]])
     act = observe_activity(config, provider=lambda: next(snaps), sleeper=noop_sleep, db_quiet_fn=lambda: 9999.0)
     assert act.present is True
     assert act.active is True
@@ -70,7 +75,7 @@ def test_observe_active_when_child_worker_burns_cpu() -> None:
 def test_observe_idle_when_quiet() -> None:
     config = make_config(activity_sample_seconds=2.0)
     main = ProcessInfo(100, "Codex.exe", CODEX_EXE, f'"{CODEX_EXE}"', parent_pid=10, cpu_ticks=1000)
-    snaps = iter([[main], [main]])  # keine CPU-Änderung
+    snaps: Iterator[list[ProcessInfo]] = iter([[main], [main]])  # keine CPU-Änderung
     act = observe_activity(config, provider=lambda: next(snaps), sleeper=noop_sleep, db_quiet_fn=lambda: 9999.0)
     assert act.present is True
     assert act.active is False
@@ -78,7 +83,7 @@ def test_observe_idle_when_quiet() -> None:
 
 def test_observe_absent_when_no_codex() -> None:
     config = make_config()
-    snaps = iter([[], []])
+    snaps: Iterator[list[ProcessInfo]] = iter([[], []])
     act = observe_activity(config, provider=lambda: next(snaps), sleeper=noop_sleep, db_quiet_fn=lambda: 9999.0)
     assert act.present is False
     assert act.active is False
@@ -233,6 +238,7 @@ def test_safe_mode_reaches_real_maintenance_despite_cli_noise(tmp_path) -> None:
     dass keine Desktop-App laeuft.
     """
     import sqlite3
+
     from codex_logdatenbank_wartung.maintenance import MaintenanceRunner
 
     db_path = tmp_path / "logs_2.sqlite"
@@ -248,14 +254,16 @@ def test_safe_mode_reaches_real_maintenance_despite_cli_noise(tmp_path) -> None:
         maintenance_lock_path=str(tmp_path / "maintenance.lock"),
     )
 
-    cli_noise = lambda: [
-        ProcessInfo(500, "node.exe", r"C:\Program Files\nodejs\node.exe",
-                    r"node C:\Users\dev\.codex\run.js"),
-        ProcessInfo(501, "node_repl.exe", r"C:\tools\node_repl.exe", ""),
-    ]
+    def cli_noise():
+        return [
+            ProcessInfo(500, "node.exe", r"C:\Program Files\nodejs\node.exe",
+                        r"node C:\Users\dev\.codex\run.js"),
+            ProcessInfo(501, "node_repl.exe", r"C:\tools\node_repl.exe", ""),
+        ]
 
-    real_maintain = lambda: MaintenanceRunner(config, cli_noise).run(
-        dry_run=False, trigger="auto-maintain")
+    def real_maintain():
+        return MaintenanceRunner(config, cli_noise).run(
+            dry_run=False, trigger="auto-maintain")
 
     res = auto_maintain(
         config, mode="safe", execute=True, allow_close=True,

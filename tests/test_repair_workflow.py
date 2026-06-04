@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from codex_logdatenbank_wartung.config import MaintenanceConfig
 from codex_logdatenbank_wartung.repair_workflow import (
     AdminRequired,
@@ -14,8 +16,8 @@ from codex_logdatenbank_wartung.repair_workflow import (
 )
 
 
-def make_config(**kw) -> MaintenanceConfig:
-    base = dict(deploy_timeout_seconds=75, renderer_timeout_seconds=120)
+def make_config(**kw: Any) -> MaintenanceConfig:
+    base: dict[str, Any] = {"deploy_timeout_seconds": 75, "renderer_timeout_seconds": 120}
     base.update(kw)
     return MaintenanceConfig(**base)
 
@@ -145,7 +147,7 @@ def test_fallback_timeout_blocks_and_stops_after_clean_s3_failure() -> None:
     def tag(name):
         def f():
             return None
-        f._tag = name  # type: ignore[attr-defined]
+        f._tag = name
         return f
 
     def rwt(fn, _secs):
@@ -179,7 +181,7 @@ def test_clean_failures_s3_and_fallback_then_abort_reboot() -> None:
     def tag(name):
         def f():
             return None
-        f._tag = name  # type: ignore[attr-defined]
+        f._tag = name
         return f
 
     def rwt_fail(fn, _secs):
@@ -230,7 +232,7 @@ def test_fallback_reset_succeeds_after_clean_s3_failure() -> None:
     def tag(name):
         def f():
             return None
-        f._tag = name  # type: ignore[attr-defined]
+        f._tag = name
         return f
 
     def rwt(fn, _secs):
@@ -261,7 +263,7 @@ def test_s3_access_denied_aborts_with_needs_admin_no_fallback() -> None:
     def tag(name):
         def f():
             return None
-        f._tag = name  # type: ignore[attr-defined]
+        f._tag = name
         return f
 
     def rwt(fn, _secs):
@@ -325,7 +327,7 @@ def test_remove_and_reinstall_are_never_called() -> None:
     def tag(name):
         def f():
             return None
-        f._tag = name  # type: ignore[attr-defined]
+        f._tag = name
         return f
 
     deps = RepairDeps(
@@ -406,6 +408,11 @@ def test_package_absent_in_planning_mode_reports_reinstall() -> None:
 
 def test_dry_run_calls_no_mutating_dep() -> None:
     muts: list[str] = []
+
+    def run_with_timeout(fn, _seconds):
+        muts.append("rwt")
+        return "ok", None
+
     deps = RepairDeps(
         observe=observe_const(
             RepairState(ghost_pids=[1], staged_update=True, clipsvc_running=False)
@@ -415,7 +422,7 @@ def test_dry_run_calls_no_mutating_dep() -> None:
         complete_staged_update=lambda: muts.append("stage"),
         reset_package=lambda: muts.append("reset"),
         launch_codex=lambda: muts.append("launch"),
-        run_with_timeout=lambda fn, s: (muts.append("rwt"), ("ok", None))[1],
+        run_with_timeout=run_with_timeout,
     )
     out = run_repair(make_config(), deps, dry_run=True)
     assert out.status == "ok"
@@ -486,7 +493,11 @@ def test_outcome_to_dict_and_to_text() -> None:
     data = out.to_dict()
     assert data["status"] == "ok"
     assert data["reached_window"] is True
-    assert data["steps"][0]["name"] == "S1"
+    steps = data["steps"]
+    assert isinstance(steps, list)
+    first_step = steps[0]
+    assert isinstance(first_step, dict)
+    assert first_step["name"] == "S1"
     text = out.to_text()
     assert "Status: ok" in text
     assert "S1" in text
