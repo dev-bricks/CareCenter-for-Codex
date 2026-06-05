@@ -75,6 +75,26 @@ def test_load_accepts_int_for_float_field(tmp_path: Path) -> None:
     )
 
 
+def test_load_rejects_bool_for_int_field(tmp_path: Path) -> None:
+    """bool darf nicht als gueltiger int-Wert durchgehen (bool ist int-Unterklasse).
+
+    Szenario: config.json enthaelt ``backup_keep: true`` (z. B. Tipp-Fehler).
+    Ohne den bool-Guard wuerde ``isinstance(True, type(3))`` == True gelten und
+    backup_keep=True (=1) speichern -- prune_backups() wuerde danach nur 1 Backup halten.
+    """
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        json.dumps({"backup_keep": True}),
+        encoding="utf-8",
+    )
+    config = MaintenanceConfig.load(config_path)
+    assert isinstance(config, MaintenanceConfig)
+    assert isinstance(config.backup_keep, int) and not isinstance(config.backup_keep, bool), (
+        f"backup_keep sollte int-Default sein, ist {config.backup_keep!r} ({type(config.backup_keep).__name__})"
+    )
+    assert config.backup_keep == 3  # Default-Wert
+
+
 def test_load_returns_defaults_on_wrong_field_type(tmp_path: Path) -> None:
     """Bug-Fix: Config mit bekanntem Feld in falschem Typ -> Defaults, kein Crash.
 
