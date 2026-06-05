@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.2 - 2026-06-05
+
+- Fixed the reproducible README/Store screenshot so it renders the normal status window with
+  readable text and captures the native title bar on Windows.
+
 ## 0.7.1 - 2026-06-05
 
 - Fixed Safe Start snapshot fallback typing so the new adapter passes isolated Mypy checks.
