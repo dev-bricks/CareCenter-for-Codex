@@ -158,7 +158,15 @@ class MaintenanceConfig:
             config.save(path)
             return config
 
-        data = json.loads(path.read_text(encoding="utf-8"))
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (ValueError, OSError):
+            # ValueError faengt JSONDecodeError UND UnicodeDecodeError (abgebrochener
+            # Multibyte-Schreibvorgang, Disk-Korruption) ab. OSError fuer Lesefehler.
+            # Sicher auf Defaults zurueckfallen, damit der Tray-Start nicht crasht.
+            return cls()
+        if not isinstance(data, dict):
+            return cls()
         known = set(cls.__dataclass_fields__)
         filtered = {key: value for key, value in data.items() if key in known}
         return cls(**filtered)
