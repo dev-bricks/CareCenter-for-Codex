@@ -59,3 +59,36 @@ def test_load_drops_legacy_watcher_terminate_user_starts_and_does_not_reemit(tmp
     saved = json.loads(config_path.read_text(encoding="utf-8"))
     assert "watcher_terminate_user_starts" not in saved
     assert saved["watcher_enabled"] is True
+
+
+def test_load_accepts_int_for_float_field(tmp_path: Path) -> None:
+    """Regression: JSON-Integer (z.B. 25) darf fuer ein float-Feld nicht verworfen werden."""
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        json.dumps({"idle_cpu_percent": 25}),
+        encoding="utf-8",
+    )
+    config = MaintenanceConfig.load(config_path)
+    assert isinstance(config, MaintenanceConfig)
+    assert config.idle_cpu_percent == 25.0, (
+        f"idle_cpu_percent sollte 25.0 sein, ist {config.idle_cpu_percent!r}"
+    )
+
+
+def test_load_returns_defaults_on_wrong_field_type(tmp_path: Path) -> None:
+    """Bug-Fix: Config mit bekanntem Feld in falschem Typ -> Defaults, kein Crash.
+
+    Scenario: Nutzer editiert config.json manuell und schreibt z.B.
+    backup_keep: "drei" statt 3 (gueltiges JSON, dict, aber falscher Typ fuer das Feld).
+    cls(**filtered) wuerde das speichern; spaeter crasht prune_backups() bei keep <= 0.
+    """
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        json.dumps({"backup_keep": "drei", "watcher_enabled": True}),
+        encoding="utf-8",
+    )
+    config = MaintenanceConfig.load(config_path)
+    assert isinstance(config, MaintenanceConfig)
+    assert isinstance(config.backup_keep, int), (
+        f"backup_keep sollte int sein (Defaults), ist {type(config.backup_keep).__name__!r}"
+    )

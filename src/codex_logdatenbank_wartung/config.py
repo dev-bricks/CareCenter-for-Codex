@@ -169,7 +169,26 @@ class MaintenanceConfig:
             return cls()
         known = set(cls.__dataclass_fields__)
         filtered = {key: value for key, value in data.items() if key in known}
-        return cls(**filtered)
+        # Typsicherung: Felder mit falschem Typ (z.B. backup_keep="drei" statt 3) werden
+        # verworfen und erhalten ihren Default -- verhindert spaete TypeErrors (keep<=0 etc.).
+        # JSON liefert fuer Dezimalfelder manchmal int (z.B. 25 statt 25.0) -- das ist ok.
+        # bool ist Unterklasse von int -- strikt behandeln, damit True/False nicht als int zaehlt.
+        def _type_ok(val: object, default: object) -> bool:
+            if isinstance(val, bool):
+                return isinstance(default, bool)
+            if isinstance(default, float):
+                return isinstance(val, (int, float))
+            return isinstance(val, type(default))
+
+        defaults = cls()
+        safe = {
+            key: val for key, val in filtered.items()
+            if _type_ok(val, getattr(defaults, key))
+        }
+        try:
+            return cls(**safe)
+        except Exception:
+            return defaults
 
     def save(self, path: Path = DEFAULT_CONFIG_PATH) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
