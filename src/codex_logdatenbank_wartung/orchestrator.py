@@ -232,9 +232,11 @@ def auto_maintain(
     launcher = launcher or default_launcher(config)
     maintain_fn = maintain_fn or _default_maintain_fn(config, execute, progress)
     # Schliessen ist nur erlaubt, wenn explizit gewuenscht (Tray-Klick / --close) oder
-    # per Konfiguration freigegeben. Sonst blockiert auto-maintain bei laufendem Codex,
-    # statt es ungefragt zu beenden (scheduler-/unbeaufsichtigt-sicher).
+    # per Konfiguration freigegeben. Fast-Modus impliziert immer Berechtigung — er ist
+    # per Definition ein "sofort beenden ohne Warten". Safe-Modus wartet erst auf Leerlauf
+    # und blockiert dann, wenn keine Berechtigung vorliegt (kein Sofort-Abbruch).
     allow = config.auto_close_codex if allow_close is None else allow_close
+    effective_allow = allow or (mode == "fast")
 
     def emit(phase: str, message: str, percent: int, indeterminate: bool = False) -> None:
         if progress is not None:
@@ -243,16 +245,6 @@ def auto_maintain(
     result = AutoMaintainResult(status="ok", mode=mode, dry_run=not execute)
     emit("assess", "Prüfe Codex-Zustand …", 0, True)
     act = observe_fn()
-
-    if act.present and not allow:
-        result.status = "blocked"
-        result.add(
-            "Codex läuft", "blocked",
-            "Codex läuft und Schließen ist nicht freigegeben (auto_close_codex=False bzw. kein --close). "
-            "Bitte Codex selbst beenden oder den Tray-Button nutzen.",
-        )
-        emit("blocked", "Codex läuft — Schließen nicht freigegeben.", 100)
-        return result
 
     if act.present:
         if mode == "safe":
@@ -285,6 +277,15 @@ def auto_maintain(
     # Codex (falls noch da) kontrolliert vollstaendig beenden.
     act = observe_fn()
     if act.present:
+        if not effective_allow:
+            result.status = "blocked"
+            result.add(
+                "Codex läuft", "blocked",
+                "Codex läuft und Schließen ist nicht freigegeben (auto_close_codex=False bzw. kein --close). "
+                "Bitte Codex selbst beenden oder den Tray-Button nutzen.",
+            )
+            emit("blocked", "Codex läuft — Schließen nicht freigegeben.", 100)
+            return result
         if not execute:
             result.add("Codex beenden", "planned", f"Würde Codex beenden ({mode}-Modus) und Reste bereinigen.")
         else:

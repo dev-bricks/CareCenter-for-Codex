@@ -205,6 +205,49 @@ def test_blocks_when_close_not_allowed() -> None:
     assert res.closed_codex is False
 
 
+def test_fast_mode_closes_without_explicit_allow_close_flag() -> None:
+    """Bug-Fix: Fast-Modus ohne --close-Flag beendet Codex (effective_allow=True via Modus)."""
+    config = make_config(auto_close_codex=False, restart_codex_after=False)
+    k = _kit()
+    mfn, calls = fake_maintain()
+    seq = [
+        CodexActivity(present=True, active=True, cpu_percent=300, main_pids=[100]),
+        CodexActivity(present=True, active=True, main_pids=[100]),
+        CodexActivity(present=False, active=False),
+        CodexActivity(present=False, active=False),
+    ]
+    res = auto_maintain(
+        config, mode="fast", execute=True, allow_close=None,
+        observe_fn=observe_sequence(seq),
+        killer=k["killer"], graceful_closer=k["closer"], launcher=k["launcher"],
+        maintain_fn=mfn, sleeper=noop_sleep,
+    )
+    assert res.status == "ok"
+    assert k["closed"] == [100]
+    assert calls == [True]
+    assert res.closed_codex is True
+    assert res.waited is False
+
+
+def test_safe_mode_waits_before_blocking_when_no_allow() -> None:
+    """Bug-Fix: Safe-Modus wartet (kein Sofort-Abbruch) auch ohne allow_close."""
+    config = make_config(auto_close_codex=False, idle_wait_timeout_seconds=1, activity_poll_seconds=0)
+    k = _kit()
+    mfn, calls = fake_maintain()
+    base = datetime(2026, 6, 5, 10, 0, 0)
+    times = iter([base, base + timedelta(seconds=10)])
+    res = auto_maintain(
+        config, mode="safe", execute=True, allow_close=False,
+        observe_fn=observe_sequence([CodexActivity(present=True, active=True, cpu_percent=200, main_pids=[100])]),
+        killer=k["killer"], graceful_closer=k["closer"], launcher=k["launcher"],
+        maintain_fn=mfn, sleeper=noop_sleep, clock=lambda: next(times),
+    )
+    assert res.status == "blocked"
+    assert res.waited is True
+    assert calls == []
+    assert k["closed"] == [] and k["killed"] == []
+
+
 def test_dry_run_does_not_touch_codex() -> None:
     config = make_config()
     k = _kit()
