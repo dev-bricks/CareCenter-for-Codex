@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+from unittest.mock import MagicMock, patch
+
 from codex_logdatenbank_wartung.config import MaintenanceConfig
 from codex_logdatenbank_wartung.processes import (
     ProcessInfo,
@@ -9,6 +12,7 @@ from codex_logdatenbank_wartung.processes import (
     is_companion_orphan,
     process_type,
     tree_pids,
+    windows_processes,
 )
 
 CODEX_EXE = r"C:\Users\dev\AppData\Local\Programs\Codex\Codex.exe"
@@ -34,7 +38,7 @@ def test_find_by_executable_uses_exact_path_not_substring() -> None:
     config = make_config()
     processes = [
         ProcessInfo(1, "Codex.exe", CODEX_EXE, f'"{CODEX_EXE}"'),
-        # Fremdprozess, der nur "codex" im Kommandozeilentext trägt -> darf NICHT matchen
+        # Fremdprozess, der nur "codex" im Kommandozeilentext traegt -> darf NICHT matchen
         ProcessInfo(2, "node.exe", r"C:\Program Files\nodejs\node.exe", "node serve --dir C:\\Users\\dev\\.codex"),
         # Anderes Codex an fremdem Pfad -> darf NICHT als unsere Ziel-Exe matchen
         ProcessInfo(3, "Codex.exe", r"C:\Other\Codex.exe", r'"C:\Other\Codex.exe"'),
@@ -122,3 +126,83 @@ def test_tree_and_descendants() -> None:
     ]
     assert descendant_pids(100, processes) == {101, 102, 103}
     assert tree_pids(100, processes) == {100, 101, 102, 103}
+
+
+# ---------------------------------------------------------------------------
+# windows_processes: Steuerzeichen im JSON-Output (Bug-Fix)
+# ---------------------------------------------------------------------------
+
+def _make_ps_result(stdout: str, returncode: int = 0) -> MagicMock:
+    """Hilfsfunktion: subprocess.CompletedProcess-Mock fuer windows_processes()."""
+    mock = MagicMock()
+    mock.returncode = returncode
+    mock.stdout = stdout
+    mock.stderr = ""
+    return mock
+
+
+def _buggy_ps_json_with_control_chars() -> str:
+    """Simuliert PowerShell-Output: Null-Byte (chr(0)) im CommandLine-Feld PLUS
+    das abschliessende \\r\\n wie PowerShell es immer anhaengt.
+
+    Damit werden BEIDE Teile des Bugs abgedeckt:
+    1. Null-Byte (0x00) im Stringwert -> json.loads scheitert an ungueltigem Steuerzeichen.
+    2. Trailing \\r\\n -> nach Sanitisierung ohne vorherigen strip() werden \\r\\n
+       zu \\u000d\\u000a ausserhalb der JSON-Struktur -> 'Extra data'-Fehler.
+    """
+    valid = json.dumps([{
+        "ProcessId": 42,
+        "ParentProcessId": 1,
+        "Name": "test.exe",
+        "ExecutablePath": "C:\\test.exe",
+        "CommandLine": "PLACEHOLDER",
+        "CpuTicks": 0,
+        "CreationDate": "",
+    }])
+    # chr(0) erzeugt das Null-Byte-Zeichen ohne Literal-Null-Byte im Quelltext.
+    json_with_null = valid.replace('"PLACEHOLDER"', '"test' + chr(0) + 'arg"')
+    # chr(13) + chr(10) = \\r\\n wie PowerShell es an den JSON-Output anhaengt.
+    return json_with_null + chr(13) + chr(10)
+
+
+def test_windows_processes_tolerates_control_chars_in_commandline() -> None:
+    """Bug-Fix: PowerShell laesst Steuerzeichen (z.B. Null-Bytes) in CommandLine
+    unescaped stehen und haengt \\r\\n ans Ende. Beide zusammen liessen
+    windows_processes() eine leere Liste zurueckgeben.
+
+    Dieser Test sperrt BEIDE Haelften des Fixes fest:
+    - Die Steuerzeichen-Sanitisierung (Null-Byte -> kein JSONDecodeError mehr)
+    - Das strip() vor der Sanitisierung (kein 'Extra data' durch \\r\\n)
+    """
+    import pytest
+
+    buggy_json = _buggy_ps_json_with_control_chars()
+
+    # Haelfte 1: json.loads muss ohne Fix scheitern (Null-Byte im Stringwert).
+    with pytest.raises(json.JSONDecodeError):
+        json.loads(buggy_json)
+
+    with patch("codex_logdatenbank_wartung.processes.subprocess.run") as mock_run:
+        mock_run.return_value = _make_ps_result(buggy_json)
+        result = windows_processes()
+
+    # Haelfte 2: Nach dem Fix (strip + sanitize) muessen die Prozesse korrekt geparst werden.
+    assert len(result) == 1
+    assert result[0].pid == 42
+    assert result[0].name == "test.exe"
+
+
+def test_windows_processes_returns_empty_on_powershell_failure() -> None:
+    """Fail-closed: Wenn PowerShell-Aufruf fehlschlaegt (returncode!=0), leere Liste."""
+    with patch("codex_logdatenbank_wartung.processes.subprocess.run") as mock_run:
+        mock_run.return_value = _make_ps_result("", returncode=1)
+        result = windows_processes()
+    assert result == []
+
+
+def test_windows_processes_returns_empty_on_empty_stdout() -> None:
+    """Fail-closed: Leerer stdout (PowerShell hat nichts ausgegeben) -> leere Liste."""
+    with patch("codex_logdatenbank_wartung.processes.subprocess.run") as mock_run:
+        mock_run.return_value = _make_ps_result("")
+        result = windows_processes()
+    assert result == []

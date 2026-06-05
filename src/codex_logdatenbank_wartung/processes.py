@@ -89,7 +89,17 @@ def windows_processes() -> list[ProcessInfo]:
         return []
 
     try:
-        rows = _as_process_list(json.loads(completed.stdout))
+        # Erst strip(), dann sanitisieren: das abschliessende \r\n von PowerShell
+        # darf nicht als Steuerzeichen-Escape in den JSON-Body wandern (Extra-data-Fehler).
+        # PowerShell's ConvertTo-Json laesst manchmal rohe Steuerzeichen (z.B.
+        # Null-Bytes in CommandLine-Feldern) unescaped stehen (JSON-RFC-Verletzung).
+        # Loesung: erst Whitespace-Strip, dann U+0000-U+001F durch \uXXXX ersetzen.
+        stdout_clean = re.sub(
+            r'[\x00-\x1f]',
+            lambda m: r'\u{:04x}'.format(ord(m.group())),
+            completed.stdout.strip(),
+        )
+        rows = _as_process_list(json.loads(stdout_clean))
     except json.JSONDecodeError:
         return []
 
