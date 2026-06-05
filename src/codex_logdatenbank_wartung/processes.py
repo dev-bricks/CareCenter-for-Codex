@@ -96,7 +96,7 @@ def windows_processes() -> list[ProcessInfo]:
         # Loesung: erst Whitespace-Strip, dann U+0000-U+001F durch \uXXXX ersetzen.
         stdout_clean = re.sub(
             r'[\x00-\x1f]',
-            lambda m: r'\u{:04x}'.format(ord(m.group())),
+            lambda m: f'\\u{ord(m.group()):04x}',
             completed.stdout.strip(),
         )
         rows = _as_process_list(json.loads(stdout_clean))
