@@ -6,6 +6,8 @@ from codex_logdatenbank_wartung.i18n import (
     _CATALOG,
     available_keys,
     get_language,
+    language_label,
+    normalize_language,
     set_language,
     t,
 )
@@ -77,6 +79,20 @@ def test_language_switch_is_consistent() -> None:
     assert en != de
     assert "No Codex" in en
     assert "Keine Codex" in de
+
+
+def test_language_helpers_normalize_and_label_values() -> None:
+    assert normalize_language("EN") == "en"
+    assert normalize_language(" de ") == "de"
+    assert normalize_language("fr") is None
+
+    set_language("en")
+    assert language_label("de") == "German"
+    assert language_label("en") == "English"
+
+    set_language("de")
+    assert language_label("de") == "Deutsch"
+    assert language_label("en") == "Englisch"
 
 
 # ---------------------------------------------------------------------------

@@ -39,6 +39,7 @@ from PySide6.QtWidgets import (
 
 from .config import MaintenanceConfig
 from .health import RepairResult, diagnose, repair_start
+from .i18n import LANGUAGES, get_language, language_label, normalize_language, set_language, t
 from .orchestrator import AutoMaintainResult, AutoProgress, Mode, auto_maintain
 from .single_instance import SingleInstanceGuard
 from .store_repair import StoreRepairResult, open_store_page, repair_store_codex
@@ -54,7 +55,7 @@ APP_SHORT = "CareCenter"
 
 def _zombie_text(count: int) -> str:
     """Zombie-Zaehler-Text fuers Status-Fenster (mit Zombie-Emoji, vom User gewuenscht)."""
-    return f"\U0001F9DF  {count} hängende Codex-Reste seit Start entfernt"
+    return t("zombie_counter", count=count)
 
 
 def _app_icon() -> QIcon:
@@ -287,7 +288,7 @@ class StartRepairWorker(QObject):
         try:
             report = diagnose(config)
         except Exception as exc:  # noqa: BLE001 -- Diagnose darf den Lauf nicht crashen
-            self.finished.emit({"outcome": "escalate", "reaped": 0, "message": f"Diagnose-Fehler: {exc}"})
+            self.finished.emit({"outcome": "escalate", "reaped": 0, "message": f"Diagnose: {exc}"})
             return
 
         installed = codex_installed_for_user(config)
@@ -299,18 +300,18 @@ class StartRepairWorker(QObject):
         )
 
         if decision == "already_running":
-            self.finished.emit({"outcome": "already_running", "reaped": 0, "message": "Codex läuft bereits — nichts zu tun."})
+            self.finished.emit({"outcome": "already_running", "reaped": 0, "message": t("codex_already_running")})
             return
         if decision == "needs_store_reinstall":
             self.finished.emit({
                 "outcome": "needs_store_reinstall", "reaped": 0,
-                "message": "Keine Codex-Installation gefunden — Neuinstallation aus dem Microsoft Store nötig.",
+                "message": t("store_reinstall_needed"),
             })
             return
 
         reaped = 0
         if decision == "reap":
-            self.progress.emit("Leichte Stufe: hängende Codex-Reste entfernen (ohne Admin) …")
+            self.progress.emit(t("repair_light_reap"))
             try:
                 result = repair_start(config, execute=True, trigger="tray-start", write_log=True)
                 reaped = sum(
@@ -318,10 +319,10 @@ class StartRepairWorker(QObject):
                     if step.name.startswith("Zombie beenden") and step.status == "ok"
                 )
             except Exception as exc:  # noqa: BLE001
-                self.finished.emit({"outcome": "escalate", "reaped": 0, "message": f"Reap-Fehler: {exc}"})
+                self.finished.emit({"outcome": "escalate", "reaped": 0, "message": f"Reap: {exc}"})
                 return
 
-            self.progress.emit("Codex starten und auf Fenster warten …")
+            self.progress.emit(t("repair_launch_wait"))
             with contextlib.suppress(Exception):  # noqa: BLE001 -- Startfehler eskalieren bei der naechsten Pruefung
                 default_launcher(config)()
 
@@ -340,17 +341,17 @@ class StartRepairWorker(QObject):
             if appeared:
                 self.finished.emit({
                     "outcome": "ok", "reaped": reaped,
-                    "message": "Codex gestartet — leichte Reparatur genügte (kein Admin nötig).",
+                    "message": t("repair_light_ok"),
                 })
                 return
             self.finished.emit({
                 "outcome": "escalate", "reaped": reaped,
-                "message": "Leichte Stufe genügte nicht — volle Reparatur folgt …",
+                "message": t("repair_light_escalate"),
             })
             return
 
         # decision == "needs_escalation": installiert, aber Start scheitert ohne offensichtliche Reste.
-        self.finished.emit({"outcome": "escalate", "reaped": 0, "message": "Volle Reparatur nötig …"})
+        self.finished.emit({"outcome": "escalate", "reaped": 0, "message": t("repair_full_needed")})
 
 
 class StatusWindow(QWidget):
@@ -365,6 +366,7 @@ class StatusWindow(QWidget):
     audit_requested = Signal()
     mcp_mode_changed = Signal(str)
     plugin_mode_changed = Signal(str)
+    language_changed = Signal(str)
 
     def __init__(self) -> None:
         super().__init__()
@@ -373,7 +375,7 @@ class StatusWindow(QWidget):
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
 
         layout = QVBoxLayout(self)
-        self.state_label = QLabel("Bereit.")
+        self.state_label = QLabel(t("ready"))
         self.state_label.setStyleSheet("font-weight: bold;")
         layout.addWidget(self.state_label)
 
@@ -397,15 +399,9 @@ class StatusWindow(QWidget):
 
         # Haupt-Aktion: EINE zusammengefasste Codex-Start-Reparatur (Eskalation, Stopp bei Erfolg).
         repair_row = QHBoxLayout()
-        self.repair_button = QPushButton("Codex reparieren")
-        self.repair_button.setToolTip(
-            "Begrenzte Reparatur (ohne Admin): hängende Reste entfernen, ClipSVC, sanftes "
-            "Re-Register, ein Reset-Fallback. Stoppt, sobald Codex startet. Schlägt bei Bedarf "
-            "Reboot, Neustart als Administrator oder Store-Neuinstallation vor."
-        )
+        self.repair_button = QPushButton()
         self.repair_button.clicked.connect(self.request_codex_repair)
-        self.diagnose_button = QPushButton("Diagnose")
-        self.diagnose_button.setToolTip("Nur prüfen (read-only), nichts ändern.")
+        self.diagnose_button = QPushButton()
         self.diagnose_button.clicked.connect(self.request_diagnose)
         repair_row.addWidget(self.repair_button)
         repair_row.addWidget(self.diagnose_button)
@@ -413,11 +409,9 @@ class StatusWindow(QWidget):
 
         # DB-Wartung (eigene Funktion, bewusst getrennt von der Start-Reparatur).
         maint_row = QHBoxLayout()
-        self.safe_button = QPushButton("Wartung – Safe")
-        self.safe_button.setToolTip("Wartet auf Codex-Leerlauf, schließt Codex, wartet, startet neu.")
+        self.safe_button = QPushButton()
         self.safe_button.clicked.connect(self.request_safe)
-        self.fast_button = QPushButton("Wartung – Fast")
-        self.fast_button.setToolTip("Sofort: Codex beenden und warten, ohne auf Leerlauf zu warten.")
+        self.fast_button = QPushButton()
         self.fast_button.clicked.connect(self.request_fast)
         maint_row.addWidget(self.safe_button)
         maint_row.addWidget(self.fast_button)
@@ -426,59 +420,56 @@ class StatusWindow(QWidget):
         # Store-Werkzeuge (Vorschläge/Notfall): meist als Vorschlag aus der Eskalation,
         # hier zusätzlich direkt erreichbar.
         store_row = QHBoxLayout()
-        self.store_button = QPushButton("Store-Update reparieren")
-        self.store_button.setToolTip("Store-Cache leeren und Codex-Paket neu registrieren.")
+        self.store_button = QPushButton()
         self.store_button.clicked.connect(self.request_store_repair)
-        self.store_reinstall_button = QPushButton("Codex neu installieren")
-        self.store_reinstall_button.setToolTip("Öffnet die Microsoft-Store-Seite der OpenAI-Codex-App.")
+        self.store_reinstall_button = QPushButton()
         self.store_reinstall_button.clicked.connect(self.request_store_reinstall)
         store_row.addWidget(self.store_button)
         store_row.addWidget(self.store_reinstall_button)
         layout.addLayout(store_row)
 
-        # Settings: Config-Audit (MCP-Duplikate, Plugins)
-        settings_group = QGroupBox("Einstellungen: Config-Audit")
-        settings_layout = QVBoxLayout(settings_group)
+        self.settings_group = QGroupBox()
+        settings_layout = QVBoxLayout(self.settings_group)
+
+        language_row = QHBoxLayout()
+        self.language_label_widget = QLabel()
+        language_row.addWidget(self.language_label_widget)
+        self.language_combo = QComboBox()
+        for language in LANGUAGES:
+            self.language_combo.addItem(language_label(language), language)
+        self.language_combo.currentIndexChanged.connect(self._on_language_index_changed)
+        language_row.addWidget(self.language_combo)
+        settings_layout.addLayout(language_row)
 
         mcp_row = QHBoxLayout()
-        mcp_row.addWidget(QLabel("MCP-Duplikate:"))
+        self.mcp_label = QLabel()
+        mcp_row.addWidget(self.mcp_label)
         self.mcp_combo = QComboBox()
         self.mcp_combo.addItems(["off", "notify", "auto"])
-        self.mcp_combo.setToolTip(
-            "off = ignorieren, notify = bei Fund benachrichtigen, "
-            "auto = Duplikate automatisch entfernen"
-        )
         mcp_row.addWidget(self.mcp_combo)
         settings_layout.addLayout(mcp_row)
 
         plugin_row = QHBoxLayout()
-        plugin_row.addWidget(QLabel("Ungenutzte Plugins:"))
+        self.plugin_label = QLabel()
+        plugin_row.addWidget(self.plugin_label)
         self.plugin_combo = QComboBox()
         self.plugin_combo.addItems(["off", "notify", "auto"])
-        self.plugin_combo.setToolTip(
-            "off = ignorieren, notify = bei Fund benachrichtigen, "
-            "auto = plattform-inkompatible Plugins automatisch deaktivieren"
-        )
         plugin_row.addWidget(self.plugin_combo)
         settings_layout.addLayout(plugin_row)
 
         self.mcp_combo.currentTextChanged.connect(self.mcp_mode_changed.emit)
         self.plugin_combo.currentTextChanged.connect(self.plugin_mode_changed.emit)
 
-        self.audit_button = QPushButton("Audit jetzt ausführen")
-        self.audit_button.setToolTip("Config-Audit sofort starten (prüft MCP + Plugins + CLI).")
+        self.audit_button = QPushButton()
         self.audit_button.clicked.connect(self.request_audit)
         settings_layout.addWidget(self.audit_button)
 
-        layout.addWidget(settings_group)
+        layout.addWidget(self.settings_group)
 
-        self.close_button = QPushButton("Schließen (läuft im Hintergrund weiter)")
-        self.close_button.setToolTip(
-            "Schließt nur das Fenster. Eine laufende Reparatur läuft weiter; über das "
-            "Tray-Menü 'Status & Fortschritt anzeigen' jederzeit wieder öffnen."
-        )
+        self.close_button = QPushButton()
         self.close_button.clicked.connect(self.hide)
         layout.addWidget(self.close_button)
+        self.retranslate()
 
     def request_audit(self) -> None:
         self.audit_requested.emit()
@@ -495,6 +486,52 @@ class StatusWindow(QWidget):
             self.plugin_combo.setCurrentIndex(idx_plugin)
         self.mcp_combo.blockSignals(False)
         self.plugin_combo.blockSignals(False)
+
+    def set_language_setting(self, language: str) -> None:
+        """Setzt den sichtbaren Sprachwert ohne Signals auszulösen."""
+        normalized = normalize_language(language) or get_language()
+        self.language_combo.blockSignals(True)
+        for index in range(self.language_combo.count()):
+            if self.language_combo.itemData(index) == normalized:
+                self.language_combo.setCurrentIndex(index)
+                break
+        self.language_combo.blockSignals(False)
+
+    def _on_language_index_changed(self, index: int) -> None:
+        language = normalize_language(self.language_combo.itemData(index))
+        if language is not None:
+            self.language_changed.emit(language)
+
+    def retranslate(self) -> None:
+        """Aktualisiert alle statischen UI-Texte nach einem Sprachwechsel."""
+        self.repair_button.setText(t("repair_codex"))
+        self.repair_button.setToolTip(t("repair_codex_tooltip"))
+        self.diagnose_button.setText(t("diagnose"))
+        self.diagnose_button.setToolTip(t("diagnose_tooltip"))
+        self.safe_button.setText(t("maintenance_safe_button"))
+        self.safe_button.setToolTip(t("maintenance_safe_tooltip"))
+        self.fast_button.setText(t("maintenance_fast_button"))
+        self.fast_button.setToolTip(t("maintenance_fast_tooltip"))
+        self.store_button.setText(t("store_repair"))
+        self.store_button.setToolTip(t("store_repair_tooltip"))
+        self.store_reinstall_button.setText(t("store_reinstall"))
+        self.store_reinstall_button.setToolTip(t("store_reinstall_tooltip"))
+        self.settings_group.setTitle(f"{t('settings_group')}: {t('settings_config_audit')}")
+        self.language_label_widget.setText(t("settings_language"))
+        self.language_combo.setToolTip(t("settings_language_tooltip"))
+        self.language_combo.blockSignals(True)
+        for index, language in enumerate(LANGUAGES):
+            if index < self.language_combo.count():
+                self.language_combo.setItemText(index, language_label(language))
+        self.language_combo.blockSignals(False)
+        self.mcp_label.setText(t("settings_mcp_duplicates"))
+        self.plugin_label.setText(t("settings_unused_plugins"))
+        self.mcp_combo.setToolTip(t("settings_audit_mode_tooltip"))
+        self.plugin_combo.setToolTip(t("settings_plugin_mode_tooltip"))
+        self.audit_button.setText(t("settings_audit_now"))
+        self.audit_button.setToolTip(t("settings_audit_now_tooltip"))
+        self.close_button.setText(t("window_close"))
+        self.close_button.setToolTip(t("window_close_tooltip"))
 
     def set_zombie_count(self, count: int) -> None:
         self.zombie_label.setText(_zombie_text(count))
@@ -531,6 +568,7 @@ class TrayController(QObject):
         super().__init__()
         self.config_path = config_path
         self.config = MaintenanceConfig.load(config_path)
+        set_language(normalize_language(self.config.language) or get_language())
         self.tray = tray
         self.running = False
         self.auto_thread: QThread | None = None
@@ -558,8 +596,10 @@ class TrayController(QObject):
         self.window.request_store_reinstall.connect(self.open_store_reinstall)
         self.window.mcp_mode_changed.connect(self.on_mcp_mode_changed)
         self.window.plugin_mode_changed.connect(self.on_plugin_mode_changed)
+        self.window.language_changed.connect(self.on_language_changed)
         self.window.audit_requested.connect(self.run_config_audit)
         self.window.set_audit_settings(self.config.audit_duplicate_mcp, self.config.audit_unused_plugins)
+        self.window.set_language_setting(self.config.language)
 
         # Bewusst schlankes Tray-Menue: EIN Reparatur-Eintrag (Eskalation), der Rest
         # (Diagnose, Wartung, Store) liegt als Buttons im Status-Fenster.
@@ -567,37 +607,23 @@ class TrayController(QObject):
         # Drei Einträge öffnen alle dasselbe Status-Fenster -- die Labels machen aber die
         # Use-Cases sichtbar (App-Übersicht / Fortschritt / Wartung), damit der User erkennt,
         # was das Tool kann.
-        self.open_action = QAction("CareCenter öffnen")
-        self.open_action.setToolTip("Öffnet das CareCenter-Fenster (Übersicht, Reparatur, Wartung, Store).")
+        self.open_action = QAction()
         self.open_action.triggered.connect(self.show_window)
-        self.status_action = QAction("Status & Fortschritt anzeigen")
+        self.status_action = QAction()
         self.status_action.triggered.connect(self.show_window)
-        self.maintenance_action = QAction("Wartung")
-        self.maintenance_action.setToolTip("Öffnet das Fenster mit den Wartungs-Buttons (Safe/Fast: DB-Wartung).")
+        self.maintenance_action = QAction()
         self.maintenance_action.triggered.connect(self.show_window)
-        self.repair_action = QAction("Codex reparieren")
-        self.repair_action.setToolTip(
-            "Begrenzte Reparatur (ohne Admin): hängende Reste entfernen, ClipSVC, sanftes "
-            "Re-Register, ein Reset-Fallback. Stopp sobald Codex startet. Schlägt bei Bedarf "
-            "Reboot, Neustart als Administrator oder Store-Neuinstallation vor."
-        )
+        self.repair_action = QAction()
         self.repair_action.triggered.connect(self.run_codex_repair)
-        self.safe_start_action = QAction("Safe Start prüfen")
-        self.safe_start_action.setToolTip(
-            "Zeigt Safe-Start-Snapshots, Start-Storm-Signale und seltene Catch-up-Kandidaten."
-        )
+        self.safe_start_action = QAction()
         self.safe_start_action.triggered.connect(self.show_safe_start_report)
-        self.watchdog_action = QAction("Auto-Wächter: Start-Reste entfernen")
+        self.watchdog_action = QAction()
         self.watchdog_action.setCheckable(True)
         self.watchdog_action.setChecked(bool(self.config.watcher_enabled))
-        self.watchdog_action.setToolTip(
-            "Überwacht im Hintergrund: ist Codex zu und hängen alte Reste (Ghost-Prozess ohne "
-            "Fenster / verwaistes Lockfile), werden sie entfernt, damit der nächste Start sauber "
-            "ist. Beendet nie eine aktive Sitzung und nie die Codex-CLI. Benachrichtigt beim Aufräumen."
-        )
         self.watchdog_action.toggled.connect(self.on_toggle_watchdog)
-        self.quit_action = QAction("Beenden")
+        self.quit_action = QAction()
         self.quit_action.triggered.connect(QApplication.quit)
+        self._retranslate_menu()
 
         self.menu.addAction(self.open_action)
         self.menu.addAction(self.status_action)
@@ -638,10 +664,24 @@ class TrayController(QObject):
         self.window.raise_()
         self.window.activateWindow()
 
+    def _retranslate_menu(self) -> None:
+        self.open_action.setText(t("open_carecenter"))
+        self.open_action.setToolTip(t("open_carecenter_tooltip"))
+        self.status_action.setText(t("show_status_progress"))
+        self.maintenance_action.setText(t("maintenance"))
+        self.maintenance_action.setToolTip(t("maintenance_action_tooltip"))
+        self.repair_action.setText(t("repair_codex"))
+        self.repair_action.setToolTip(t("repair_codex_tooltip"))
+        self.safe_start_action.setText(t("safe_start_check"))
+        self.safe_start_action.setToolTip(t("safe_start_tooltip"))
+        self.watchdog_action.setText(t("watchdog_menu"))
+        self.watchdog_action.setToolTip(t("watchdog_tooltip"))
+        self.quit_action.setText(t("quit"))
+
     def refresh_idle_tooltip(self) -> None:
         if self.running:
             return
-        self.tray.setToolTip(f"{APP_SHORT}: bereit  \U0001F9DF {self.zombie_kill_count}")
+        self.tray.setToolTip(t("tray_ready", app=APP_SHORT, count=self.zombie_kill_count))
 
     def _add_zombie_kills(self, count: int) -> None:
         """Zombie-Zaehler erhoehen und in Fenster + Tooltip spiegeln."""
@@ -650,29 +690,29 @@ class TrayController(QObject):
         self.zombie_kill_count += count
         self.window.set_zombie_count(self.zombie_kill_count)
         if not self.running:
-            self.tray.setToolTip(f"{APP_SHORT}: bereit  \U0001F9DF {self.zombie_kill_count}")
+            self.tray.setToolTip(t("tray_ready", app=APP_SHORT, count=self.zombie_kill_count))
 
     # -- Autonome Wartung (Safe/Fast) -------------------------------------
 
     def run_auto(self, mode: Mode) -> None:
         if self.running:
             self.tray.showMessage(
-                "CareCenter", "Eine Wartung läuft bereits.",
+                "CareCenter", t("maintenance_running"),
                 QSystemTrayIcon.MessageIcon.Information, 3000,
             )
             self.show_window()
             return
         self.running = True
         self.window.set_running(True)
-        label = "Safe-Modus" if mode == "safe" else "Fast-Modus"
-        self.window.set_state(f"Wartung läuft ({label}) …")
-        self.window.set_progress(0, "Wird vorbereitet …", True)
+        label = t("maintenance_safe_label") if mode == "safe" else t("maintenance_fast_label")
+        self.window.set_state(t("maintenance_state_running", mode=label))
+        self.window.set_progress(0, t("maintenance_prepare"), True)
         self.window.set_result("")
         self.show_window()
-        self.tray.setToolTip(f"CareCenter: {label} gestartet …")
+        self.tray.setToolTip(t("maintenance_tooltip_started", mode=label))
         self.tray.showMessage(
             "CareCenter",
-            f"Wartung gestartet ({label}). Fortschritt über Klick aufs Tray-Symbol.",
+            t("maintenance_started", mode=label),
             QSystemTrayIcon.MessageIcon.Information, 4000,
         )
 
@@ -696,30 +736,30 @@ class TrayController(QObject):
     def on_auto_finished(self, result: AutoMaintainResult) -> None:
         self.running = False
         self.window.set_running(False)
-        self.window.set_progress(100, "Fertig.", False)
+        self.window.set_progress(100, t("done"), False)
         summary = {
-            "ok": "Wartung abgeschlossen.",
-            "blocked": "Verschoben — Codex war aktiv (kein Lauf abgebrochen).",
-            "failed": "Fehlgeschlagen — Details im Protokoll.",
-        }.get(result.status, f"Beendet: {result.status}")
+            "ok": t("maintenance_done_ok"),
+            "blocked": t("maintenance_done_blocked"),
+            "failed": t("maintenance_done_failed"),
+        }.get(result.status, t("maintenance_done_other", status=result.status))
         self.window.set_state(summary)
         details = []
         if result.waited:
-            details.append("auf Leerlauf gewartet")
+            details.append(t("detail_waited_idle"))
         if result.closed_codex:
-            details.append("Codex beendet")
+            details.append(t("detail_closed_codex"))
         if result.restarted_codex:
-            details.append("Codex neu gestartet")
+            details.append(t("detail_restarted_codex"))
         if result.maintenance:
-            details.append(f"Wartung: {result.maintenance.get('status')}")
+            details.append(t("detail_maintenance_status", status=result.maintenance.get("status")))
         self.window.set_result(" · ".join(details) if details else "")
         icon = (
             QSystemTrayIcon.MessageIcon.Information
             if result.status == "ok"
             else QSystemTrayIcon.MessageIcon.Warning
         )
-        self.tray.setToolTip(f"CareCenter: {summary} (Klick für Details)")
-        self.tray.showMessage("CareCenter — fertig", summary, icon, 8000)
+        self.tray.setToolTip(f"CareCenter: {summary} ({t('click_for_details')})")
+        self.tray.showMessage(t("maintenance_toast_done"), summary, icon, 8000)
 
     def clear_auto_thread(self) -> None:
         self.auto_thread = None
@@ -739,15 +779,15 @@ class TrayController(QObject):
         """
         if self.start_repair_thread is not None or self.full_repair_thread is not None:
             self.tray.showMessage(
-                "Codex reparieren", "Läuft bereits.",
+                t("repair_codex"), t("repair_running"),
                 QSystemTrayIcon.MessageIcon.Information, 3000,
             )
             self.show_window()
             return
         self.running = True
         self.window.set_running(True)
-        self.window.set_state("Codex-Reparatur: leichte Stufe (ohne Admin) …")
-        self.window.set_progress(0, "Lage prüfen und hängende Reste entfernen …", True)
+        self.window.set_state(t("repair_light_state"))
+        self.window.set_progress(0, t("repair_light_prepare"), True)
         self.window.set_result("")
         self.show_window()
 
@@ -776,27 +816,24 @@ class TrayController(QObject):
         if outcome == "escalate":
             # Leichte Stufe genügte nicht -> volle Reparatur anschließen (ebenfalls ohne UAC).
             self.running = False  # run_full_repair verwaltet seinen eigenen Lauf-Zustand
-            self.window.set_state("Eskaliere zur vollen Reparatur …")
+            self.window.set_state(t("repair_escalating"))
             self.window.set_result(message)
             self.run_full_repair()
             return
 
         self.running = False
         self.window.set_running(False)
-        self.window.set_progress(100, "Fertig.", False)
+        self.window.set_progress(100, t("done"), False)
         self.window.set_state(message)
 
         if outcome == "needs_store_reinstall":
-            self.window.set_result(
-                "→ Knopf 'Codex neu installieren' (öffnet die Store-Seite). Es ist Teil "
-                "desselben Problems: ohne Installation kann nichts starten."
-            )
+            self.window.set_result(t("repair_reinstall_hint"))
             icon = QSystemTrayIcon.MessageIcon.Warning
         else:  # ok / already_running
             self.window.set_result("")
             icon = QSystemTrayIcon.MessageIcon.Information
         self.tray.setToolTip(f"{APP_SHORT}: {message}")
-        self.tray.showMessage("CareCenter – Codex reparieren", message, icon, 9000)
+        self.tray.showMessage(t("repair_toast_title"), message, icon, 9000)
 
     def clear_start_repair_thread(self) -> None:
         self.start_repair_thread = None
@@ -810,38 +847,38 @@ class TrayController(QObject):
         self.window.set_result(status.to_text())
         self.show_window()
         if status.storm_status in {"release_burst", "gate_active"}:
-            message = "Safe Start ist aktiv; CareCenter hält Start-Gegenaktionen zurück."
+            message = t("safe_start_active")
             icon = QSystemTrayIcon.MessageIcon.Warning
         elif status.eligible_count:
-            message = f"{status.eligible_count} seltene Automation(en) für Catch-up priorisieren."
+            message = t("safe_start_catchup", count=status.eligible_count)
             icon = QSystemTrayIcon.MessageIcon.Information
         else:
-            message = "Keine Safe-Start-Auffälligkeiten."
+            message = t("safe_start_ok")
             icon = QSystemTrayIcon.MessageIcon.Information
         self.tray.showMessage("CareCenter - Safe Start", message, icon, 7000)
 
     def show_diagnosis(self) -> None:
         report = diagnose(MaintenanceConfig.load(self.config_path))
         if report.zombie_main_pids or report.stale_lockfile or not report.codex_exe_present:
-            text = f"Startblockade erkannt (Status: {report.status}). Über 'Start reparieren' beheben."
+            text = t("diagnosis_start_blocker", status=report.status)
         elif report.status != "ok":
-            text = f"{len(report.issues)} Hinweis(e), Status: {report.status}."
+            text = t("diagnosis_findings", count=len(report.issues), status=report.status)
         else:
-            text = "Keine Startprobleme erkannt. Codex sollte normal starten."
-        self.window.set_state("Diagnose")
+            text = t("diagnosis_ok")
+        self.window.set_state(t("diagnose"))
         self.window.set_result(text)
         self.show_window()
-        self.tray.showMessage("Codex-Start-Diagnose", text, QSystemTrayIcon.MessageIcon.Information, 5000)
+        self.tray.showMessage(t("diagnosis_title"), text, QSystemTrayIcon.MessageIcon.Information, 5000)
 
     def repair_start_problems(self) -> None:
         if self.repair_thread is not None:
             self.tray.showMessage(
-                "Codex-Start-Reparatur", "Eine Reparatur läuft bereits.",
+                t("repair_done_title"), t("repair_running"),
                 QSystemTrayIcon.MessageIcon.Information, 3000,
             )
             return
-        self.window.set_state("Reparatur läuft …")
-        self.window.set_progress(0, "Suche hängende Codex-Prozesse / verwaiste Lockfiles …", True)
+        self.window.set_state(t("repair_running_state"))
+        self.window.set_progress(0, t("repair_searching"), True)
         self.repair_thread = QThread(self)
         self.repair_worker = RepairWorker(MaintenanceConfig.load(self.config_path))
         self.repair_worker.moveToThread(self.repair_thread)
@@ -854,11 +891,11 @@ class TrayController(QObject):
         self.repair_thread.start()
 
     def on_repair_finished(self, result: RepairResult) -> None:
-        self.window.set_progress(100, "Reparatur beendet.", False)
-        self.window.set_state(f"Reparatur: {result.status}")
+        self.window.set_progress(100, t("repair_done"), False)
+        self.window.set_state(t("repair_state_status", status=result.status))
         self.tray.showMessage(
-            "Codex-Start-Reparatur — fertig",
-            f"Reparatur beendet: {result.status}.",
+            t("repair_done_title"),
+            t("repair_done_status", status=result.status),
             QSystemTrayIcon.MessageIcon.Information, 6000,
         )
 
@@ -871,16 +908,16 @@ class TrayController(QObject):
     def run_store_repair(self) -> None:
         if self.store_thread is not None:
             self.tray.showMessage(
-                "Store-Reparatur", "Läuft bereits.",
+                t("store_repair"), t("repair_running"),
                 QSystemTrayIcon.MessageIcon.Information, 3000,
             )
             return
-        self.window.set_state("Store-Reparatur läuft …")
-        self.window.set_progress(0, "Store-Cache leeren und Codex-Paket neu registrieren …", True)
+        self.window.set_state(t("store_repair_running"))
+        self.window.set_progress(0, t("store_repair_progress"), True)
         self.show_window()
         self.tray.showMessage(
-            "Store-Reparatur",
-            "Leere Store-Cache und registriere das Codex-Paket neu …",
+            t("store_repair"),
+            t("store_repair_toast_progress"),
             QSystemTrayIcon.MessageIcon.Information, 4000,
         )
         self.store_thread = QThread(self)
@@ -897,14 +934,14 @@ class TrayController(QObject):
     def on_store_repair_finished(self, result: StoreRepairResult) -> None:
         ok = result.status == "ok"
         msg = (
-            "Store-Cache geleert und Codex-Paket neu registriert. Codex sollte wieder aktualisierbar sein."
-            if ok else f"Store-Reparatur: {result.status} — Details im Protokoll/Logfenster."
+            t("store_repair_ok")
+            if ok else t("store_repair_failed", status=result.status)
         )
-        self.window.set_progress(100, "Store-Reparatur beendet.", False)
+        self.window.set_progress(100, t("store_repair_done"), False)
         self.window.set_state(msg)
         # Tray-Icon bleibt konstant (kein Wechsel) -- siehe CODEX-AUTO-DEBUG-DESIGN.md.
         self.tray.showMessage(
-            "Store-Reparatur — fertig", msg,
+            t("store_repair_done_title"), msg,
             QSystemTrayIcon.MessageIcon.Information if ok else QSystemTrayIcon.MessageIcon.Warning,
             7000,
         )
@@ -918,23 +955,22 @@ class TrayController(QObject):
         product_id = getattr(self.config, "codex_store_product_id", "") or ""
         if not product_id:
             self.tray.showMessage(
-                "Codex aus dem Store neu installieren",
-                "Keine Store-Produkt-ID konfiguriert.",
+                t("store_reinstall_title"),
+                t("store_product_missing"),
                 QSystemTrayIcon.MessageIcon.Warning, 6000,
             )
             return
         ok, detail = open_store_page(product_id)
         if ok:
             self.tray.showMessage(
-                "Codex aus dem Store neu installieren",
-                "Store-Seite geoeffnet. Dort auf 'Installieren' klicken — danach ist Codex "
-                "wieder Store-verwaltet (Auto-Updates).",
+                t("store_reinstall_title"),
+                t("store_page_opened"),
                 QSystemTrayIcon.MessageIcon.Information, 8000,
             )
         else:
             self.tray.showMessage(
-                "Codex aus dem Store neu installieren",
-                f"Store-Seite konnte nicht geoeffnet werden: {detail}",
+                t("store_reinstall_title"),
+                t("store_page_failed", detail=detail),
                 QSystemTrayIcon.MessageIcon.Warning, 8000,
             )
 
@@ -943,20 +979,20 @@ class TrayController(QObject):
     def run_full_repair(self) -> None:
         if self.full_repair_thread is not None:
             self.tray.showMessage(
-                "Codex-Start-Reparatur (voll)", "Läuft bereits.",
+                t("repair_full"), t("repair_running"),
                 QSystemTrayIcon.MessageIcon.Information, 3000,
             )
             self.show_window()
             return
         self.running = True
         self.window.set_running(True)
-        self.window.set_state("Volle Reparatur läuft …")
-        self.window.set_progress(0, "Volle Eskalation läuft …", True)
+        self.window.set_state(t("repair_full_running"))
+        self.window.set_progress(0, t("repair_full_progress"), True)
         self.window.set_result("")
         self.show_window()
         self.tray.showMessage(
-            "Codex-Start-Reparatur (voll)",
-            "Volle Eskalation gestartet.",
+            t("repair_full"),
+            t("repair_full_started"),
             QSystemTrayIcon.MessageIcon.Information, 5000,
         )
 
@@ -984,17 +1020,14 @@ class TrayController(QObject):
     def on_full_repair_finished(self, outcome: object) -> None:
         self.running = False
         self.window.set_running(False)
-        self.window.set_progress(100, "Fertig.", False)
+        self.window.set_progress(100, t("done"), False)
         if not isinstance(outcome, dict):
-            self.window.set_state("Reparatur unterbrochen")
-            self.window.set_result(
-                "Die Reparatur wurde unterbrochen oder ist fehlgeschlagen. "
-                "Bitte erneut versuchen."
-            )
-            self.tray.setToolTip("CareCenter: Reparatur unterbrochen")
+            self.window.set_state(t("repair_interrupted"))
+            self.window.set_result(t("repair_interrupted_detail"))
+            self.tray.setToolTip(f"CareCenter: {t('repair_interrupted')}")
             self.tray.showMessage(
-                "Codex-Start-Reparatur (voll)",
-                "Reparatur unterbrochen.",
+                t("repair_full"),
+                t("repair_interrupted"),
                 QSystemTrayIcon.MessageIcon.Warning, 7000,
             )
             return
@@ -1008,18 +1041,18 @@ class TrayController(QObject):
             # Eine Deploy-Op scheiterte EINDEUTIG an fehlenden Admin-Rechten. KEINE Selbst-Elevation
             # (der fruehere UAC-Selbstaufruf verklemmte den Appinfo-Dienst) -- der User startet bewusst
             # neu mit Admin-Rechten. Ein Reboot hilft hier NICHT.
-            summary = "CareCenter braucht für die Reparatur Admin-Rechte. Starte die App neu mit Admin-Rechten."
+            summary = t("repair_admin_required")
         elif needs_reinstall:
             # Store-Paket vollstaendig weg -> Reparatur kann nichts registrieren.
             # Ehrliche Botschaft + Hinweis aufs Menue (KEIN Auto-Install -- der User
             # entscheidet, wann er neu installiert).
-            summary = "Store-Paket fehlt — Neuinstallation aus dem Store nötig (kein Reboot)."
+            summary = t("repair_store_missing")
         else:
             summary = {
-                "ok": "Codex-Start repariert — Fenster erschienen.",
-                "blocked": "Gestoppt — AppX-Engine verklemmt. Reboot empfohlen.",
-                "failed": "Reparatur erschöpft (sanftes Re-Register + Reset). Reboot empfohlen.",
-            }.get(status, f"Beendet: {status}")
+                "ok": t("repair_full_ok"),
+                "blocked": t("repair_full_blocked"),
+                "failed": t("repair_full_failed"),
+            }.get(status, t("maintenance_done_other", status=status))
         self.window.set_state(summary)
         lines = [
             f"[{step.get('status')}] {step.get('name')}: {step.get('message')}"
@@ -1027,13 +1060,13 @@ class TrayController(QObject):
             if isinstance(step, dict)
         ]
         if needs_admin:
-            lines.append("→ App als Administrator neu starten (Rechtsklick → 'Als Administrator ausführen').")
+            lines.append(t("repair_admin_hint"))
         elif needs_reinstall:
-            lines.append("→ Knopf 'Codex neu installieren' im Fenster (öffnet die Store-Seite). Nur ein Vorschlag.")
+            lines.append(t("repair_reinstall_button_hint"))
         elif reboot:
-            lines.append("→ Reboot empfohlen (nur ein Vorschlag).")
+            lines.append(t("repair_reboot_hint"))
         elif reached:
-            lines.append("→ Codex-Fenster erkannt.")
+            lines.append(t("repair_window_detected"))
         self.window.set_result("\n".join(lines))
         icon = (
             QSystemTrayIcon.MessageIcon.Information
@@ -1041,15 +1074,15 @@ class TrayController(QObject):
             else QSystemTrayIcon.MessageIcon.Warning
         )
         if needs_admin:
-            tip = "Admin-Rechte nötig — App als Administrator neu starten."
+            tip = t("repair_admin_tip")
         elif needs_reinstall:
-            tip = "Store-Paket fehlt — Knopf 'Codex neu installieren' im Fenster."
+            tip = t("repair_reinstall_tip")
         elif reboot:
-            tip = "Reparatur gestoppt — Reboot empfohlen."
+            tip = t("repair_reboot_tip")
         else:
             tip = summary
         self.tray.setToolTip(f"CareCenter: {tip}")
-        self.tray.showMessage("CareCenter – Codex reparieren", summary, icon, 9000)
+        self.tray.showMessage(t("repair_toast_title"), summary, icon, 9000)
 
     def clear_full_repair_thread(self) -> None:
         self.full_repair_thread = None
@@ -1071,6 +1104,26 @@ class TrayController(QObject):
         with contextlib.suppress(OSError):
             self.config.save(self.config_path)
 
+    def on_language_changed(self, language: str) -> None:
+        normalized = normalize_language(language)
+        if normalized is None:
+            return
+        self.config.language = normalized
+        set_language(normalized)
+        with contextlib.suppress(OSError):
+            self.config.save(self.config_path)
+        self.window.set_language_setting(normalized)
+        self.window.retranslate()
+        if not self.running:
+            self.window.set_state(t("ready"))
+        self._retranslate_menu()
+        self.refresh_idle_tooltip()
+        self.tray.showMessage(
+            "CareCenter",
+            t("settings_language_saved", language=language_label(normalized)),
+            QSystemTrayIcon.MessageIcon.Information, 3000,
+        )
+
     def run_config_audit(self) -> None:
         """Fuehrt einen sofortigen Config-Audit aus und zeigt die Ergebnisse."""
         from .config_audit import fix_duplicate_mcp, fix_unused_plugins, run_full_audit
@@ -1088,26 +1141,27 @@ class TrayController(QObject):
 
         lines = [report.summary()]
         if fixed_mcp:
-            lines.append(f"\nAuto-Fix: {fixed_mcp} MCP-Duplikat(e) entfernt.")
+            lines.append("\n" + t("audit_fixed_mcp", count=fixed_mcp))
         if fixed_plugins:
-            lines.append(f"\nAuto-Fix: {fixed_plugins} Plugin(s) deaktiviert.")
+            lines.append("\n" + t("audit_fixed_plugins", count=fixed_plugins))
         result_text = "\n".join(lines)
 
-        self.window.set_state("Config-Audit abgeschlossen")
+        self.window.set_state(t("audit_done"))
         self.window.set_result(result_text)
         self.show_window()
 
         if report.has_warnings or fixed_mcp or fixed_plugins:
+            fixed_count = fixed_mcp + fixed_plugins
             self.tray.showMessage(
-                "CareCenter – Config-Audit",
-                f"{len(report.findings)} Befund(e)"
-                + (f", {fixed_mcp + fixed_plugins} auto-korrigiert" if fixed_mcp + fixed_plugins else ""),
+                t("audit_title"),
+                t("audit_findings", count=len(report.findings))
+                + (t("audit_auto_fixed_suffix", count=fixed_count) if fixed_count else ""),
                 QSystemTrayIcon.MessageIcon.Warning, 6000,
             )
         else:
             self.tray.showMessage(
-                "CareCenter – Config-Audit",
-                "Keine Auffälligkeiten.",
+                t("audit_title"),
+                t("audit_no_findings"),
                 QSystemTrayIcon.MessageIcon.Information, 4000,
             )
 
@@ -1135,20 +1189,20 @@ class TrayController(QObject):
         )
 
     def on_watchdog_reaped(self, info: object) -> None:
-        message = "Hängende Codex-Reste entfernt."
+        message = t("watchdog_reaped_short")
         if isinstance(info, dict):
             message = str(info.get("message") or message)
             self._add_zombie_kills(len(info.get("zombie_pids") or []))
         self.tray.showMessage(
-            "CareCenter – Start-Prävention",
+            t("watchdog_toast_title"),
             message,
             QSystemTrayIcon.MessageIcon.Information, 8000,
         )
 
     def on_audit_finding(self, summary: str) -> None:
-        short = summary.split("\n")[0] if summary else "Config-Befund"
+        short = summary.split("\n")[0] if summary else t("audit_finding")
         self.tray.showMessage(
-            "CareCenter – Config-Audit",
+            t("audit_title"),
             short,
             QSystemTrayIcon.MessageIcon.Information, 6000,
         )
@@ -1160,8 +1214,8 @@ class TrayController(QObject):
         if checked and self.watchdog_thread is None:
             self._start_watchdog()
         self.tray.showMessage(
-            "Codex-Start-Prävention",
-            "Auto-Wächter aktiv." if checked else "Auto-Wächter deaktiviert.",
+            t("watchdog_toggle_title"),
+            t("watchdog_enabled") if checked else t("watchdog_disabled_toast"),
             QSystemTrayIcon.MessageIcon.Information, 4000,
         )
 
@@ -1188,15 +1242,7 @@ def run_tray(config_path: Path) -> int:
             pass
 
     config = MaintenanceConfig.load(config_path)
-
-    from .i18n import Language, detect_language, set_language
-
-    language = (
-        cast(Language, config.language)
-        if config.language in ("de", "en")
-        else detect_language()
-    )
-    set_language(language)
+    set_language(normalize_language(config.language) or get_language())
 
     guard = SingleInstanceGuard(
         "Global\\CareCenterForCodex",
@@ -1215,7 +1261,7 @@ def run_tray(config_path: Path) -> int:
     tray.show()
     tray.showMessage(
         "CareCenter",
-        "Tray läuft. Klick aufs Symbol öffnet Status & Fortschritt.",
+        t("tray_start_message"),
         QSystemTrayIcon.MessageIcon.Information, 4000,
     )
     exit_code = app.exec()

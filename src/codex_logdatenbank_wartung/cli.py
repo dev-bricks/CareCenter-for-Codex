@@ -5,9 +5,10 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
-from typing import Protocol, cast
+from typing import Protocol
 
 from .config import DEFAULT_CONFIG_PATH, MaintenanceConfig
+from .i18n import normalize_language, set_language, t
 from .maintenance import MaintenanceRunner
 from .processes import describe_processes, find_codex_processes
 
@@ -25,26 +26,26 @@ def load_config(args: argparse.Namespace) -> MaintenanceConfig:
 def cmd_init_config(args: argparse.Namespace) -> int:
     path = Path(args.config)
     if path.exists() and not args.force:
-        print(f"Konfiguration existiert bereits: {path}")
+        print(t("config_exists", path=path))
         return 0
     config = MaintenanceConfig()
     config.save(path)
-    print(f"Konfiguration geschrieben: {path}")
+    print(t("config_written", path=path))
     return 0
 
 
 def cmd_status(args: argparse.Namespace) -> int:
     config = load_config(args)
     db_path = config.db_path
-    print(f"Konfiguration: {Path(args.config)}")
-    print(f"Datenbank: {db_path}")
-    print(f"Datenbank vorhanden: {db_path.exists()}")
+    print(t("cli_config", path=Path(args.config)))
+    print(t("cli_database", path=db_path))
+    print(t("cli_database_exists", exists=db_path.exists()))
     processes = find_codex_processes(config)
     if processes:
-        print("Codex läuft:")
+        print(t("cli_codex_running"))
         print(describe_processes(processes))
         return 2
-    print("Keine Codex-Prozesse erkannt.")
+    print(t("cli_no_codex_processes"))
     return 0
 
 
@@ -122,7 +123,7 @@ def cmd_store_screenshot(args: argparse.Namespace) -> int:
     from .store_screenshot import render_store_screenshot
 
     output_path = render_store_screenshot(Path(args.output))
-    print(f"Store-Screenshot geschrieben: {output_path}")
+    print(t("cli_screenshot_written", path=output_path))
     return 0
 
 
@@ -196,7 +197,7 @@ def cmd_repair(args: argparse.Namespace) -> int:
     if args.execute and not dry_run:
         log_path = _persist_repair_log(config, result)
         if log_path is not None:
-            print(f"Log: {log_path}")
+            print(t("cli_log", path=log_path))
 
     print(result.to_text())
     return {"ok": 0, "blocked": 2, "failed": 1}.get(result.status, 1)
@@ -452,18 +453,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
-    from .i18n import Language, detect_language, set_language
-
     config_path = Path(args.config)
     if config_path.exists():
         try:
             config = MaintenanceConfig.load(config_path)
-            language = (
-                cast(Language, config.language)
-                if config.language in ("de", "en")
-                else detect_language()
-            )
-            set_language(language)
+            set_language(normalize_language(config.language) or config.language)
         except (ValueError, OSError):
             pass
 

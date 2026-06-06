@@ -71,24 +71,24 @@ class MaintenanceResult:
 
     def to_text(self) -> str:
         lines = [
-            f"Status: {self.status}",
-            f"Dry-Run: {self.dry_run}",
-            f"Datenbank: {self.database_path}",
+            f"{t('report_status')}: {self.status}",
+            f"{t('report_dry_run')}: {self.dry_run}",
+            f"{t('report_database')}: {self.database_path}",
         ]
         if self.backup_dir:
-            lines.append(f"Backup: {self.backup_dir}")
+            lines.append(f"{t('report_backup')}: {self.backup_dir}")
         if self.codex_processes:
-            lines.append("Codex-Prozesse:")
+            lines.append(f"{t('report_codex_processes')}:")
             for process in self.codex_processes:
                 lines.append(
                     f"  - {process.get('pid')} {process.get('name')} "
                     f"{process.get('executable') or process.get('command_line') or ''}".rstrip()
                 )
-        lines.append("Schritte:")
+        lines.append(f"{t('report_steps')}:")
         for step in self.steps:
             lines.append(f"  - [{step.status}] {step.name}: {step.message}")
         if self.error:
-            lines.append(f"Fehler: {self.error}")
+            lines.append(f"{t('report_error')}: {self.error}")
         return "\n".join(lines)
 
 
@@ -169,23 +169,23 @@ class MaintenanceRunner:
             trigger=trigger,
         )
 
-        self._emit("start", "Wartung gestartet …", 0)
+        self._emit("start", t("maintenance_progress_start"), 0)
         try:
             self._run_inner(result)
         except Exception as exc:  # pragma: no cover - Schutznetz für Protokollierung
             result.status = "failed"
             result.error = f"{type(exc).__name__}: {exc}"
-            result.add("Ausnahme", "failed", traceback.format_exc())
+            result.add(t("step_exception"), "failed", traceback.format_exc())
         finally:
             result.ended_at = iso_now()
             if not dry_run:
                 self.write_log(result)
         terminal = {
-            "ok": "Wartung abgeschlossen.",
-            "blocked": "Wartung übersprungen (blockiert).",
-            "failed": "Wartung fehlgeschlagen.",
-            "dry-run": "Dry-Run abgeschlossen.",
-        }.get(result.status, f"Wartung beendet: {result.status}")
+            "ok": t("maintenance_done_ok"),
+            "blocked": t("maintenance_terminal_blocked"),
+            "failed": t("maintenance_terminal_failed"),
+            "dry-run": t("maintenance_terminal_dry_run"),
+        }.get(result.status, t("maintenance_terminal_other", status=result.status))
         self._emit(result.status, terminal, 100)
         return result
 
@@ -196,13 +196,13 @@ class MaintenanceRunner:
 
         if not db_path.exists():
             result.status = "failed"
-            result.add("Datenbank", "failed", f"{db_path} wurde nicht gefunden.")
+            result.add(t("step_database"), "failed", t("database_missing", path=db_path))
             return
 
         result.add(
-            "Datenbank",
+            t("step_database"),
             "ok",
-            f"{db_path} vorhanden; {len(existing_sidecars)} Datei(en) inklusive WAL/SHM gefunden.",
+            t("database_found", path=db_path, count=len(existing_sidecars)),
         )
 
         if self.process_provider is None:
@@ -210,7 +210,7 @@ class MaintenanceRunner:
             if not all_processes:
                 result.status = "blocked"
                 result.add(
-                    "Codex-Prozessprüfung",
+                    t("process_check_step"),
                     "blocked",
                     t("process_check_fail_closed"),
                 )
@@ -224,61 +224,61 @@ class MaintenanceRunner:
         result.codex_processes = [asdict(process) for process in codex_processes]
         if codex_processes:
             result.status = "blocked"
-            result.add("Codex-Prozessprüfung", "blocked", t("process_check_blocked"))
+            result.add(t("process_check_step"), "blocked", t("process_check_blocked"))
             return
-        result.add("Codex-Prozessprüfung", "ok", t("process_check_ok"))
+        result.add(t("process_check_step"), "ok", t("process_check_ok"))
 
         if is_onedrive_path(db_path) and not self.config.allow_onedrive_control:
             result.status = "blocked"
             result.add(
-                "OneDrive-Schutz",
+                t("step_onedrive"),
                 "blocked",
-                "Datenbank liegt in OneDrive; OneDrive-Kontrolle ist nicht freigegeben.",
+                t("onedrive_blocked"),
             )
             return
-        result.add("OneDrive-Schutz", "ok", "Keine blockierende OneDrive-Lage erkannt.")
+        result.add(t("step_onedrive"), "ok", t("onedrive_ok"))
 
         if result.dry_run:
-            result.add("Backup", "planned", "Backup würde in einem Zeitstempelordner erstellt.")
+            result.add(t("step_backup"), "planned", t("backup_planned"))
             if self.config.backup_state_db:
-                result.add("State-DB-Backup", "planned", "state_5.sqlite würde mitgesichert (kein VACUUM).")
-            result.add("Integritätscheck", "planned", "Integritätscheck würde auf dem Backup laufen.")
+                result.add(t("step_state_backup"), "planned", t("state_backup_planned"))
+            result.add(t("step_integrity"), "planned", t("integrity_planned"))
             if self.config.allow_optimize:
-                result.add("Optimize", "planned", "PRAGMA optimize würde ausgeführt.")
+                result.add(t("step_optimize"), "planned", t("optimize_planned"))
             if self.config.allow_vacuum:
-                result.add("Vacuum", "planned", "VACUUM würde nach erfolgreichem Check laufen.")
+                result.add(t("step_vacuum"), "planned", t("vacuum_planned"))
             result.add(
-                "Archivierung",
+                t("step_archive"),
                 "skipped",
-                "Alte Logs werden ohne explizite Konfiguration nicht archiviert oder gelöscht.",
+                t("archive_skipped"),
             )
             return
 
         with MaintenanceLock(self.config.lock_path) as lock:
             if not lock.acquired:
                 result.status = "blocked"
-                result.add("Wartungs-Lock", "blocked", "Eine Wartung läuft bereits.")
+                result.add(t("step_lock"), "blocked", t("lock_running"))
                 return
-            result.add("Wartungs-Lock", "ok", f"Lock gesetzt: {self.config.lock_path}")
+            result.add(t("step_lock"), "ok", t("lock_set", path=self.config.lock_path))
 
-            self._emit("backup", "Sicherung wird erstellt …", 5)
+            self._emit("backup", t("backup_progress_start"), 5)
             backup_dir = self.create_backup(existing_sidecars)
             result.backup_dir = str(backup_dir)
-            result.add("Backup", "ok", f"Backup erstellt: {backup_dir}")
+            result.add(t("step_backup"), "ok", t("backup_created", path=backup_dir))
 
             if self.config.backup_state_db:
                 self._backup_state_db(backup_dir, result)
 
             self.prune_backups(result)
 
-            self._emit("integrity", "Integritätscheck auf der Sicherung …", 58, indeterminate=True)
+            self._emit("integrity", t("integrity_progress"), 58, indeterminate=True)
             backup_db = backup_dir / db_path.name
             integrity = self.integrity_check(backup_db)
             if integrity != "ok":
                 result.status = "failed"
-                result.add("Integritätscheck", "failed", integrity)
+                result.add(t("step_integrity"), "failed", integrity)
                 return
-            result.add("Integritätscheck", "ok", "SQLite meldet integrity_check=ok.")
+            result.add(t("step_integrity"), "ok", t("integrity_ok"))
 
             self.archive_old_logs(result)
             self.optimize_and_vacuum(db_path, result)
@@ -288,19 +288,19 @@ class MaintenanceRunner:
         state_files = database_sidecars(self.config.state_db_path)
         existing = [f for f in state_files if f.exists()]
         if not existing:
-            result.add("State-DB-Backup", "skipped", "state_5.sqlite nicht gefunden.")
+            result.add(t("step_state_backup"), "skipped", t("state_backup_missing"))
             return
         try:
             for source in existing:
                 shutil.copy2(source, backup_dir / source.name)
             total_mb = sum(f.stat().st_size for f in existing) / (1024 * 1024)
             result.add(
-                "State-DB-Backup",
+                t("step_state_backup"),
                 "ok",
-                f"state_5.sqlite gesichert ({total_mb:.1f} MB, {len(existing)} Datei(en)).",
+                t("state_backup_ok", mb=total_mb, count=len(existing)),
             )
         except OSError as exc:
-            result.add("State-DB-Backup", "failed", f"Backup fehlgeschlagen: {exc}")
+            result.add(t("step_state_backup"), "failed", t("backup_failed", error=exc))
 
     def create_backup(self, files: list[Path]) -> Path:
         backup_dir = self.config.backup_path / f"logs_2-{timestamp()}"
@@ -336,7 +336,7 @@ class MaintenanceRunner:
                     last_mb = done_mb
                     self._emit(
                         "backup",
-                        f"Sicherung … {done_mb} / {total // (1024 * 1024)} MB",
+                        t("backup_progress", done=done_mb, total=total // (1024 * 1024)),
                         percent,
                     )
         shutil.copystat(source, target)
@@ -346,7 +346,7 @@ class MaintenanceRunner:
         """Begrenze die Zahl der DB-Backups (Lektion: unbegrenzte Backups fuellten 123 GB)."""
         keep = self.config.backup_keep
         if keep <= 0:
-            result.add("Backup-Retention", "skipped", "Aufbewahrung unbegrenzt (backup_keep<=0).")
+            result.add(t("step_backup_retention"), "skipped", t("retention_unlimited"))
             return
         backups = sorted(
             (path for path in self.config.backup_path.glob("logs_2-*") if path.is_dir()),
@@ -359,15 +359,15 @@ class MaintenanceRunner:
             removed.append(directory.name)
         if removed:
             result.add(
-                "Backup-Retention",
+                t("step_backup_retention"),
                 "ok",
-                f"{len(removed)} alte Backup(s) entfernt; behalte die neuesten {keep}.",
+                t("retention_removed", removed=len(removed), keep=keep),
             )
         else:
             result.add(
-                "Backup-Retention",
+                t("step_backup_retention"),
                 "ok",
-                f"Keine ueberzaehligen Backups; behalte die neuesten {keep}.",
+                t("retention_ok", keep=keep),
             )
 
     def integrity_check(self, db_path: Path) -> str:
@@ -381,51 +381,51 @@ class MaintenanceRunner:
     def archive_old_logs(self, result: MaintenanceResult) -> None:
         if not self.config.allow_archive_old_logs:
             result.add(
-                "Archivierung",
+                t("step_archive"),
                 "skipped",
-                "Nicht aktiviert; es werden keine Logdaten gelöscht oder verschoben.",
+                t("archive_disabled"),
             )
             return
         result.add(
-            "Archivierung",
+            t("step_archive"),
             "skipped",
-            "Archivierung ist freigegeben, aber noch nicht schemaspezifisch implementiert.",
+            t("archive_not_implemented"),
         )
 
     def optimize_and_vacuum(self, db_path: Path, result: MaintenanceResult) -> None:
         with sqlite3.connect(db_path, timeout=60) as connection:
             if self.config.allow_wal_checkpoint:
-                self._emit("wal", "WAL-Checkpoint …", 72)
+                self._emit("wal", t("wal_progress"), 72)
                 row = connection.execute("PRAGMA wal_checkpoint(TRUNCATE);").fetchone()
                 result.add(
-                    "WAL-Checkpoint",
+                    t("step_wal_checkpoint"),
                     "ok",
-                    f"PRAGMA wal_checkpoint(TRUNCATE) ausgeführt (Ergebnis {row}).",
+                    t("wal_ok", row=row),
                 )
             else:
-                result.add("WAL-Checkpoint", "skipped", "In der Konfiguration deaktiviert.")
+                result.add(t("step_wal_checkpoint"), "skipped", t("step_disabled"))
 
             if self.config.allow_optimize:
-                self._emit("optimize", "PRAGMA optimize …", 78)
+                self._emit("optimize", t("optimize_progress"), 78)
                 connection.execute("PRAGMA optimize;")
-                result.add("Optimize", "ok", "PRAGMA optimize ausgeführt.")
+                result.add(t("step_optimize"), "ok", t("optimize_ok"))
             else:
-                result.add("Optimize", "skipped", "In der Konfiguration deaktiviert.")
+                result.add(t("step_optimize"), "skipped", t("step_disabled"))
 
             if self.config.allow_vacuum:
                 self._emit(
                     "vacuum",
-                    "VACUUM läuft … (kann 1–2 Minuten dauern)",
+                    t("vacuum_progress"),
                     82,
                     indeterminate=True,
                 )
                 start = time.monotonic()
                 connection.execute("VACUUM;")
                 elapsed = time.monotonic() - start
-                result.add("Vacuum", "ok", f"VACUUM abgeschlossen in {elapsed:.1f}s.")
-                self._emit("vacuum", f"VACUUM abgeschlossen in {elapsed:.0f}s", 98)
+                result.add(t("step_vacuum"), "ok", t("vacuum_ok", seconds=elapsed))
+                self._emit("vacuum", t("vacuum_done_progress", seconds=elapsed), 98)
             else:
-                result.add("Vacuum", "skipped", "In der Konfiguration deaktiviert.")
+                result.add(t("step_vacuum"), "skipped", t("step_disabled"))
 
     def write_log(self, result: MaintenanceResult) -> Path:
         self.config.logs_path.mkdir(parents=True, exist_ok=True)

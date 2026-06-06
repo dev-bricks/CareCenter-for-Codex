@@ -6,6 +6,7 @@ Patcht PySide6 so, dass QObject eine echte Basisklasse ist (kein MagicMock als E
 
 from __future__ import annotations
 
+import json
 import sys
 import tempfile
 from pathlib import Path
@@ -105,6 +106,52 @@ def test_full_repair_sets_running_true():
 
             controller.on_full_repair_finished(None)
             assert controller.running is False, "on_full_repair_finished must set self.running = False"
+    finally:
+        for key in list(sys.modules):
+            if "codex_logdatenbank_wartung.tray" in key:
+                del sys.modules[key]
+        for key in list(mocks):
+            if key in sys.modules and sys.modules[key] is mocks[key]:
+                del sys.modules[key]
+
+
+def test_language_setting_persists_and_retranslates():
+    """Der Settings-Sprachwechsel speichert config.language und relabelt die UI."""
+    mocks = _mock_pyside6()
+    try:
+        for key in list(sys.modules):
+            if "codex_logdatenbank_wartung.tray" in key:
+                del sys.modules[key]
+
+        from codex_logdatenbank_wartung.config import MaintenanceConfig
+        from codex_logdatenbank_wartung.i18n import get_language, set_language
+        from codex_logdatenbank_wartung.tray import TrayController
+
+        with tempfile.TemporaryDirectory() as tmp:
+            config_path = Path(tmp) / "config.json"
+            config = MaintenanceConfig(language="de")
+            config.save(config_path)
+
+            controller = object.__new__(TrayController)
+            controller.config_path = config_path
+            controller.config = config
+            controller.tray = MagicMock()
+            controller.window = MagicMock()
+            controller.running = False
+            controller.zombie_kill_count = 0
+            controller._retranslate_menu = MagicMock()
+
+            set_language("de")
+            controller.on_language_changed("en")
+
+            saved = json.loads(config_path.read_text(encoding="utf-8"))
+            assert saved["language"] == "en"
+            assert get_language() == "en"
+            controller.window.set_language_setting.assert_called_once_with("en")
+            controller.window.retranslate.assert_called_once()
+            controller._retranslate_menu.assert_called_once()
+            controller.tray.showMessage.assert_called()
+            set_language("de")
     finally:
         for key in list(sys.modules):
             if "codex_logdatenbank_wartung.tray" in key:

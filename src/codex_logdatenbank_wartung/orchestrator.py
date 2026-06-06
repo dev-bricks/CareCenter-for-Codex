@@ -29,6 +29,7 @@ from datetime import datetime, timedelta
 from typing import Literal
 
 from .config import MaintenanceConfig
+from .i18n import t
 from .maintenance import MaintenanceResult, MaintenanceRunner, ProgressUpdate
 from .processes import (
     ProcessProvider,
@@ -243,7 +244,7 @@ def auto_maintain(
             progress(AutoProgress(phase, message, max(0, min(100, percent)), indeterminate))
 
     result = AutoMaintainResult(status="ok", mode=mode, dry_run=not execute)
-    emit("assess", "Prüfe Codex-Zustand …", 0, True)
+    emit("assess", t("auto_assess"), 0, True)
     act = observe_fn()
 
     if act.present:
@@ -253,26 +254,28 @@ def auto_maintain(
                 result.waited = True
                 emit(
                     "wait",
-                    f"Wartung eingereiht — warte auf Codex-Leerlauf "
-                    f"(CPU {act.cpu_percent:.0f}%). Laufende Automatisierungen werden nicht unterbrochen.",
+                    t("auto_waiting_idle", cpu=act.cpu_percent),
                     5, True,
                 )
                 if clock() >= deadline:
                     result.status = "blocked"
                     result.add(
                         "Warten", "blocked",
-                        f"Codex blieb über {config.idle_wait_timeout_seconds}s aktiv "
-                        f"(CPU {act.cpu_percent:.0f}%); Wartung verschoben — kein Lauf abgebrochen.",
+                        t(
+                            "auto_timeout_step",
+                            seconds=config.idle_wait_timeout_seconds,
+                            cpu=act.cpu_percent,
+                        ),
                     )
-                    emit("blocked", "Codex noch aktiv — Wartung verschoben.", 100)
+                    emit("blocked", t("auto_timeout_short"), 100)
                     return result
                 sleeper(config.activity_poll_seconds)
                 act = observe_fn()
                 if not act.present:
                     break
-            result.add("Leerlauf", "ok", "Codex ist im Leerlauf (keine aktiven Automatisierungen).")
+            result.add("Leerlauf", "ok", t("auto_idle_ok"))
         else:
-            result.add("Modus", "ok", "Fast-Modus: ohne auf Leerlauf zu warten.")
+            result.add("Modus", "ok", t("auto_fast_mode"))
 
     # Codex (falls noch da) kontrolliert vollstaendig beenden.
     act = observe_fn()
@@ -280,16 +283,15 @@ def auto_maintain(
         if not effective_allow:
             result.status = "blocked"
             result.add(
-                "Codex läuft", "blocked",
-                "Codex läuft und Schließen ist nicht freigegeben (auto_close_codex=False bzw. kein --close). "
-                "Bitte Codex selbst beenden oder den Tray-Button nutzen.",
+                t("step_codex_running"), "blocked",
+                t("auto_close_blocked"),
             )
-            emit("blocked", "Codex läuft — Schließen nicht freigegeben.", 100)
+            emit("blocked", t("auto_close_blocked_short"), 100)
             return result
         if not execute:
-            result.add("Codex beenden", "planned", f"Würde Codex beenden ({mode}-Modus) und Reste bereinigen.")
+            result.add("Codex beenden", "planned", t("auto_close_planned", mode=mode))
         else:
-            emit("close", "Beende Codex vollständig (inkl. Tray) …", 10, True)
+            emit("close", t("auto_closing"), 10, True)
             for pid in act.main_pids:
                 graceful_closer(pid)
             sleeper(config.activity_poll_seconds)
@@ -299,7 +301,7 @@ def auto_maintain(
                     killer(pid)
                 sleeper(2)
             result.closed_codex = True
-            result.add("Codex beenden", "ok", "Codex vollständig beendet.")
+            result.add("Codex beenden", "ok", t("auto_closed"))
 
     # Sicherheits-Check direkt vor der Wartung.
     if execute:
@@ -307,20 +309,20 @@ def auto_maintain(
         if guard.present:
             if guard.active:
                 result.status = "blocked"
-                result.add("Abbruch", "blocked", "Codex wurde wieder aktiv; Wartung abgebrochen.")
-                emit("blocked", "Codex wieder aktiv — Wartung abgebrochen.", 100)
+                result.add("Abbruch", "blocked", t("auto_abort_active"))
+                emit("blocked", t("auto_abort_active_short"), 100)
                 return result
             for pid in guard.main_pids:
                 killer(pid)
             sleeper(2)
             if observe_fn().present:
                 result.status = "blocked"
-                result.add("Abbruch", "blocked", "Codex ließ sich nicht vollständig beenden; Wartung abgebrochen.")
-                emit("blocked", "Codex nicht beendbar — Wartung abgebrochen.", 100)
+                result.add("Abbruch", "blocked", t("auto_abort_not_closed"))
+                emit("blocked", t("auto_abort_not_closed_short"), 100)
                 return result
 
     # Wartung ausfuehren.
-    emit("maintain", "Starte Wartung …", 15)
+    emit("maintain", t("auto_maintain_start"), 15)
     mres = maintain_fn()
     result.maintenance = mres.to_dict()
     result.status = "ok" if mres.status in {"ok", "dry-run"} else mres.status
@@ -328,7 +330,7 @@ def auto_maintain(
     # Codex neu starten, falls WIR es beendet haben — und den Neustart VERIFIZIEREN
     # (ein blosser Popen-Erfolg kann einen frischen Ghost ohne Fenster sein).
     if result.closed_codex and config.restart_codex_after and execute:
-        emit("restart", "Starte Codex neu …", 97, True)
+        emit("restart", t("auto_restart"), 97, True)
         ok, msg = launcher()
         appeared = False
         if ok:
@@ -341,15 +343,18 @@ def auto_maintain(
                     break
         result.restarted_codex = appeared
         if appeared:
-            result.add("Neustart", "ok", f"Codex neu gestartet (Fenster erkannt). {msg}".strip())
+            result.add("Neustart", "ok", t("auto_restart_ok", message=msg).strip())
         else:
             result.add(
                 "Neustart", "warn",
-                f"Codex gestartet, aber Fenster (Renderer) nicht innerhalb "
-                f"{config.restart_verify_seconds}s erkannt. {msg}".strip(),
+                t(
+                    "auto_restart_warn",
+                    seconds=config.restart_verify_seconds,
+                    message=msg,
+                ).strip(),
             )
 
-    emit(result.status, "Fertig.", 100)
+    emit(result.status, t("done"), 100)
     return result
 
 

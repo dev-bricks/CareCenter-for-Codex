@@ -2,68 +2,37 @@
 
 [![CareCenter tests](https://github.com/dev-bricks/CareCenter-for-Codex/actions/workflows/tests.yml/badge.svg)](https://github.com/dev-bricks/CareCenter-for-Codex/actions/workflows/tests.yml)
 
-A local Windows tray + CLI utility that keeps the **OpenAI Codex desktop app** healthy:
-it repairs failed starts, cleans up hung leftover processes, and safely maintains Codex's
-local SQLite log database — all offline, with no telemetry.
+CareCenter for Codex is an unofficial local Windows tray and CLI utility for keeping the OpenAI Codex desktop app healthy. It repairs failed starts, removes hung leftovers, and safely maintains Codex's local SQLite log database. Everything runs offline and without telemetry.
 
-*Deutsch: Ein lokales Windows-Tray- und CLI-Werkzeug, das die **OpenAI-Codex-Desktop-App**
-gesund hält: Start-Reparatur, Aufräumen hängender Reste und sichere Wartung der lokalen
-Codex-Logdatenbank — komplett offline.*
+German documentation: [README.de.md](README.de.md)
 
 > [!IMPORTANT]
-> **Unofficial / Inoffiziell.** This is an independent, community tool. It is **not** created by,
-> affiliated with, endorsed by, or sponsored by OpenAI. *"OpenAI"* and *"Codex"* are trademarks of
-> OpenAI; they are used here only to describe what this tool is compatible with (nominative use).
-> Dieses Werkzeug stammt **nicht** von OpenAI und ist nicht mit OpenAI verbunden.
-
----
+> This is an independent community tool. It is not created by, affiliated with, endorsed by, or sponsored by OpenAI. "OpenAI" and "Codex" are trademarks of OpenAI and are used here only to describe compatibility.
 
 ## Why
 
-Closing the Codex window often leaves a hung main process behind (a known Codex-on-Windows
-behavior). That ghost holds the singleton lock, so the **next start silently fails**. A failed
-start is the first domino: it tempts a Store "repair/update" that can hang and cascade into
-deeper breakage. CareCenter removes that first domino automatically and keeps the start clean.
+On Windows, closing the Codex desktop window can leave a hung main process behind. That leftover process can hold the app singleton lock, so the next start appears to do nothing. CareCenter removes that first blocker safely: it only touches inactive ghost processes, stale lock files, and explicitly requested maintenance paths.
 
 ## Features
 
-- **Background start-prevention watcher** — every 60 s (read-only) it checks: if Codex is
-  **closed** and hung leftovers exist (ghost process without a window / stale lockfile), it
-  removes them so the next start is clean, and notifies you. It **never** touches an active
-  session, **never** the node-based Codex CLI, and **never** a process tree that is still busy
-  (CPU activity gate). A 🧟 counter shows how many leftovers were cleared since start.
-- **Safe Start integration** - reads optional Safe Start for Codex snapshots, detects release
-  bursts/start storms, and reports rare automations that should be prioritized for catch-up. If
-  Safe Start is actively gating releases, the watcher defers its own start-counteractions.
-- **One-click "Repair Codex"** — a single escalation that stops as soon as Codex starts: first a
-  light, no-admin step (remove leftovers → launch → check for a window); only if needed it
-  escalates (elevated: ClipSVC, complete a staged Store update, reset, re-register). If the
-  package is completely gone it suggests a Store reinstall; if everything is exhausted it suggests
-  a reboot — both only as suggestions.
-- **Two maintenance modes** (tray + CLI `auto-maintain`):
-  - **Safe** — queue maintenance, wait until the *entire* Codex process tree is truly idle
-    (CPU + DB), then close Codex cleanly, maintain, restart. Never interrupts a running automation.
-  - **Fast** — close immediately, then maintain.
-- **Store tools** — repair a stuck Microsoft-Store update (`wsreset` / re-register / reset) and a
-  one-click "reinstall Codex from the Store".
-- **Conservative DB maintenance** — backup (incl. `-wal`/`-shm`), SQLite integrity check on the
-  backup, `wal_checkpoint(TRUNCATE)`, `PRAGMA optimize`, `VACUUM`. Refuses to run while Codex is
-  running. Limited backup retention.
-- **Status window with progress bar** — opens for every manual action, is closable (work keeps
-  running in the background), and re-opens from the tray. Plus a live tooltip.
-- **Audit log** — every watcher tick is recorded in `logs/watchdog.log`, so it is never ambiguous
-  whether the watcher touched anything.
-- Dual detection of Codex (Standalone **and** Microsoft-Store), single-instance guard, no console
-  window flashes.
+- Background start-prevention watcher: checks every 60 seconds whether Codex is closed and old start blockers remain. It never touches an active Codex session, the node-based Codex CLI, or a process tree that is still doing CPU work.
+- Tray settings with language switching: choose English or German in the Settings area. The choice is saved in `config.json` and the visible tray UI is relabeled immediately.
+- One-click Repair Codex action: runs a bounded escalation that stops as soon as Codex starts again. It begins with no-admin cleanup and only suggests admin restart, Store reinstall, or reboot when needed.
+- Safe and Fast maintenance modes:
+  - Safe waits until the complete Codex process tree is idle, closes Codex cleanly, runs maintenance, and restarts it.
+  - Fast closes Codex immediately and then runs maintenance.
+- Store tools: repair a stuck Microsoft Store update path and open the Store reinstall page for Codex.
+- Conservative database maintenance: backup including WAL/SHM, integrity check on the backup, WAL checkpoint, `PRAGMA optimize`, `VACUUM`, and limited backup retention.
+- Status window with progress bar, live tray tooltip, and persistent audit logs.
+- Optional Safe Start for Codex integration for release bursts, start storms, and catch-up hints.
 
 ## Screenshot
 
-The tray's status window shows the current state, a leftovers-cleared counter, a progress bar,
-and one-click buttons (Repair Codex, Diagnose, Safe/Fast maintenance, Store tools).
+The tray status window shows current state, removed-leftover count, progress, maintenance controls, Store actions, and settings.
 
 ![CareCenter status window](README/screenshots/main.png)
 
-The image is generated reproducibly from the real PySide6 status window:
+Regenerate the screenshot from the real PySide6 status window:
 
 ```powershell
 $env:PYTHONPATH="src"
@@ -72,11 +41,13 @@ python -m codex_logdatenbank_wartung.cli store-screenshot
 
 ## Requirements
 
-- Windows 10/11
-- Python 3.12+ (for running from source) — packaged EXE has no Python requirement
-- [PySide6](https://pypi.org/project/PySide6/) (LGPL) for the tray GUI
+- Windows 10 or Windows 11
+- Python 3.12+ when running from source
+- [PySide6](https://pypi.org/project/PySide6/) for the tray UI
 
-## Install / Run
+Packaged EXE builds do not require a separate Python installation.
+
+## Install and Run
 
 From source:
 
@@ -84,92 +55,81 @@ From source:
 $env:PYTHONPATH="$PWD\src"
 pip install -r requirements.txt
 python -m codex_logdatenbank_wartung.cli status
-python -m codex_logdatenbank_wartung.cli tray      # start the tray app
+python -m codex_logdatenbank_wartung.cli tray
 ```
 
-Build a standalone EXE (PyInstaller):
+Build a standalone EXE:
 
 ```powershell
 build_exe.bat
 ```
 
-## Usage (CLI)
+## CLI
 
 ```powershell
-python -m codex_logdatenbank_wartung.cli doctor                 # diagnose start problems (read-only)
-python -m codex_logdatenbank_wartung.cli repair --dry-run       # plan the full start repair
-python -m codex_logdatenbank_wartung.cli repair --execute       # run it (needs admin for AppX steps)
-python -m codex_logdatenbank_wartung.cli dry-run                # DB maintenance preview
-python -m codex_logdatenbank_wartung.cli maintain --execute     # DB maintenance (blocks if Codex runs)
+python -m codex_logdatenbank_wartung.cli doctor
+python -m codex_logdatenbank_wartung.cli repair --dry-run
+python -m codex_logdatenbank_wartung.cli repair --execute
+python -m codex_logdatenbank_wartung.cli dry-run
+python -m codex_logdatenbank_wartung.cli maintain --execute
 python -m codex_logdatenbank_wartung.cli auto-maintain --mode safe --execute
 python -m codex_logdatenbank_wartung.cli store-repair --level repair --execute
-python -m codex_logdatenbank_wartung.cli store-materials        # check project-local Store materials
-python -m codex_logdatenbank_wartung.cli safe-start-report      # Safe Start, start storm, catch-up
+python -m codex_logdatenbank_wartung.cli store-materials
+python -m codex_logdatenbank_wartung.cli safe-start-report
 python -m codex_logdatenbank_wartung.cli schedule install --interval-minutes 180
 ```
 
-## Windows Store path
-
-The project now carries its own Windows Store groundwork:
-
-- `PORTIERUNGSPLAN.md` documents why **Windows Store** is the only active platform track.
-- `store_package.json`, `STORE_LISTING.md`, `PRIVACY_POLICY.md`, and `SUPPORT.md` hold the
-  project-local Store materials.
-- `python -m codex_logdatenbank_wartung.cli store-materials` validates those materials and can
-  optionally check a built `CareCenterForCodex.exe` via `--exe-path`.
-- `python -m codex_logdatenbank_wartung.cli store-screenshot` regenerates
-  `README/screenshots/main.png` for README and Store visuals.
-
-## LLM context and tests
-
-- `llms.txt` provides a machine-readable project summary, safety boundaries, and verification commands.
-- Local verification currently covers 185 pytest tests plus `compileall` on `src` and `tests`.
+The CLI reads `language` from `config.json` for runtime reports. The tray settings are the intended way to switch the persisted language.
 
 ## Configuration
 
-Configuration, logs and backups live in a local folder outside any cloud-synced directory
-(default `C:\_Local_DEV\codex-maintenance`, configurable in `config.json`). Codex paths are
-auto-detected from `%LOCALAPPDATA%` / `%APPDATA%` / `~/.codex` and can be overridden.
+Configuration, logs, and backups live outside cloud-synced folders by default:
 
 ```text
-config:   <data-dir>\config.json
-logs:     <data-dir>\logs\
-backups:  <data-dir>\backups\
-database: ~\.codex\logs_2.sqlite   (override via CODEX_HOME or config)
+config:   C:\_Local_DEV\codex-maintenance\config.json
+logs:     C:\_Local_DEV\codex-maintenance\logs\
+backups:  C:\_Local_DEV\codex-maintenance\backups\
+database: %USERPROFILE%\.codex\logs_2.sqlite
 ```
 
-## Safety
+Codex paths are detected from `%LOCALAPPDATA%`, `%APPDATA%`, and `CODEX_HOME`. You can override them in `config.json`.
 
-- The conservative `maintain` path and the optional scheduled task **never** close Codex; they
-  block while Codex runs. Only the explicitly triggered `auto-maintain` (or tray "Safe/Fast") may
-  close Codex — in Safe mode only when no automation is active.
-- The watcher kills **only** an inactive ghost (no window, idle, older than a threshold) — proven
-  by a CPU activity gate ("no window" ≠ idle) — and never the Codex CLI.
+## Safety Model
 
----
+- Conservative maintenance blocks while Codex is running.
+- Scheduled maintenance never closes Codex.
+- Safe auto-maintain only closes Codex after the full process tree is idle.
+- The watcher kills only inactive ghosts without a renderer and only after the configured age threshold.
+- The Codex CLI and active desktop sessions are explicitly excluded.
+- Destructive paths such as Store reset, admin repair, reinstall, and reboot are suggestions or explicit user actions, not automatic surprises.
 
-## Deutsch (Kurzfassung)
+## Windows Store Materials
 
-**CareCenter for Codex** ist ein lokales Windows-Tray- und CLI-Werkzeug für die OpenAI-Codex-Desktop-App:
+The project includes Windows Store groundwork:
 
-- **Hintergrund-Wächter (Start-Prävention):** entfernt bei geschlossenem Codex hängende Reste
-  (Ghost ohne Fenster / verwaistes Lockfile), damit der nächste Start sauber ist — nie eine aktive
-  Sitzung, nie die Codex-CLI, nie einen noch arbeitenden Prozessbaum (CPU-Gate). 🧟-Zähler im Tray.
-- **Ein „Codex reparieren"** als Eskalation (Stopp bei Erfolg): erst leicht & ohne Admin
-  (Reste entfernen → starten → Fenster prüfen), nur wenn nötig elevated weiter; bei fehlendem
-  Paket Reinstall-Vorschlag, bei Erschöpfung Reboot-Vorschlag.
-- **Wartung Safe/Fast**, **Store-Reparatur/-Neuinstallation**, **konservative DB-Wartung**
-  (Backup → Integrität → WAL-Checkpoint → optimize → VACUUM; blockiert bei laufendem Codex).
-- **Safe-Start-Integration:** erkennt aktive Safe-Start-Gates und Start-Storms, hält den Wächter
-  zurück und zeigt seltene Catch-up-Kandidaten an.
-- **Status-Fenster mit Fortschrittsbalken** (öffnet bei jeder manuellen Aktion, schließbar, läuft
-  im Hintergrund weiter), Live-Tooltip, **Audit-Log** (`logs/watchdog.log`).
+- `PORTIERUNGSPLAN.md`
+- `store_package.json`
+- `STORE_LISTING.md`
+- `PRIVACY_POLICY.md`
+- `SUPPORT.md`
 
-Konfiguration/Logs/Backups liegen lokal (Standard `C:\_Local_DEV\codex-maintenance`, konfigurierbar).
-Codex-Pfade werden automatisch über `%LOCALAPPDATA%`/`%APPDATA%`/`~/.codex` erkannt.
+Validate them with:
+
+```powershell
+python -m codex_logdatenbank_wartung.cli store-materials
+```
+
+## Development
+
+```powershell
+$env:PYTHONPATH="src"
+python -m pytest
+python -m ruff check src tests
+python -m compileall src tests
+```
+
+The test suite covers maintenance safety, repair escalation, Safe Start integration, Store material validation, configuration loading, i18n, and tray language persistence.
 
 ## License
 
-[MIT](LICENSE) for this tool's own code. PySide6 is used under the LGPL; see
-[`THIRD_PARTY_LICENSES.txt`](THIRD_PARTY_LICENSES.txt). *"OpenAI"* and *"Codex"* are trademarks of
-OpenAI and are used here for compatibility/identification purposes only.
+CareCenter for Codex is licensed under [MIT](LICENSE). PySide6 is used under the LGPL; see [THIRD_PARTY_LICENSES.txt](THIRD_PARTY_LICENSES.txt).

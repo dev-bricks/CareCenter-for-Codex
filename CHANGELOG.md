@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.0 - 2026-06-06
+
+- Completed English/German i18n for the tray-facing CareCenter UI and maintenance runtime reports.
+- Added a language selector to the tray Settings area. The selected language is saved in `config.json` and visible UI labels update immediately.
+- Localized key CLI runtime output through the existing configuration-driven language path.
+- Split documentation into English `README.md` and German `README.de.md`.
+- Added regression tests for language helpers, CLI language loading, and tray language persistence/retranslation.
+
 ## 0.7.2 - 2026-06-05
 
 - Fixed the reproducible README/Store screenshot so it renders the normal status window with
