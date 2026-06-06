@@ -2,6 +2,10 @@
 
 ## 0.8.0 - 2026-06-06
 
+- Added cancellable Safe maintenance: the tray exposes an abort button while Safe mode is waiting for Codex idle, and the CLI handles Ctrl+C without a traceback.
+- Added Safe Start install/update support via tray button and CLI command `safe-start-install`.
+- Shipped Safe Start as a runtime dependency and added a PyInstaller hidden import so EXE builds bundle the dynamic integration module.
+- Regenerated the README screenshot as widget-only German UI text without emoji or native title-bar glyphs.
 - Completed English/German i18n for the tray-facing CareCenter UI and maintenance runtime reports.
 - Added a language selector to the tray Settings area. The selected language is saved in `config.json` and visible UI labels update immediately.
 - Localized key CLI runtime output through the existing configuration-driven language path.
@@ -60,7 +64,7 @@
   leftovers (ghost without a window / stale lockfile) only when Codex is closed, then notifies.
   **Critical safety:** a CPU activity gate (`observe_activity`) ensures a still-working background
   Codex tree is never killed ("no window" != idle); never kills an active session or the node CLI.
-  Per-tick audit log in `logs/watchdog.log`. Tray toggle + 🧟 counter.
+  Per-tick audit log in `logs/watchdog.log`. Tray toggle plus removed-remnants counter.
 - **One unified "Repair Codex"** escalation (tray): light no-admin step first (remove leftovers →
   launch → check window), escalates to the elevated full repair only if needed, stops on success;
   absent package → Store-reinstall suggestion, exhausted → reboot suggestion.

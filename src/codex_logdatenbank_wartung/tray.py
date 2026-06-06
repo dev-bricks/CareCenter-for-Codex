@@ -18,6 +18,7 @@ import contextlib
 import sys
 from collections.abc import Callable
 from pathlib import Path
+from threading import Event
 from typing import cast
 
 from PySide6.QtCore import QObject, Qt, QThread, QTimer, Signal
@@ -54,7 +55,7 @@ APP_SHORT = "CareCenter"
 
 
 def _zombie_text(count: int) -> str:
-    """Zombie-Zaehler-Text fuers Status-Fenster (mit Zombie-Emoji, vom User gewuenscht)."""
+    """Zaehler-Text fuer entfernte Codex-Reste im Status-Fenster."""
     return t("zombie_counter", count=count)
 
 
@@ -85,14 +86,23 @@ class AutoMaintainWorker(QObject):
         super().__init__()
         self.config = config
         self.mode = mode
+        self._cancel_requested = Event()
+
+    def request_cancel(self) -> None:
+        self._cancel_requested.set()
+
+    def _sleep(self, seconds: float) -> None:
+        self._cancel_requested.wait(max(0.0, seconds))
 
     def run(self) -> None:
         result = auto_maintain(
             self.config,
             mode=self.mode,
             execute=True,
+            sleeper=self._sleep,
             allow_close=True,  # expliziter Tray-Klick = Zustimmung zum Schließen
             progress=lambda update: self.progress.emit(update),
+            cancel_requested=self._cancel_requested.is_set,
         )
         self.finished.emit(result)
 
@@ -117,6 +127,15 @@ class StoreRepairWorker(QObject):
         repair_store_codex(level="wsreset", execute=True)
         result = repair_store_codex(level="repair", execute=True)
         self.finished.emit(result)
+
+
+class SafeStartInstallWorker(QObject):
+    finished = Signal(object)
+
+    def run(self) -> None:
+        from .safe_start_integration import install_safe_start_package
+
+        self.finished.emit(install_safe_start_package())
 
 
 class FullRepairWorker(QObject):
@@ -359,10 +378,13 @@ class StatusWindow(QWidget):
 
     request_safe = Signal()
     request_fast = Signal()
+    request_cancel_auto = Signal()
     request_diagnose = Signal()
     request_codex_repair = Signal()
     request_store_repair = Signal()
     request_store_reinstall = Signal()
+    request_safe_start_report = Signal()
+    request_safe_start_install = Signal()
     audit_requested = Signal()
     mcp_mode_changed = Signal(str)
     plugin_mode_changed = Signal(str)
@@ -413,8 +435,12 @@ class StatusWindow(QWidget):
         self.safe_button.clicked.connect(self.request_safe)
         self.fast_button = QPushButton()
         self.fast_button.clicked.connect(self.request_fast)
+        self.cancel_auto_button = QPushButton()
+        self.cancel_auto_button.clicked.connect(self.request_cancel_auto)
+        self.cancel_auto_button.setEnabled(False)
         maint_row.addWidget(self.safe_button)
         maint_row.addWidget(self.fast_button)
+        maint_row.addWidget(self.cancel_auto_button)
         layout.addLayout(maint_row)
 
         # Store-Werkzeuge (Vorschläge/Notfall): meist als Vorschlag aus der Eskalation,
@@ -427,6 +453,15 @@ class StatusWindow(QWidget):
         store_row.addWidget(self.store_button)
         store_row.addWidget(self.store_reinstall_button)
         layout.addLayout(store_row)
+
+        safe_start_row = QHBoxLayout()
+        self.safe_start_report_button = QPushButton()
+        self.safe_start_report_button.clicked.connect(self.request_safe_start_report)
+        self.safe_start_install_button = QPushButton()
+        self.safe_start_install_button.clicked.connect(self.request_safe_start_install)
+        safe_start_row.addWidget(self.safe_start_report_button)
+        safe_start_row.addWidget(self.safe_start_install_button)
+        layout.addLayout(safe_start_row)
 
         self.settings_group = QGroupBox()
         settings_layout = QVBoxLayout(self.settings_group)
@@ -512,10 +547,16 @@ class StatusWindow(QWidget):
         self.safe_button.setToolTip(t("maintenance_safe_tooltip"))
         self.fast_button.setText(t("maintenance_fast_button"))
         self.fast_button.setToolTip(t("maintenance_fast_tooltip"))
+        self.cancel_auto_button.setText(t("maintenance_cancel_button"))
+        self.cancel_auto_button.setToolTip(t("maintenance_cancel_tooltip"))
         self.store_button.setText(t("store_repair"))
         self.store_button.setToolTip(t("store_repair_tooltip"))
         self.store_reinstall_button.setText(t("store_reinstall"))
         self.store_reinstall_button.setToolTip(t("store_reinstall_tooltip"))
+        self.safe_start_report_button.setText(t("safe_start_check"))
+        self.safe_start_report_button.setToolTip(t("safe_start_tooltip"))
+        self.safe_start_install_button.setText(t("safe_start_install"))
+        self.safe_start_install_button.setToolTip(t("safe_start_install_tooltip"))
         self.settings_group.setTitle(f"{t('settings_group')}: {t('settings_config_audit')}")
         self.language_label_widget.setText(t("settings_language"))
         self.language_combo.setToolTip(t("settings_language_tooltip"))
@@ -536,7 +577,7 @@ class StatusWindow(QWidget):
     def set_zombie_count(self, count: int) -> None:
         self.zombie_label.setText(_zombie_text(count))
 
-    def set_running(self, running: bool) -> None:
+    def set_running(self, running: bool, can_cancel: bool = False) -> None:
         for button in (
             self.repair_button,
             self.diagnose_button,
@@ -544,8 +585,14 @@ class StatusWindow(QWidget):
             self.fast_button,
             self.store_button,
             self.store_reinstall_button,
+            self.safe_start_report_button,
+            self.safe_start_install_button,
         ):
             button.setEnabled(not running)
+        self.cancel_auto_button.setEnabled(running and can_cancel)
+
+    def set_cancel_enabled(self, enabled: bool) -> None:
+        self.cancel_auto_button.setEnabled(enabled)
 
     def set_progress(self, percent: int, message: str, indeterminate: bool) -> None:
         if indeterminate:
@@ -577,6 +624,8 @@ class TrayController(QObject):
         self.repair_worker: RepairWorker | None = None
         self.store_thread: QThread | None = None
         self.store_worker: StoreRepairWorker | None = None
+        self.safe_start_install_thread: QThread | None = None
+        self.safe_start_install_worker: SafeStartInstallWorker | None = None
         self.full_repair_thread: QThread | None = None
         self.full_repair_worker: FullRepairWorker | None = None
         self.watchdog_thread: QThread | None = None
@@ -590,10 +639,13 @@ class TrayController(QObject):
         self.window = StatusWindow()
         self.window.request_safe.connect(lambda: self.run_auto("safe"))
         self.window.request_fast.connect(lambda: self.run_auto("fast"))
+        self.window.request_cancel_auto.connect(self.cancel_auto)
         self.window.request_diagnose.connect(self.show_diagnosis)
         self.window.request_codex_repair.connect(self.run_codex_repair)
         self.window.request_store_repair.connect(self.run_store_repair)
         self.window.request_store_reinstall.connect(self.open_store_reinstall)
+        self.window.request_safe_start_report.connect(self.show_safe_start_report)
+        self.window.request_safe_start_install.connect(self.install_safe_start)
         self.window.mcp_mode_changed.connect(self.on_mcp_mode_changed)
         self.window.plugin_mode_changed.connect(self.on_plugin_mode_changed)
         self.window.language_changed.connect(self.on_language_changed)
@@ -703,7 +755,7 @@ class TrayController(QObject):
             self.show_window()
             return
         self.running = True
-        self.window.set_running(True)
+        self.window.set_running(True, can_cancel=(mode == "safe"))
         label = t("maintenance_safe_label") if mode == "safe" else t("maintenance_fast_label")
         self.window.set_state(t("maintenance_state_running", mode=label))
         self.window.set_progress(0, t("maintenance_prepare"), True)
@@ -730,8 +782,28 @@ class TrayController(QObject):
 
     def on_auto_progress(self, update: AutoProgress) -> None:
         self.window.set_progress(update.percent, update.message, update.indeterminate)
+        self.window.set_cancel_enabled(update.phase in {"assess", "wait"})
         short = update.message if len(update.message) < 60 else update.message[:57] + "…"
         self.tray.setToolTip(f"CareCenter: {short} ({update.percent}%)")
+
+    def cancel_auto(self) -> None:
+        if self.auto_worker is None:
+            self.tray.showMessage(
+                "CareCenter",
+                t("maintenance_cancel_noop"),
+                QSystemTrayIcon.MessageIcon.Information,
+                3000,
+            )
+            return
+        self.auto_worker.request_cancel()
+        self.window.set_cancel_enabled(False)
+        self.window.set_progress(0, t("maintenance_cancel_requested"), True)
+        self.tray.showMessage(
+            "CareCenter",
+            t("maintenance_cancel_requested"),
+            QSystemTrayIcon.MessageIcon.Information,
+            4000,
+        )
 
     def on_auto_finished(self, result: AutoMaintainResult) -> None:
         self.running = False
@@ -740,6 +812,7 @@ class TrayController(QObject):
         summary = {
             "ok": t("maintenance_done_ok"),
             "blocked": t("maintenance_done_blocked"),
+            "cancelled": t("maintenance_done_cancelled"),
             "failed": t("maintenance_done_failed"),
         }.get(result.status, t("maintenance_done_other", status=result.status))
         self.window.set_state(summary)
@@ -856,6 +929,56 @@ class TrayController(QObject):
             message = t("safe_start_ok")
             icon = QSystemTrayIcon.MessageIcon.Information
         self.tray.showMessage("CareCenter - Safe Start", message, icon, 7000)
+
+    def install_safe_start(self) -> None:
+        if self.safe_start_install_thread is not None:
+            self.tray.showMessage(
+                "CareCenter",
+                t("safe_start_install_running"),
+                QSystemTrayIcon.MessageIcon.Information,
+                3000,
+            )
+            return
+        self.running = True
+        self.window.set_running(True)
+        self.window.set_state(t("safe_start_install_running"))
+        self.window.set_progress(0, t("safe_start_install_progress"), True)
+        self.window.set_result("")
+        self.show_window()
+
+        self.safe_start_install_thread = QThread(self)
+        self.safe_start_install_worker = SafeStartInstallWorker()
+        self.safe_start_install_worker.moveToThread(self.safe_start_install_thread)
+        self.safe_start_install_thread.started.connect(self.safe_start_install_worker.run)
+        self.safe_start_install_worker.finished.connect(self.on_safe_start_install_finished)
+        self.safe_start_install_worker.finished.connect(self.safe_start_install_thread.quit)
+        self.safe_start_install_worker.finished.connect(self.safe_start_install_worker.deleteLater)
+        self.safe_start_install_thread.finished.connect(self.safe_start_install_thread.deleteLater)
+        self.safe_start_install_thread.finished.connect(self.clear_safe_start_install_thread)
+        self.safe_start_install_thread.start()
+
+    def on_safe_start_install_finished(self, result: object) -> None:
+        self.running = False
+        self.window.set_running(False)
+        status = str(getattr(result, "status", "failed"))
+        ok = status == "ok"
+        summary = t("safe_start_install_ok") if ok else t("safe_start_install_failed")
+        self.window.set_progress(100, t("done"), False)
+        self.window.set_state(summary)
+        text = result.to_text() if hasattr(result, "to_text") else str(result)
+        self.window.set_result(text)
+        icon = (
+            QSystemTrayIcon.MessageIcon.Information
+            if ok
+            else QSystemTrayIcon.MessageIcon.Warning
+        )
+        self.tray.showMessage("CareCenter - Safe Start", summary, icon, 7000)
+        if ok:
+            self.show_safe_start_report()
+
+    def clear_safe_start_install_thread(self) -> None:
+        self.safe_start_install_thread = None
+        self.safe_start_install_worker = None
 
     def show_diagnosis(self) -> None:
         report = diagnose(MaintenanceConfig.load(self.config_path))
@@ -1185,6 +1308,7 @@ class TrayController(QObject):
             or self.auto_thread is not None
             or self.repair_thread is not None
             or self.store_thread is not None
+            or self.safe_start_install_thread is not None
             or self.full_repair_thread is not None
         )
 

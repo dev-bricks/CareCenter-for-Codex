@@ -89,14 +89,20 @@ def cmd_auto_maintain(args: argparse.Namespace) -> int:
     from .orchestrator import auto_maintain
 
     config = load_config(args)
-    result = auto_maintain(
-        config,
-        mode=args.mode,
-        execute=args.execute,
-        allow_close=True if args.close else None,
-    )
+    try:
+        result = auto_maintain(
+            config,
+            mode=args.mode,
+            execute=args.execute,
+            allow_close=True if args.close else None,
+        )
+    except KeyboardInterrupt:
+        print(t("auto_cancelled_short"))
+        return 130
     print(result.to_text())
-    return {"ok": 0, "dry-run": 0, "blocked": 2, "failed": 1}.get(result.status, 0)
+    return {"ok": 0, "dry-run": 0, "blocked": 2, "cancelled": 130, "failed": 1}.get(
+        result.status, 0
+    )
 
 
 def cmd_store_repair(args: argparse.Namespace) -> int:
@@ -224,6 +230,19 @@ def cmd_safe_start_report(args: argparse.Namespace) -> int:
     else:
         print(status.to_text())
     return 0
+
+
+def cmd_safe_start_install(args: argparse.Namespace) -> int:
+    import json as _json
+
+    from .safe_start_integration import install_safe_start_package
+
+    result = install_safe_start_package(target=args.target)
+    if args.json:
+        print(_json.dumps(result.to_dict(), ensure_ascii=False, indent=2))
+    else:
+        print(result.to_text())
+    return 0 if result.status == "ok" else 1
 
 
 def cmd_tray(args: argparse.Namespace) -> int:
@@ -405,6 +424,20 @@ def build_parser() -> argparse.ArgumentParser:
     )
     safe_start_parser.add_argument("--json", action="store_true", help="Status als JSON ausgeben.")
     safe_start_parser.set_defaults(func=cmd_safe_start_report)
+
+    safe_start_install_parser = subparsers.add_parser(
+        "safe-start-install",
+        help="Safe Start for Codex installieren oder aktualisieren.",
+    )
+    safe_start_install_parser.add_argument(
+        "--target",
+        default=None,
+        help="Optionales pip-Ziel. Ohne Angabe: lokale Schwesterquelle, sonst safe-start-for-codex>=1.1.2.",
+    )
+    safe_start_install_parser.add_argument(
+        "--json", action="store_true", help="Ergebnis als JSON ausgeben."
+    )
+    safe_start_install_parser.set_defaults(func=cmd_safe_start_install)
 
     tray_parser = subparsers.add_parser("tray", help="Systemtray-App starten.")
     tray_parser.set_defaults(func=cmd_tray)

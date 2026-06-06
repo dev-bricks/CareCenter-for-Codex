@@ -167,6 +167,29 @@ def test_safe_blocks_on_timeout_without_killing_active_run() -> None:
     assert k["killed"] == [] and k["closed"] == []   # aktiver Lauf NICHT abgebrochen
 
 
+def test_safe_wait_can_be_cancelled_without_touching_codex() -> None:
+    config = make_config(idle_wait_timeout_seconds=999, activity_poll_seconds=0)
+    k = _kit()
+    mfn, calls = fake_maintain()
+    cancel_checks = {"count": 0}
+
+    def cancel_requested() -> bool:
+        cancel_checks["count"] += 1
+        return cancel_checks["count"] >= 3
+
+    res = auto_maintain(
+        config, mode="safe", execute=True, allow_close=True,
+        observe_fn=observe_sequence([CodexActivity(present=True, active=True, cpu_percent=200, main_pids=[100])]),
+        killer=k["killer"], graceful_closer=k["closer"], launcher=k["launcher"],
+        maintain_fn=mfn, sleeper=noop_sleep, cancel_requested=cancel_requested,
+    )
+
+    assert res.status == "cancelled"
+    assert res.waited is True
+    assert calls == []
+    assert k["closed"] == [] and k["killed"] == []
+
+
 def test_fast_mode_closes_immediately_without_waiting() -> None:
     config = make_config(restart_codex_after=False)
     k = _kit()

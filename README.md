@@ -19,16 +19,16 @@ On Windows, closing the Codex desktop window can leave a hung main process behin
 - Tray settings with language switching: choose English or German in the Settings area. The choice is saved in `config.json` and the visible tray UI is relabeled immediately.
 - One-click Repair Codex action: runs a bounded escalation that stops as soon as Codex starts again. It begins with no-admin cleanup and only suggests admin restart, Store reinstall, or reboot when needed.
 - Safe and Fast maintenance modes:
-  - Safe waits until the complete Codex process tree is idle, closes Codex cleanly, runs maintenance, and restarts it.
+  - Safe waits until the complete Codex process tree is idle, can be cancelled while waiting, closes Codex cleanly, runs maintenance, and restarts it.
   - Fast closes Codex immediately and then runs maintenance.
 - Store tools: repair a stuck Microsoft Store update path and open the Store reinstall page for Codex.
 - Conservative database maintenance: backup including WAL/SHM, integrity check on the backup, WAL checkpoint, `PRAGMA optimize`, `VACUUM`, and limited backup retention.
 - Status window with progress bar, live tray tooltip, and persistent audit logs.
-- Optional Safe Start for Codex integration for release bursts, start storms, and catch-up hints.
+- Safe Start for Codex is shipped as a dependency and can be installed or updated from the CareCenter window or CLI. CareCenter uses it for release bursts, start storms, and catch-up hints.
 
 ## Screenshot
 
-The tray status window shows current state, removed-leftover count, progress, maintenance controls, Store actions, and settings.
+The tray status window shows current state, removed-leftover count, progress, maintenance controls with Safe cancellation, Store actions, Safe Start actions, and settings.
 
 ![CareCenter status window](README/screenshots/main.png)
 
@@ -76,6 +76,7 @@ python -m codex_logdatenbank_wartung.cli auto-maintain --mode safe --execute
 python -m codex_logdatenbank_wartung.cli store-repair --level repair --execute
 python -m codex_logdatenbank_wartung.cli store-materials
 python -m codex_logdatenbank_wartung.cli safe-start-report
+python -m codex_logdatenbank_wartung.cli safe-start-install
 python -m codex_logdatenbank_wartung.cli schedule install --interval-minutes 180
 ```
 
@@ -99,6 +100,7 @@ Codex paths are detected from `%LOCALAPPDATA%`, `%APPDATA%`, and `CODEX_HOME`. Y
 - Conservative maintenance blocks while Codex is running.
 - Scheduled maintenance never closes Codex.
 - Safe auto-maintain only closes Codex after the full process tree is idle.
+- Safe cancellation stops only the waiting phase before Codex is closed; active database operations are not force-interrupted.
 - The watcher kills only inactive ghosts without a renderer and only after the configured age threshold.
 - The Codex CLI and active desktop sessions are explicitly excluded.
 - Destructive paths such as Store reset, admin repair, reinstall, and reboot are suggestions or explicit user actions, not automatic surprises.

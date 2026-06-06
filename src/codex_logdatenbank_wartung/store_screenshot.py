@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from sys import platform as sys_platform
 from time import sleep
@@ -59,6 +60,12 @@ def _save_window_capture(window: StatusWindow, output_path: Path) -> bool:
     return not pixmap.isNull() and pixmap.save(str(output_path))
 
 
+def _save_widget_capture(window: StatusWindow, output_path: Path) -> bool:
+    """Speichert nur die App-Oberflaeche ohne native Fenstersymbole."""
+    pixmap = window.grab()
+    return not pixmap.isNull() and pixmap.save(str(output_path))
+
+
 def render_store_screenshot(output_path: Path = DEFAULT_SCREENSHOT_PATH) -> Path:
     """Rendert einen reproduzierbaren Screenshot des Statusfensters."""
     output_path = output_path.resolve()
@@ -86,7 +93,10 @@ def render_store_screenshot(output_path: Path = DEFAULT_SCREENSHOT_PATH) -> Path
         if QApplication.platformName().lower() not in {"minimal", "offscreen"}:
             sleep(0.05)
 
-    saved = _save_window_capture(window, output_path)
+    if os.environ.get("CARECENTER_SCREENSHOT_NATIVE_FRAME") == "1":
+        saved = _save_window_capture(window, output_path)
+    else:
+        saved = _save_widget_capture(window, output_path)
     window.close()
     app.processEvents()
 

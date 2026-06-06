@@ -19,16 +19,16 @@ Unter Windows kann nach dem Schließen des Codex-Desktopfensters ein hängender 
 - Spracheinstellung im Tray: Im Bereich Einstellungen kann zwischen Deutsch und Englisch gewechselt werden. Die Auswahl wird in `config.json` gespeichert und die sichtbare Tray-Oberfläche wird sofort neu beschriftet.
 - Ein-Klick-Aktion „Codex reparieren“: startet eine begrenzte Eskalation, die stoppt, sobald Codex wieder startet. Zuerst läuft eine Reparatur ohne Adminrechte; Admin-Neustart, Store-Neuinstallation oder Reboot werden nur bei Bedarf vorgeschlagen.
 - Wartung in zwei Modi:
-  - Safe wartet, bis der gesamte Codex-Prozessbaum im Leerlauf ist, schließt Codex sauber, wartet und startet danach neu.
+  - Safe wartet, bis der gesamte Codex-Prozessbaum im Leerlauf ist, lässt sich während des Wartens abbrechen, schließt Codex sauber, wartet und startet danach neu.
   - Fast schließt Codex sofort und startet anschließend die Wartung.
 - Store-Werkzeuge: reparieren einen hängenden Microsoft-Store-Updatepfad und öffnen bei Bedarf die Store-Seite zur Neuinstallation.
 - Konservative Datenbankwartung: Backup inklusive WAL/SHM, Integritätscheck auf dem Backup, WAL-Checkpoint, `PRAGMA optimize`, `VACUUM` und begrenzte Backup-Aufbewahrung.
 - Statusfenster mit Fortschrittsbalken, Live-Tray-Tooltip und dauerhaften Audit-Logs.
-- Optionale Integration mit Safe Start for Codex für Release-Bursts, Start-Storms und Catch-up-Hinweise.
+- Safe Start for Codex wird als Abhängigkeit mitgeliefert und kann im CareCenter-Fenster oder per CLI installiert beziehungsweise aktualisiert werden. CareCenter nutzt es für Release-Bursts, Start-Storms und Catch-up-Hinweise.
 
 ## Screenshot
 
-Das Tray-Statusfenster zeigt aktuellen Zustand, Zähler für entfernte Reste, Fortschritt, Wartungsaktionen, Store-Aktionen und Einstellungen.
+Das Tray-Statusfenster zeigt aktuellen Zustand, Zähler für entfernte Reste, Fortschritt, Wartungsaktionen mit Safe-Abbruch, Store-Aktionen, Safe-Start-Aktionen und Einstellungen.
 
 ![CareCenter-Statusfenster](README/screenshots/main.png)
 
@@ -76,6 +76,7 @@ python -m codex_logdatenbank_wartung.cli auto-maintain --mode safe --execute
 python -m codex_logdatenbank_wartung.cli store-repair --level repair --execute
 python -m codex_logdatenbank_wartung.cli store-materials
 python -m codex_logdatenbank_wartung.cli safe-start-report
+python -m codex_logdatenbank_wartung.cli safe-start-install
 python -m codex_logdatenbank_wartung.cli schedule install --interval-minutes 180
 ```
 
@@ -99,6 +100,7 @@ Codex-Pfade werden aus `%LOCALAPPDATA%`, `%APPDATA%` und `CODEX_HOME` erkannt. S
 - Konservative Wartung blockiert, solange Codex läuft.
 - Geplante Wartung schließt Codex nie.
 - Safe Auto-Maintain schließt Codex erst, wenn der gesamte Prozessbaum im Leerlauf ist.
+- Der Safe-Abbruch stoppt nur das Warten vor dem Schließen von Codex; laufende Datenbankoperationen werden nicht hart unterbrochen.
 - Der Wächter beendet nur inaktive Ghosts ohne Renderer und nur nach der konfigurierten Altersschwelle.
 - Die Codex-CLI und aktive Desktop-Sitzungen sind ausdrücklich ausgeschlossen.
 - Destruktive Pfade wie Store-Reset, Admin-Reparatur, Neuinstallation und Reboot sind Vorschläge oder ausdrückliche Nutzeraktionen, keine automatischen Überraschungen.

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from unittest.mock import patch
 
 from codex_logdatenbank_wartung.cli import main
 
@@ -100,3 +101,24 @@ def test_store_screenshot_command_writes_png(tmp_path: Path, capsys, monkeypatch
     assert output.exists()
     assert output.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
     assert "Store-Screenshot geschrieben" in capsys.readouterr().out
+
+
+def test_safe_start_install_command_uses_installer(tmp_path: Path, capsys) -> None:
+    cfg = tmp_path / "config.json"
+    cfg.write_text("{}", encoding="utf-8")
+
+    class Result:
+        status = "ok"
+
+        def to_text(self) -> str:
+            return "Safe Start installiert"
+
+    with patch(
+        "codex_logdatenbank_wartung.safe_start_integration.install_safe_start_package",
+        return_value=Result(),
+    ) as installer:
+        rc = main(["--config", str(cfg), "safe-start-install", "--target", "local-src"])
+
+    assert rc == 0
+    installer.assert_called_once_with(target="local-src")
+    assert "Safe Start installiert" in capsys.readouterr().out

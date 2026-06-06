@@ -46,10 +46,13 @@ _CATALOG: dict[str, dict[Language, str]] = {
     # -- Tray / StatusWindow --
     "ready": {"de": "Bereit.", "en": "Ready."},
     "done": {"de": "Fertig.", "en": "Done."},
-    "tray_ready": {"de": "{app}: bereit  🧟 {count}", "en": "{app}: ready  🧟 {count}"},
+    "tray_ready": {
+        "de": "{app}: bereit; entfernte Reste: {count}",
+        "en": "{app}: ready; removed remnants: {count}",
+    },
     "zombie_counter": {
-        "de": "🧟  {count} hängende Codex-Reste seit Start entfernt",
-        "en": "🧟  {count} hanging Codex remnants removed since start",
+        "de": "{count} hängende Codex-Reste seit Start entfernt",
+        "en": "{count} hanging Codex remnants removed since start",
     },
     "window_close": {
         "de": "Schließen (läuft im Hintergrund weiter)",
@@ -79,6 +82,7 @@ _CATALOG: dict[str, dict[Language, str]] = {
     "maintenance_fast_label": {"de": "Fast-Modus", "en": "Fast mode"},
     "maintenance_safe_button": {"de": "Wartung – Safe", "en": "Maintenance - Safe"},
     "maintenance_fast_button": {"de": "Wartung – Fast", "en": "Maintenance - Fast"},
+    "maintenance_cancel_button": {"de": "Abbrechen", "en": "Cancel"},
     "maintenance_safe_tooltip": {
         "de": "Wartet auf Codex-Leerlauf, schließt Codex, wartet, startet neu.",
         "en": "Waits for Codex to become idle, closes Codex, maintains, then restarts.",
@@ -86,6 +90,10 @@ _CATALOG: dict[str, dict[Language, str]] = {
     "maintenance_fast_tooltip": {
         "de": "Sofort: Codex beenden und warten, ohne auf Leerlauf zu warten.",
         "en": "Immediate: close Codex and maintain without waiting for idle.",
+    },
+    "maintenance_cancel_tooltip": {
+        "de": "Bricht einen wartenden Safe-Wartungslauf ab, bevor Codex geschlossen oder die Datenbank angefasst wird.",
+        "en": "Cancels a waiting Safe maintenance run before Codex is closed or the database is touched.",
     },
     "maintenance_state_running": {
         "de": "Wartung läuft ({mode}) …",
@@ -105,9 +113,21 @@ _CATALOG: dict[str, dict[Language, str]] = {
         "de": "Verschoben — Codex war aktiv (kein Lauf abgebrochen).",
         "en": "Deferred — Codex was active (no run interrupted).",
     },
+    "maintenance_done_cancelled": {
+        "de": "Abgebrochen — Wartung wurde nicht gestartet.",
+        "en": "Cancelled — maintenance was not started.",
+    },
     "maintenance_done_failed": {
         "de": "Fehlgeschlagen — Details im Protokoll.",
         "en": "Failed — see log for details.",
+    },
+    "maintenance_cancel_requested": {
+        "de": "Abbruch angefordert — Safe-Wartung stoppt beim nächsten sicheren Punkt.",
+        "en": "Cancel requested — Safe maintenance will stop at the next safe point.",
+    },
+    "maintenance_cancel_noop": {
+        "de": "Keine wartende Safe-Wartung aktiv.",
+        "en": "No waiting Safe maintenance run is active.",
     },
     "maintenance_done_other": {"de": "Beendet: {status}", "en": "Finished: {status}"},
     "maintenance_toast_done": {"de": "CareCenter — fertig", "en": "CareCenter - done"},
@@ -245,6 +265,30 @@ _CATALOG: dict[str, dict[Language, str]] = {
     "safe_start_tooltip": {
         "de": "Zeigt Safe-Start-Snapshots, Start-Storm-Signale und seltene Catch-up-Kandidaten.",
         "en": "Shows Safe Start snapshots, start-storm signals and rare catch-up candidates.",
+    },
+    "safe_start_install": {
+        "de": "Safe Start installieren",
+        "en": "Install Safe Start",
+    },
+    "safe_start_install_tooltip": {
+        "de": "Installiert oder aktualisiert Safe Start for Codex über pip. Bevorzugt die lokale Schwesterquelle, sonst das Paket safe-start-for-codex.",
+        "en": "Installs or updates Safe Start for Codex via pip. Prefers the local sibling source, otherwise the safe-start-for-codex package.",
+    },
+    "safe_start_install_running": {
+        "de": "Safe Start wird installiert oder aktualisiert …",
+        "en": "Installing or updating Safe Start ...",
+    },
+    "safe_start_install_progress": {
+        "de": "pip installiert Safe Start for Codex …",
+        "en": "pip is installing Safe Start for Codex ...",
+    },
+    "safe_start_install_ok": {
+        "de": "Safe Start ist installiert oder aktualisiert.",
+        "en": "Safe Start is installed or updated.",
+    },
+    "safe_start_install_failed": {
+        "de": "Safe Start konnte nicht installiert werden.",
+        "en": "Safe Start could not be installed.",
     },
     "safe_start_active": {
         "de": "Safe Start ist aktiv; CareCenter hält Start-Gegenaktionen zurück.",
@@ -637,6 +681,14 @@ _CATALOG: dict[str, dict[Language, str]] = {
     "auto_timeout_short": {
         "de": "Codex noch aktiv — Wartung verschoben.",
         "en": "Codex still active — maintenance deferred.",
+    },
+    "auto_cancelled_step": {
+        "de": "Safe-Wartung durch Nutzer abgebrochen; Codex wurde nicht geschlossen.",
+        "en": "Safe maintenance cancelled by user; Codex was not closed.",
+    },
+    "auto_cancelled_short": {
+        "de": "Safe-Wartung abgebrochen.",
+        "en": "Safe maintenance cancelled.",
     },
     "auto_idle_ok": {
         "de": "Codex ist im Leerlauf (keine aktiven Automatisierungen).",

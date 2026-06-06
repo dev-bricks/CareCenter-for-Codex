@@ -32,6 +32,7 @@ python -m PyInstaller --noconfirm --clean --onefile --windowed ^
   --name CareCenterForCodex ^
   --icon "%PROJECT_ROOT%\CareCenterForCodex.ico" ^
   --add-data "%PROJECT_ROOT%\CareCenterForCodex.ico;." ^
+  --hidden-import safe_start_for_codex.cli ^
   --paths "%PROJECT_ROOT%\src" ^
   %EXCLUDES% ^
   --distpath "%DIST_DIR%" ^

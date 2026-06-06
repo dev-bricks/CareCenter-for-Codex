@@ -78,6 +78,7 @@ flowchart TD
     D -- safe --> E{"aktiv? (CPU>Schwelle o. DB frisch)"}
     E -- ja --> W["warten + Tray informiert (eingereiht) → erneut messen"]
     W --> E
+    E -- "User-Abbruch" --> CXL["abgebrochen: Codex nicht geschlossen, Wartung nicht gestartet"]
     E -- "Timeout" --> X["blockiert: Lauf NICHT abgebrochen, Wartung verschoben"]
     E -- nein --> F["Codex kontrolliert schließen (sanft, dann Rest beenden)"]
     D -- fast --> F
@@ -91,6 +92,8 @@ flowchart TD
 Empirie (2026-05-29): Aktive Automatisierung erzeugt 25–500 % CPU eines Kerns (auch in Worker-Kindern
 wie `python run.py`), Leerlauf-Rest <2 %. Das Schließen von Codex **bricht laufende Läufe ab** —
 deshalb handelt der Safe-Modus erst bei echtem Leerlauf und unterbricht nie einen Lauf.
+Der manuelle Safe-Abbruch beendet nur die Wartephase; er schließt Codex nicht und greift
+nicht in bereits laufende Datenbankoperationen ein.
 
 ## Sicherheitsmodell
 

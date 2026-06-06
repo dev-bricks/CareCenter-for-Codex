@@ -51,6 +51,7 @@ MaintainFn = Callable[[], MaintenanceResult]
 Sleeper = Callable[[float], None]
 Clock = Callable[[], datetime]
 ProgressFn = Callable[["AutoProgress"], None]
+CancelFn = Callable[[], bool]
 
 
 @dataclass(slots=True)
@@ -224,6 +225,7 @@ def auto_maintain(
     sleeper: Sleeper = _time.sleep,
     clock: Clock = datetime.now,
     progress: ProgressFn | None = None,
+    cancel_requested: CancelFn | None = None,
 ) -> AutoMaintainResult:
     from .health import default_tree_killer
 
@@ -232,6 +234,7 @@ def auto_maintain(
     graceful_closer = graceful_closer or default_graceful_closer
     launcher = launcher or default_launcher(config)
     maintain_fn = maintain_fn or _default_maintain_fn(config, execute, progress)
+    cancel_requested = cancel_requested or (lambda: False)
     # Schliessen ist nur erlaubt, wenn explizit gewuenscht (Tray-Klick / --close) oder
     # per Konfiguration freigegeben. Fast-Modus impliziert immer Berechtigung — er ist
     # per Definition ein "sofort beenden ohne Warten". Safe-Modus wartet erst auf Leerlauf
@@ -244,13 +247,24 @@ def auto_maintain(
             progress(AutoProgress(phase, message, max(0, min(100, percent)), indeterminate))
 
     result = AutoMaintainResult(status="ok", mode=mode, dry_run=not execute)
+
+    def cancel_result() -> AutoMaintainResult:
+        result.status = "cancelled"
+        result.add("Abbruch", "cancelled", t("auto_cancelled_step"))
+        emit("cancelled", t("auto_cancelled_short"), 100)
+        return result
+
     emit("assess", t("auto_assess"), 0, True)
+    if cancel_requested():
+        return cancel_result()
     act = observe_fn()
 
     if act.present:
         if mode == "safe":
             deadline = clock() + timedelta(seconds=config.idle_wait_timeout_seconds)
             while act.active:
+                if cancel_requested():
+                    return cancel_result()
                 result.waited = True
                 emit(
                     "wait",
@@ -270,6 +284,8 @@ def auto_maintain(
                     emit("blocked", t("auto_timeout_short"), 100)
                     return result
                 sleeper(config.activity_poll_seconds)
+                if cancel_requested():
+                    return cancel_result()
                 act = observe_fn()
                 if not act.present:
                     break
@@ -278,6 +294,8 @@ def auto_maintain(
             result.add("Modus", "ok", t("auto_fast_mode"))
 
     # Codex (falls noch da) kontrolliert vollstaendig beenden.
+    if cancel_requested():
+        return cancel_result()
     act = observe_fn()
     if act.present:
         if not effective_allow:
@@ -304,6 +322,8 @@ def auto_maintain(
             result.add("Codex beenden", "ok", t("auto_closed"))
 
     # Sicherheits-Check direkt vor der Wartung.
+    if cancel_requested():
+        return cancel_result()
     if execute:
         guard = observe_fn()
         if guard.present:

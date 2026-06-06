@@ -5,7 +5,9 @@ from __future__ import annotations
 import importlib
 import json
 import os
-from collections.abc import Iterator
+import subprocess
+import sys
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
@@ -13,6 +15,9 @@ from pathlib import Path
 from types import ModuleType
 
 from .config import MaintenanceConfig
+
+SAFE_START_PACKAGE_SPEC = "safe-start-for-codex>=1.1.2"
+SAFE_START_SOURCE_ENV = "CARECENTER_SAFE_START_SOURCE"
 
 
 @dataclass(slots=True)
@@ -65,11 +70,150 @@ class SafeStartStatus:
         return "\n".join(lines)
 
 
+@dataclass(slots=True)
+class SafeStartInstallResult:
+    status: str
+    target: str
+    command: list[str]
+    message: str
+    stdout: str = ""
+    stderr: str = ""
+
+    def to_dict(self) -> dict[str, object]:
+        return asdict(self)
+
+    def to_text(self) -> str:
+        lines = [
+            f"Status: {self.status}",
+            f"Ziel: {self.target}",
+            "Befehl: " + " ".join(self.command),
+            self.message,
+        ]
+        if self.stdout.strip():
+            lines.append("Ausgabe:")
+            lines.append(self.stdout.strip())
+        if self.stderr.strip():
+            lines.append("Fehlerausgabe:")
+            lines.append(self.stderr.strip())
+        return "\n".join(lines)
+
+
 def _safe_start_cli() -> ModuleType | None:
     try:
         return importlib.import_module("safe_start_for_codex.cli")
     except Exception:
         return None
+
+
+def _local_safe_start_source() -> Path | None:
+    env_path = os.environ.get(SAFE_START_SOURCE_ENV)
+    if env_path:
+        candidate = Path(env_path).expanduser()
+        if (candidate / "pyproject.toml").exists():
+            return candidate
+
+    project_root = Path(__file__).resolve().parents[2]
+    sibling = project_root.parent / "REL-PUB_safe-start-for-codex"
+    if (sibling / "pyproject.toml").exists():
+        return sibling
+    return None
+
+
+def safe_start_install_target() -> str:
+    """Bevorzuge die lokale Schwesterquelle, sonst das veröffentlichte Paket."""
+    local_source = _local_safe_start_source()
+    if local_source is not None:
+        return str(local_source)
+    return SAFE_START_PACKAGE_SPEC
+
+
+def _pip_command_candidates() -> list[list[str]]:
+    candidates: list[list[str]] = []
+    if not getattr(sys, "frozen", False):
+        candidates.append([sys.executable, "-m", "pip"])
+    candidates.extend((["py", "-3", "-m", "pip"], ["python", "-m", "pip"]))
+
+    unique: list[list[str]] = []
+    seen: set[tuple[str, ...]] = set()
+    for candidate in candidates:
+        key = tuple(candidate)
+        if key not in seen:
+            unique.append(candidate)
+            seen.add(key)
+    return unique
+
+
+def _run_install_command(command: list[str]) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        command,
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+
+
+def install_safe_start_package(
+    *,
+    target: str | None = None,
+    runner: Callable[[list[str]], subprocess.CompletedProcess[str]] | None = None,
+) -> SafeStartInstallResult:
+    """Installiere oder aktualisiere Safe Start for Codex über pip.
+
+    Das ist bewusst eine explizite Nutzeraktion. Der Tray nutzt dieselbe Funktion wie
+    der CLI-Befehl; automatisch wird hier nichts nachinstalliert.
+    """
+    chosen_target = target or safe_start_install_target()
+    run = runner or _run_install_command
+    attempts: list[SafeStartInstallResult] = []
+    for pip_command in _pip_command_candidates():
+        command = [*pip_command, "install", "--upgrade", chosen_target]
+        try:
+            completed = run(command)
+        except OSError as exc:
+            attempts.append(
+                SafeStartInstallResult(
+                    status="failed",
+                    target=chosen_target,
+                    command=command,
+                    message=str(exc),
+                )
+            )
+            continue
+        status = "ok" if completed.returncode == 0 else "failed"
+        result = SafeStartInstallResult(
+            status=status,
+            target=chosen_target,
+            command=command,
+            message=(
+                "Safe Start wurde installiert oder aktualisiert."
+                if status == "ok"
+                else f"pip endete mit Code {completed.returncode}."
+            ),
+            stdout=completed.stdout or "",
+            stderr=completed.stderr or "",
+        )
+        if status == "ok":
+            return result
+        attempts.append(result)
+
+    if attempts:
+        last = attempts[-1]
+        return SafeStartInstallResult(
+            status="failed",
+            target=chosen_target,
+            command=last.command,
+            message="Safe Start konnte nicht installiert werden.",
+            stdout=last.stdout,
+            stderr=last.stderr or last.message,
+        )
+    return SafeStartInstallResult(
+        status="failed",
+        target=chosen_target,
+        command=[],
+        message="Kein Python/pip-Befehl gefunden.",
+    )
 
 
 @contextmanager

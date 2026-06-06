@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -8,6 +9,8 @@ from codex_logdatenbank_wartung.config import MaintenanceConfig
 from codex_logdatenbank_wartung.safe_start_integration import (
     build_safe_start_status,
     detect_safe_start_storm,
+    install_safe_start_package,
+    safe_start_install_target,
     should_defer_for_safe_start,
 )
 
@@ -94,3 +97,30 @@ def test_build_safe_start_status_uses_snapshot_fallback(tmp_path: Path, monkeypa
     assert status.available is False
     assert status.eligible_ids == ["weekly"]
     assert status.candidate_count == 1
+
+
+def test_safe_start_install_target_prefers_local_source(tmp_path: Path, monkeypatch) -> None:
+    source = tmp_path / "safe-start-for-codex"
+    source.mkdir()
+    (source / "pyproject.toml").write_text("[project]\nname='safe-start-for-codex'\n", encoding="utf-8")
+    monkeypatch.setenv("CARECENTER_SAFE_START_SOURCE", str(source))
+
+    assert safe_start_install_target() == str(source)
+
+
+def test_install_safe_start_package_runs_pip_upgrade(tmp_path: Path, monkeypatch) -> None:
+    source = tmp_path / "safe-start-for-codex"
+    source.mkdir()
+    (source / "pyproject.toml").write_text("[project]\nname='safe-start-for-codex'\n", encoding="utf-8")
+    monkeypatch.setenv("CARECENTER_SAFE_START_SOURCE", str(source))
+    calls: list[list[str]] = []
+
+    def fake_runner(command: list[str]) -> subprocess.CompletedProcess[str]:
+        calls.append(command)
+        return subprocess.CompletedProcess(command, 0, stdout="installed\n", stderr="")
+
+    result = install_safe_start_package(runner=fake_runner)
+
+    assert result.status == "ok"
+    assert calls
+    assert calls[0][-3:] == ["install", "--upgrade", str(source)]
