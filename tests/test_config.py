@@ -114,7 +114,7 @@ def test_load_returns_defaults_on_wrong_field_type(tmp_path: Path) -> None:
     )
 
 
-def test_ccc_data_root_env_var(tmp_path: Path, monkeypatch: object) -> None:
+def test_ccc_data_root_env_var(tmp_path: Path, monkeypatch) -> None:
     """CCC_DATA_ROOT überschreibt den Daten-Root für backup_dir, log_dir und maintenance_lock_path."""
     monkeypatch.setenv("CCC_DATA_ROOT", str(tmp_path))
 
@@ -123,6 +123,6 @@ def test_ccc_data_root_env_var(tmp_path: Path, monkeypatch: object) -> None:
     assert config.log_dir == str(tmp_path / "logs")
     assert config.maintenance_lock_path == str(tmp_path / "maintenance.lock")
 
-    config_path = tmp_path / "config.json"
     loaded = MaintenanceConfig.load()
     assert loaded.backup_dir == str(tmp_path / "backups")
+    assert (tmp_path / "config.json").exists()  # load() legte config.json unter redirected root an
