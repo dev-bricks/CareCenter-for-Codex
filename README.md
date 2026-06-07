@@ -95,6 +95,15 @@ database: %USERPROFILE%\.codex\logs_2.sqlite
 
 Codex paths are detected from `%LOCALAPPDATA%`, `%APPDATA%`, and `CODEX_HOME`. You can override them in `config.json`.
 
+To use a different data root (useful in tests or alternative installations), set `CCC_DATA_ROOT` before launching:
+
+```powershell
+$env:CCC_DATA_ROOT = "D:\my-codex-maintenance"
+python -m codex_logdatenbank_wartung.cli tray
+```
+
+When set, `config.json`, `logs\`, and `backups\` are placed under that path instead of the default `C:\_Local_DEV\codex-maintenance\`.
+
 ## Safety Model
 
 - Conservative maintenance blocks while Codex is running.

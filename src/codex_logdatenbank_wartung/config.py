@@ -8,8 +8,20 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
-LOCAL_ROOT = Path(r"C:\_Local_DEV\codex-maintenance")
-DEFAULT_CONFIG_PATH = LOCAL_ROOT / "config.json"
+def local_root() -> Path:
+    """Daten-Root; überschreibbar via CCC_DATA_ROOT (Tests, alternative Installationspfade)."""
+    if env := os.environ.get("CCC_DATA_ROOT"):
+        return Path(env)
+    return Path(r"C:\_Local_DEV\codex-maintenance")
+
+
+def default_config_path() -> Path:
+    return local_root() / "config.json"
+
+
+# Import-Zeit-Aliase für Abwärtskompatibilität (cli.py, scheduler.py, tray_app.py).
+LOCAL_ROOT = local_root()
+DEFAULT_CONFIG_PATH = default_config_path()
 
 
 def default_codex_home() -> Path:
@@ -48,9 +60,9 @@ class MaintenanceConfig:
     """Persistente Konfiguration der Wartungssoftware."""
 
     database_path: str = field(default_factory=lambda: str(default_database_path()))
-    backup_dir: str = str(LOCAL_ROOT / "backups")
-    log_dir: str = str(LOCAL_ROOT / "logs")
-    maintenance_lock_path: str = str(LOCAL_ROOT / "maintenance.lock")
+    backup_dir: str = field(default_factory=lambda: str(local_root() / "backups"))
+    log_dir: str = field(default_factory=lambda: str(local_root() / "logs"))
+    maintenance_lock_path: str = field(default_factory=lambda: str(local_root() / "maintenance.lock"))
     codex_executable: str = field(default_factory=lambda: str(default_codex_executable()))
     codex_install_dir: str = field(default_factory=lambda: str(default_codex_install_dir()))
     # Stabiler Pfad-Marker der Store-Version (versionsabhaengiger WindowsApps-Pfad).
@@ -152,7 +164,9 @@ class MaintenanceConfig:
     activity_sample_seconds: float = 2.0  # Messfenster fuer die CPU-Stichprobe
 
     @classmethod
-    def load(cls, path: Path = DEFAULT_CONFIG_PATH) -> MaintenanceConfig:
+    def load(cls, path: Path | None = None) -> MaintenanceConfig:
+        if path is None:
+            path = default_config_path()
         if not path.exists():
             config = cls()
             config.save(path)
@@ -190,7 +204,9 @@ class MaintenanceConfig:
         except Exception:
             return defaults
 
-    def save(self, path: Path = DEFAULT_CONFIG_PATH) -> None:
+    def save(self, path: Path | None = None) -> None:
+        if path is None:
+            path = default_config_path()
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(
             json.dumps(asdict(self), ensure_ascii=False, indent=2) + "\n",
