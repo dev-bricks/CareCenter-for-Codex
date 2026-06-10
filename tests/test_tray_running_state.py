@@ -147,6 +147,61 @@ def test_watchdog_busy_includes_start_repair_thread():
                 del sys.modules[key]
 
 
+def test_store_repair_sets_running_true():
+    """run_store_repair muss self.running = True setzen (Bug-Fix: fehlte bisher)."""
+    mocks = _mock_pyside6()
+    try:
+        for key in list(sys.modules):
+            if "codex_logdatenbank_wartung.tray" in key:
+                del sys.modules[key]
+
+        from codex_logdatenbank_wartung.tray import TrayController
+
+        with tempfile.TemporaryDirectory() as tmp:
+            config_path = Path(tmp) / "config.json"
+            from codex_logdatenbank_wartung.config import MaintenanceConfig
+            config = MaintenanceConfig()
+            config.save(config_path)
+
+            tray_mock = MagicMock()
+            controller = object.__new__(TrayController)
+            controller.config_path = config_path
+            controller.config = config
+            controller.tray = tray_mock
+            controller.running = False
+            controller.auto_thread = None
+            controller.repair_thread = None
+            controller.store_thread = None
+            controller.store_worker = None
+            controller.full_repair_thread = None
+            controller.start_repair_thread = None
+            controller.watchdog_thread = None
+            controller.zombie_kill_count = 0
+            controller.window = MagicMock()
+
+            with patch("codex_logdatenbank_wartung.tray.QThread") as mock_thread, \
+                 patch("codex_logdatenbank_wartung.tray.StoreRepairWorker") as mock_worker:
+                mock_thread_inst = MagicMock()
+                mock_thread.return_value = mock_thread_inst
+                mock_worker_inst = MagicMock()
+                mock_worker.return_value = mock_worker_inst
+
+                controller.run_store_repair()
+                assert controller.running is True, "run_store_repair must set self.running = True"
+
+            fake_result = MagicMock()
+            fake_result.status = "ok"
+            controller.on_store_repair_finished(fake_result)
+            assert controller.running is False, "on_store_repair_finished must set self.running = False"
+    finally:
+        for key in list(sys.modules):
+            if "codex_logdatenbank_wartung.tray" in key:
+                del sys.modules[key]
+        for key in list(mocks):
+            if key in sys.modules and sys.modules[key] is mocks[key]:
+                del sys.modules[key]
+
+
 def test_language_setting_persists_and_retranslates():
     """Der Settings-Sprachwechsel speichert config.language und relabelt die UI."""
     mocks = _mock_pyside6()

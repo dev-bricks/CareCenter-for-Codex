@@ -1035,6 +1035,8 @@ class TrayController(QObject):
                 QSystemTrayIcon.MessageIcon.Information, 3000,
             )
             return
+        self.running = True
+        self.window.set_running(True)
         self.window.set_state(t("store_repair_running"))
         self.window.set_progress(0, t("store_repair_progress"), True)
         self.show_window()
@@ -1055,6 +1057,8 @@ class TrayController(QObject):
         self.store_thread.start()
 
     def on_store_repair_finished(self, result: StoreRepairResult) -> None:
+        self.running = False
+        self.window.set_running(False)
         ok = result.status == "ok"
         msg = (
             t("store_repair_ok")
