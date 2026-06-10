@@ -115,6 +115,38 @@ def test_full_repair_sets_running_true():
                 del sys.modules[key]
 
 
+def test_watchdog_busy_includes_start_repair_thread():
+    """_watchdog_busy() muss True liefern wenn start_repair_thread aktiv ist (Bug-Fix)."""
+    mocks = _mock_pyside6()
+    try:
+        for key in list(sys.modules):
+            if "codex_logdatenbank_wartung.tray" in key:
+                del sys.modules[key]
+
+        from codex_logdatenbank_wartung.tray import TrayController
+
+        controller = object.__new__(TrayController)
+        controller.running = False
+        controller.auto_thread = None
+        controller.repair_thread = None
+        controller.store_thread = None
+        controller.safe_start_install_thread = None
+        controller.full_repair_thread = None
+        controller.start_repair_thread = None
+
+        assert controller._watchdog_busy() is False, "Kein aktiver Thread => nicht busy"
+
+        controller.start_repair_thread = MagicMock()
+        assert controller._watchdog_busy() is True, "start_repair_thread aktiv => busy"
+    finally:
+        for key in list(sys.modules):
+            if "codex_logdatenbank_wartung.tray" in key:
+                del sys.modules[key]
+        for key in list(mocks):
+            if key in sys.modules and sys.modules[key] is mocks[key]:
+                del sys.modules[key]
+
+
 def test_language_setting_persists_and_retranslates():
     """Der Settings-Sprachwechsel speichert config.language und relabelt die UI."""
     mocks = _mock_pyside6()

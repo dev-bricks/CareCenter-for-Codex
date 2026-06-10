@@ -1310,6 +1310,7 @@ class TrayController(QObject):
             or self.store_thread is not None
             or self.safe_start_install_thread is not None
             or self.full_repair_thread is not None
+            or self.start_repair_thread is not None
         )
 
     def on_watchdog_reaped(self, info: object) -> None:
