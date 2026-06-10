@@ -372,3 +372,40 @@ def test_companion_reaper_disabled_by_config() -> None:
             repair_fn=repair,
         )
     assert result.companion_orphans_reaped == 0
+
+
+def test_companion_orphans_reaped_in_disabled_path() -> None:
+    """Companion-Orphans werden auch im disabled-Pfad bereinigt (unabhaengig von watcher_enabled)."""
+    from unittest.mock import patch
+
+    from codex_logdatenbank_wartung.processes import ProcessInfo
+
+    orphan = ProcessInfo(
+        pid=66666,
+        name="codex.exe",
+        executable=r"C:\Users\Example\AppData\Roaming\npm\node_modules\@openai\codex\vendor\codex.exe",
+        command_line=r"codex.exe app-server",
+        created_at="2026-05-31T10:00:00",
+    )
+
+    repair, _calls = repair_recorder()
+    with patch(
+        "codex_logdatenbank_wartung.watchdog.find_companion_orphans",
+        return_value=[orphan],
+    ):
+        killed_pids: list[int] = []
+
+        def killer(pid: int) -> tuple[bool, str]:
+            killed_pids.append(pid)
+            return True, "ok"
+
+        result = run_watchdog_tick(
+            make_config(watcher_enabled=False),
+            diagnose_fn=diagnose_returning(_Report(zombie_main_pids=[7])),
+            repair_fn=repair,
+            killer=killer,
+        )
+    assert result.action == "disabled"
+    assert result.companion_orphans_reaped == 1
+    assert 66666 in killed_pids
+    assert _calls == []  # Zombie-Kill bleibt aus, Companion-Reap passiert

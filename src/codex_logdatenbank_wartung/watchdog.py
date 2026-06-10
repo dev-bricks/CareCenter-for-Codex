@@ -149,12 +149,18 @@ def run_watchdog_tick(
         return result
 
     if not config.watcher_enabled:
-        return WatchdogTickResult(
+        companion_reaped = _reap_companion_orphans(config, execute=execute, provider=provider, killer=killer)
+        msg = "Haengende Reste erkannt, aber der Waechter ist deaktiviert (watcher_enabled=False)."
+        if companion_reaped:
+            msg += f" {companion_reaped} Companion-Orphan(s) bereinigt."
+        result = WatchdogTickResult(
             "disabled",
-            "Haengende Reste erkannt, aber der Waechter ist deaktiviert (watcher_enabled=False).",
+            msg,
             zombie_pids=zombie_pids,
             stale_lockfile=stale_lockfile,
         )
+        result.companion_orphans_reaped = companion_reaped
+        return result
 
     # Aktivitaets-Gate: nur fuer den Ghost-Kill relevant (ein reines verwaistes Lockfile hat
     # keinen laufenden Baum). Beim echten Kill (execute) messen wir die CPU des Codex-Baums;
