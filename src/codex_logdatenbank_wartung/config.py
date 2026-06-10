@@ -8,6 +8,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+
 def local_root() -> Path:
     """Daten-Root; überschreibbar via CCC_DATA_ROOT (Tests, alternative Installationspfade)."""
     if env := os.environ.get("CCC_DATA_ROOT"):
