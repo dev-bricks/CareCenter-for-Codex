@@ -32,6 +32,12 @@ Primary commands:
 - python -m codex_logdatenbank_wartung.cli auto-maintain --mode safe --execute
 - python -m codex_logdatenbank_wartung.cli store-repair --level repair --execute
 - python -m codex_logdatenbank_wartung.cli store-materials
+- python -m codex_logdatenbank_wartung.cli safe-start-report
+- python -m codex_logdatenbank_wartung.cli safe-start-install
+- python -m codex_logdatenbank_wartung.cli schedule install --interval-minutes 180
+
+Environment variables:
+- CCC_DATA_ROOT: override the default data directory (default: C:\_Local_DEV\codex-maintenance)
 
 Verification:
 - python -m compileall -q src tests
@@ -43,3 +49,5 @@ Public documentation:
 - CHANGELOG.md: release history
 - STORE_LISTING.md, PRIVACY_POLICY.md, SUPPORT.md: Store release materials
 - SECURITY.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md: community health files
+
+Last-checked: 2026-06-10
