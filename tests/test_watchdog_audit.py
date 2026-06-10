@@ -248,3 +248,20 @@ def test_backup_created_before_auto_fix():
         codex_home = Path(tmp) / ".codex"
         backups = list(codex_home.glob("config.*.bak"))
         assert len(backups) >= 1
+
+
+def test_both_auto_fixes_create_separate_backups():
+    """Wenn beide Auto-Fixes gleichzeitig laufen, erhaelt jeder eine eigene Backup-Datei.
+
+    Regression fuer: sekundengenaue Timestamps erzeugten Namenskollision, das zweite
+    Backup ueberschrieb das erste -- das Original-TOML ging verloren.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        config = _make_config_with_toml(
+            Path(tmp), TOML_MIXED,
+            audit_duplicate_mcp="auto", audit_unused_plugins="auto",
+        )
+        run_audit_cycle(config, last_hash="", renderer_present=False)
+        codex_home = Path(tmp) / ".codex"
+        backups = list(codex_home.glob("config.*.bak"))
+        assert len(backups) == 2, f"Erwartet 2 Backups (je eines pro Fix), gefunden: {len(backups)}"

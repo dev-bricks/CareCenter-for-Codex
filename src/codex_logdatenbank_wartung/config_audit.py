@@ -296,7 +296,7 @@ def _backup_config_toml(toml_path: Path) -> Path:
     """Erstellt ein Zeitstempel-Backup von config.toml vor Mutation."""
     from datetime import datetime
 
-    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     backup = toml_path.with_suffix(f".{stamp}.bak")
     backup.write_bytes(toml_path.read_bytes())
     return backup
