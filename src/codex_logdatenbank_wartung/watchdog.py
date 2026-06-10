@@ -179,13 +179,21 @@ def run_watchdog_tick(
         except Exception:  # noqa: BLE001 -- im Zweifel NICHT killen (konservativ)
             busy = True
         if busy:
-            return WatchdogTickResult(
-                "busy",
+            companion_reaped = _reap_companion_orphans(config, execute=execute, provider=provider, killer=killer)
+            msg = (
                 "Haengende Reste erkannt, aber der Codex-Baum arbeitet aktiv (CPU) -- kein "
-                "Eingriff, um keinen Hintergrundlauf abzubrechen ('kein Renderer' != idle).",
+                "Eingriff, um keinen Hintergrundlauf abzubrechen ('kein Renderer' != idle)."
+            )
+            if companion_reaped:
+                msg += f" {companion_reaped} Companion-Orphan(s) bereinigt."
+            result = WatchdogTickResult(
+                "busy",
+                msg,
                 zombie_pids=zombie_pids,
                 stale_lockfile=stale_lockfile,
             )
+            result.companion_orphans_reaped = companion_reaped
+            return result
 
     # Reap: genau der getestete, sichere S1-Schritt (nur Ghosts ohne Renderer + verwaistes Lockfile).
     repair_result = repair_fn(
