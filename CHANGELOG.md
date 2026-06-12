@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Fixed tray running-state guards for start repair and Store repair actions, so concurrent tray operations stay blocked consistently.
+- Fixed watchdog companion-orphan cleanup in both busy and disabled paths, with regression coverage for inactive companion process cleanup.
+- Fixed config-audit backup names to include microseconds, preventing same-second backup filename collisions.
+- Applied Ruff import-format cleanup in `config.py`.
+
 ## 0.8.0 - 2026-06-06
 
 - Added cancellable Safe maintenance: the tray exposes an abort button while Safe mode is waiting for Codex idle, and the CLI handles Ctrl+C without a traceback.
