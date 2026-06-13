@@ -1,6 +1,6 @@
 # Support
 
-Stand: 2026-06-01
+Stand: 2026-06-13
 
 ## Zweck
 
@@ -12,15 +12,17 @@ eingetragen.
 
 - Das Projekt wird im öffentlichen GitHub-Repository gepflegt:
   `https://github.com/dev-bricks/CareCenter-for-Codex`
-- `privacy_url` und `support_url` in `store_package.json` zeigen auf die
-  veröffentlichten Projektdateien.
+- `privacy_url` und `support_url` in `store_package.json` zeigen jetzt auf die
+  geplanten GitHub-Pages-Ziele des Projekts.
 - Der Check `python -m codex_logdatenbank_wartung.cli store-materials` prüft
   diesen Stand vor einer Store-Einreichung.
 
 ## Öffentlicher Supportpfad
 
-- Support: `https://github.com/dev-bricks/CareCenter-for-Codex/blob/main/SUPPORT.md`
-- Datenschutz: `https://github.com/dev-bricks/CareCenter-for-Codex/blob/main/PRIVACY_POLICY.md`
+- Support: `https://dev-bricks.github.io/CareCenter-for-Codex/support`
+- Datenschutz: `https://dev-bricks.github.io/CareCenter-for-Codex/privacy`
+- Fallback-Repository: `https://github.com/dev-bricks/CareCenter-for-Codex`
+- Issue-Tracker: `https://github.com/dev-bricks/CareCenter-for-Codex/issues`
 
 Vor einer Windows-Store-Einreichung müssen Store-Listing, Screenshot und
 MSIX/WACK-Stand auf dieselben URLs bezogen bleiben.

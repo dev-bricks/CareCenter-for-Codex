@@ -114,6 +114,13 @@ Das Projekt enthält die Grundlage für den Windows Store:
 - `STORE_LISTING.md`
 - `PRIVACY_POLICY.md`
 - `SUPPORT.md`
+- `docs/privacy.md`
+- `docs/support.md`
+
+Geplante öffentliche Store-Ziele:
+
+- Datenschutz: `https://dev-bricks.github.io/CareCenter-for-Codex/privacy`
+- Support: `https://dev-bricks.github.io/CareCenter-for-Codex/support`
 
 Validieren mit:
 

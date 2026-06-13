@@ -15,6 +15,10 @@ STORE_DOCS = (
     "PRIVACY_POLICY.md",
     "SUPPORT.md",
 )
+PUBLISHED_STORE_DOCS = (
+    "docs/privacy.md",
+    "docs/support.md",
+)
 REQUIRED_FIELDS = (
     "app_name",
     "publisher",
@@ -150,6 +154,17 @@ def _check_screenshot(project_root: Path) -> StoreCheck:
     )
 
 
+def _check_published_store_docs(project_root: Path) -> StoreCheck:
+    missing = [name for name in PUBLISHED_STORE_DOCS if not (project_root / name).exists()]
+    if missing:
+        return StoreCheck(
+            "Store-Webseiten",
+            "warning",
+            "Fehlen fuer GitHub-Pages-Pfade: " + ", ".join(missing),
+        )
+    return StoreCheck("Store-Webseiten", "ok", ", ".join(PUBLISHED_STORE_DOCS))
+
+
 def _check_executable(payload: dict[str, object], exe_path: Path | None) -> StoreCheck:
     configured = str(payload.get("executable", "")).strip()
     if not configured:
@@ -187,6 +202,7 @@ def validate_store_materials(
     checks.append(_check_capabilities(payload))
     checks.append(_check_urls(payload))
     checks.append(_check_docs(project_root))
+    checks.append(_check_published_store_docs(project_root))
     checks.append(_check_screenshot(project_root))
     checks.append(_check_executable(payload, exe_path))
     return StoreMaterialsReport(checks)

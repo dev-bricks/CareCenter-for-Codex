@@ -123,6 +123,13 @@ The project includes Windows Store groundwork:
 - `STORE_LISTING.md`
 - `PRIVACY_POLICY.md`
 - `SUPPORT.md`
+- `docs/privacy.md`
+- `docs/support.md`
+
+Planned public Store targets:
+
+- Privacy: `https://dev-bricks.github.io/CareCenter-for-Codex/privacy`
+- Support: `https://dev-bricks.github.io/CareCenter-for-Codex/support`
 
 Validate them with:
 

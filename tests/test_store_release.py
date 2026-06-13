@@ -13,6 +13,10 @@ def _write_store_files(project_root: Path, payload: dict[str, object]) -> None:
     )
     for name in ("STORE_LISTING.md", "PRIVACY_POLICY.md", "SUPPORT.md"):
         (project_root / name).write_text(f"# {name}\n", encoding="utf-8")
+    docs_dir = project_root / "docs"
+    docs_dir.mkdir(parents=True, exist_ok=True)
+    for name in ("privacy.md", "support.md"):
+        (docs_dir / name).write_text(f"# {name}\n", encoding="utf-8")
     screenshot = project_root / "README" / "screenshots"
     screenshot.mkdir(parents=True, exist_ok=True)
     (screenshot / "main.png").write_bytes(b"png")
@@ -92,3 +96,29 @@ def test_validate_store_materials_warns_for_placeholder_urls(tmp_path: Path) -> 
 
     assert report.status == "warning"
     assert any(check.name == "Store-URLs" and check.status == "warning" for check in report.checks)
+
+
+def test_validate_store_materials_warns_without_published_store_docs(tmp_path: Path) -> None:
+    _write_store_files(
+        tmp_path,
+        {
+            "app_name": "CareCenter for Codex",
+            "publisher": "CN=01234567-89AB-CDEF-0123-456789ABCDEF",
+            "publisher_display": "Lukas Geiger",
+            "identity_name": "LukasGeiger.CareCenterForCodex",
+            "version": "0.6.2.0",
+            "description": "Offline Wartung und Reparatur fuer die Codex-Desktop-App.",
+            "executable": "CareCenterForCodex.exe",
+            "capabilities": "runFullTrust",
+            "category": "Developer Tools",
+            "age_rating": "3+",
+            "privacy_url": "https://lukas.example.org/privacy",
+            "support_url": "https://lukas.example.org/support",
+        },
+    )
+    (tmp_path / "docs" / "support.md").unlink()
+
+    report = validate_store_materials(project_root=tmp_path)
+
+    assert report.status == "warning"
+    assert any(check.name == "Store-Webseiten" and check.status == "warning" for check in report.checks)

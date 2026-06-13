@@ -1,6 +1,6 @@
-# Privacy Policy / Datenschutz
+# Privacy
 
-**Last updated / Zuletzt aktualisiert:** 2026-06-13
+Canonical source: [PRIVACY_POLICY.md](../PRIVACY_POLICY.md)
 
 ## English
 
@@ -31,9 +31,8 @@ or a local Windows repair command, but the tool itself does not upload data.
 
 ### Contact
 
-Support and privacy contact paths are documented in `SUPPORT.md` and published
-through the project's GitHub repository and the planned GitHub Pages path
-`https://dev-bricks.github.io/CareCenter-for-Codex/privacy`.
+Support and privacy contact paths are published on the support page:
+[Support](./support.md)
 
 ---
 
@@ -68,6 +67,5 @@ keine Daten hoch.
 
 ### Kontakt
 
-Support- und Datenschutzkontakte sind in `SUPPORT.md` dokumentiert und über das
-GitHub-Repository des Projekts sowie den geplanten GitHub-Pages-Pfad
-`https://dev-bricks.github.io/CareCenter-for-Codex/privacy` veröffentlicht.
+Support- und Datenschutzkontakte sind auf der Support-Seite veröffentlicht:
+[Support](./support.md)
