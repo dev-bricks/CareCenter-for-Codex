@@ -1,8 +1,13 @@
+<img src="assets/banner.svg" width="100%" alt="CareCenter for Codex — Keep your Codex app healthy" />
+
 # CareCenter for Codex
 
-[![CareCenter tests](https://github.com/dev-bricks/CareCenter-for-Codex/actions/workflows/tests.yml/badge.svg)](https://github.com/dev-bricks/CareCenter-for-Codex/actions/workflows/tests.yml)
+> Unofficial Windows tray & CLI utility that keeps the OpenAI Codex desktop app healthy — repairs failed starts, removes hung leftovers, and safely maintains the local SQLite log database. Fully offline, no telemetry.
 
-CareCenter for Codex is an unofficial local Windows tray and CLI utility for keeping the OpenAI Codex desktop app healthy. It repairs failed starts, removes hung leftovers, and safely maintains Codex's local SQLite log database. Everything runs offline and without telemetry.
+[![CareCenter tests](https://github.com/dev-bricks/CareCenter-for-Codex/actions/workflows/tests.yml/badge.svg)](https://github.com/dev-bricks/CareCenter-for-Codex/actions/workflows/tests.yml)
+[![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://www.python.org/)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
 
 German documentation: [README.de.md](README.de.md)
 

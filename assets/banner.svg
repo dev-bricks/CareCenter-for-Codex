@@ -1,0 +1,229 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 340" width="100%">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bg-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#050814"/>
+      <stop offset="50%" stop-color="#0b1120"/>
+      <stop offset="100%" stop-color="#03050a"/>
+    </linearGradient>
+
+    <!-- Subtle Grid Pattern -->
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#38bdf8" stroke-width="1" stroke-opacity="0.03"/>
+    </pattern>
+
+    <!-- Icon Background Circle Gradient -->
+    <linearGradient id="icon-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+
+    <!-- Glowing Circle Border Gradient -->
+    <linearGradient id="border-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#6366f1"/>
+    </linearGradient>
+
+    <!-- Plaster 1 (Under) Gradients -->
+    <linearGradient id="plaster1-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#d97706"/> <!-- Warm Amber/Brownish -->
+      <stop offset="100%" stop-color="#b45309"/>
+    </linearGradient>
+    <linearGradient id="plaster1-pad-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+
+    <!-- Plaster 2 (Top) Gradients -->
+    <linearGradient id="plaster2-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fb923c"/> <!-- Soft Coral/Peach -->
+      <stop offset="100%" stop-color="#ea580c"/>
+    </linearGradient>
+    <linearGradient id="plaster2-pad-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffedd5"/> <!-- Very Light Peach Pad -->
+      <stop offset="100%" stop-color="#fed7aa"/>
+    </linearGradient>
+
+    <!-- Wordmark Gradients -->
+    <linearGradient id="text-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#cbd5e1"/>
+    </linearGradient>
+    <linearGradient id="codex-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#60a5fa"/>
+    </linearGradient>
+
+    <!-- ECG Line Gradient -->
+    <linearGradient id="ecg-line-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#334155" stop-opacity="0"/>
+      <stop offset="20%" stop-color="#334155" stop-opacity="0.2"/>
+      <stop offset="40%" stop-color="#0ea5e9" stop-opacity="0.8"/>
+      <stop offset="45%" stop-color="#ffffff" stop-opacity="1"/>
+      <stop offset="50%" stop-color="#10b981" stop-opacity="0.8"/>
+      <stop offset="70%" stop-color="#334155" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#334155" stop-opacity="0"/>
+    </linearGradient>
+
+    <!-- Filters -->
+    <filter id="blur-large" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="60"/>
+    </filter>
+    <filter id="shadow-blur" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8"/>
+    </filter>
+    <filter id="shadow-blur-small" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="3"/>
+    </filter>
+    <filter id="glow-light" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="text-shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="1" dy="2" stdDeviation="3" flood-color="#000000" flood-opacity="0.6"/>
+    </filter>
+  </defs>
+
+  <!-- Background Base -->
+  <rect width="1200" height="340" fill="url(#bg-gradient)"/>
+
+  <!-- Ambient Glow Orbs -->
+  <circle cx="205" cy="180" r="180" fill="#0ea5e9" opacity="0.15" filter="url(#blur-large)"/>
+  <circle cx="950" cy="170" r="220" fill="#10b981" opacity="0.08" filter="url(#blur-large)"/>
+
+  <!-- Technical Grid overlay -->
+  <rect width="1200" height="340" fill="url(#grid)"/>
+
+  <!-- Subtle diagonal design lines (blueprint/technical aesthetic) -->
+  <path d="M-100 0 L400 340 M800 0 L1300 340" stroke="#1e293b" stroke-width="1" opacity="0.3"/>
+
+  <!-- ==================== LEFT SIDE: ICON (SAFE ZONE COMPLIANT) ==================== -->
+  <g id="icon-group">
+    <!-- Outer Glow Ring -->
+    <circle cx="205" cy="180" r="80" fill="none" stroke="#38bdf8" stroke-width="1" opacity="0.2" filter="url(#glow-light)"/>
+    
+    <!-- Outer Shadow -->
+    <circle cx="205" cy="184" r="74" fill="#000000" opacity="0.4" filter="url(#shadow-blur)"/>
+
+    <!-- Base Circle Container -->
+    <circle cx="205" cy="180" r="74" fill="url(#icon-bg)" stroke="url(#border-gradient)" stroke-width="2"/>
+
+    <!-- Log Entry lines inside Circle (representing repaired database) -->
+    <!-- Line 1: Normal -->
+    <path d="M163 145 h30" stroke="#475569" stroke-width="3.5" stroke-linecap="round"/>
+    <path d="M201 145 h15" stroke="#38bdf8" stroke-width="3.5" stroke-linecap="round"/>
+    <!-- Line 2: Fixed Error -->
+    <path d="M159 160 h22" stroke="#475569" stroke-width="3.5" stroke-linecap="round"/>
+    <path d="M188 160 h10" stroke="#f43f5e" stroke-width="3.5" stroke-linecap="round" opacity="0.4"/>
+    <circle cx="204" cy="160" r="2.5" fill="#f43f5e" opacity="0.4"/>
+    <!-- Line 3: Normal -->
+    <path d="M169 200 h12" stroke="#475569" stroke-width="3.5" stroke-linecap="round"/>
+    <path d="M187 200 h40" stroke="#38bdf8" stroke-width="3.5" stroke-linecap="round"/>
+    <!-- Line 4: Warning -->
+    <path d="M157 215 h36" stroke="#475569" stroke-width="3.5" stroke-linecap="round"/>
+    <path d="M199 215 h8" stroke="#eab308" stroke-width="3.5" stroke-linecap="round" opacity="0.5"/>
+
+    <!-- Plaster 1 (Under, rotated -35deg) -->
+    <g transform="translate(205, 180) rotate(-35)">
+      <!-- Shadow -->
+      <rect x="-65" y="-19" width="130" height="38" rx="19" fill="#000000" opacity="0.3" transform="translate(2, 4)" filter="url(#shadow-blur-small)"/>
+      <!-- Body -->
+      <rect x="-65" y="-19" width="130" height="38" rx="19" fill="url(#plaster1-grad)"/>
+      <!-- Pad -->
+      <rect x="-21" y="-19" width="42" height="38" rx="1" fill="url(#plaster1-pad-grad)"/>
+      <!-- Holes -->
+      <circle cx="-45" cy="0" r="2" fill="#78350f" opacity="0.4"/>
+      <circle cx="-35" cy="-7" r="2" fill="#78350f" opacity="0.4"/>
+      <circle cx="-35" cy="7" r="2" fill="#78350f" opacity="0.4"/>
+      <circle cx="45" cy="0" r="2" fill="#78350f" opacity="0.4"/>
+      <circle cx="35" cy="-7" r="2" fill="#78350f" opacity="0.4"/>
+      <circle cx="35" cy="7" r="2" fill="#78350f" opacity="0.4"/>
+    </g>
+
+    <!-- Plaster 2 (Top, rotated 55deg) -->
+    <g transform="translate(205, 180) rotate(55)">
+      <!-- Shadow -->
+      <rect x="-65" y="-19" width="130" height="38" rx="19" fill="#000000" opacity="0.4" transform="translate(2, 4)" filter="url(#shadow-blur-small)"/>
+      <!-- Body -->
+      <rect x="-65" y="-19" width="130" height="38" rx="19" fill="url(#plaster2-grad)"/>
+      <!-- Pad -->
+      <rect x="-21" y="-19" width="42" height="38" rx="1" fill="url(#plaster2-pad-grad)"/>
+      <!-- Holes -->
+      <circle cx="-45" cy="0" r="2" fill="#9a3412" opacity="0.4"/>
+      <circle cx="-35" cy="-7" r="2" fill="#9a3412" opacity="0.4"/>
+      <circle cx="-35" cy="7" r="2" fill="#9a3412" opacity="0.4"/>
+      <circle cx="45" cy="0" r="2" fill="#9a3412" opacity="0.4"/>
+      <circle cx="35" cy="-7" r="2" fill="#9a3412" opacity="0.4"/>
+      <circle cx="35" cy="7" r="2" fill="#9a3412" opacity="0.4"/>
+    </g>
+
+    <!-- Glowing White Medical Cross (Centered at overlap, not rotated) -->
+    <g transform="translate(205, 180)">
+      <!-- Shadow -->
+      <rect x="-4" y="-13" width="8" height="26" rx="3" fill="#000000" opacity="0.3" transform="translate(1, 1.5)"/>
+      <rect x="-13" y="-4" width="26" height="8" rx="3" fill="#000000" opacity="0.3" transform="translate(1, 1.5)"/>
+      
+      <!-- Outer Glow -->
+      <rect x="-4" y="-13" width="8" height="26" rx="3" fill="#ffffff" filter="url(#glow-light)" opacity="0.7">
+        <animate attributeName="opacity" values="0.4;0.9;0.4" dur="4s" repeatCount="indefinite"/>
+      </rect>
+      <rect x="-13" y="-4" width="26" height="8" rx="3" fill="#ffffff" filter="url(#glow-light)" opacity="0.7">
+        <animate attributeName="opacity" values="0.4;0.9;0.4" dur="4s" repeatCount="indefinite"/>
+      </rect>
+
+      <!-- Solid Core -->
+      <rect x="-4" y="-13" width="8" height="26" rx="3" fill="#ffffff"/>
+      <rect x="-13" y="-4" width="26" height="8" rx="3" fill="#ffffff"/>
+    </g>
+  </g>
+
+  <!-- ==================== MIDDLE DIVIDER ==================== -->
+  <line x1="320" y1="80" x2="320" y2="260" stroke="#334155" stroke-width="1.5" stroke-dasharray="4 4" opacity="0.4"/>
+
+  <!-- ==================== RIGHT SIDE: WORDMARK & TAGLINE (SAFE ZONE COMPLIANT) ==================== -->
+  
+  <!-- System tray utility badge -->
+  <g transform="translate(360, 80)">
+    <!-- Badge Background -->
+    <rect x="0" y="0" width="122" height="24" rx="12" fill="#083344" stroke="#0e7490" stroke-width="1.2" opacity="0.9"/>
+    <!-- Windows 11 style logo -->
+    <g transform="translate(10, 6)" fill="#22d3ee">
+      <rect x="0" y="0" width="5" height="5" rx="0.5"/>
+      <rect x="6" y="0" width="5" height="5" rx="0.5"/>
+      <rect x="0" y="6" width="5" height="5" rx="0.5"/>
+      <rect x="6" y="6" width="5" height="5" rx="0.5"/>
+    </g>
+    <!-- Badge Text -->
+    <text x="26" y="15" fill="#22d3ee" font-family="system-ui, -apple-system, sans-serif" font-size="9" font-weight="700" letter-spacing="1">WIN UTILITY</text>
+  </g>
+
+  <!-- Wordmark 'CareCenter for Codex' -->
+  <text x="360" y="165" font-family="system-ui, -apple-system, sans-serif" font-size="52" font-weight="800" letter-spacing="-1" filter="url(#text-shadow)">
+    <tspan fill="url(#text-gradient)">CareCenter</tspan>
+    <tspan fill="#64748b" font-weight="300"> for </tspan>
+    <tspan fill="url(#codex-gradient)">Codex</tspan>
+  </text>
+
+  <!-- Tagline 'Keep your Codex app healthy' -->
+  <g transform="translate(360, 210)">
+    <!-- Green check status circle -->
+    <circle cx="10" cy="10" r="10" fill="#064e3b" stroke="#059669" stroke-width="1"/>
+    <!-- Pulse ring around check icon -->
+    <circle cx="10" cy="10" r="10" fill="none" stroke="#34d399" stroke-width="1.5" opacity="0.4">
+      <animate attributeName="r" values="10;14;10" dur="3s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.4;0;0.4" dur="3s" repeatCount="indefinite"/>
+    </circle>
+    <!-- Checkmark Path -->
+    <path d="M7 10 l2 2 l4 -4" stroke="#34d399" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    
+    <!-- Tagline Text -->
+    <text x="30" y="15" fill="#cbd5e1" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="500" letter-spacing="0.5" filter="url(#text-shadow)">Keep your Codex app healthy</text>
+  </g>
+
+  <!-- ECG heartbeat accent line -->
+  <path d="M 360 260 H 600 L 606 260 L 610 250 L 614 270 L 620 230 L 626 285 L 632 260 L 636 265 L 640 260 H 1100" fill="none" stroke="url(#ecg-line-gradient)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+</svg>
