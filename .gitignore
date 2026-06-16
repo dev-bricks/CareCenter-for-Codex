@@ -47,6 +47,11 @@ TODO.md
 DECISIONS.md
 HANDOFF-CODEX-START.md
 CODEX-AUTO-DEBUG-DESIGN.md
+LOCK*.txt
+
+# --- Machine-specific README variants (merged into main READMEs) ---
+README-ASUS-GEI.md
+README.de-ASUS-GEI.md
 
 # --- Interne Steuerungsdateien ---
 PORTIERUNGSPLAN.md
