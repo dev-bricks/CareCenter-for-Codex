@@ -302,6 +302,100 @@ _CATALOG: dict[str, dict[Language, str]] = {
         "de": "Keine Safe-Start-Auffälligkeiten.",
         "en": "No Safe Start findings.",
     },
+    # -- Automation control --
+    "automations_menu": {"de": "Automatisierungen", "en": "Automations"},
+    "automations_pause_active": {
+        "de": "Alle aktivierten Automatisierungen aus",
+        "en": "Turn off all active automations",
+    },
+    "automations_pause_active_tooltip": {
+        "de": "Setzt alle aktuell aktiven Codex-Automatisierungen auf PAUSED und merkt sie als von CCC ausgeschaltet.",
+        "en": "Sets all currently active Codex automations to PAUSED and remembers them as disabled by CCC.",
+    },
+    "automations_restore_ccc": {
+        "de": "Alle von CCC ausgeschalteten Automatisierungen wieder an",
+        "en": "Turn on automations disabled by CCC",
+    },
+    "automations_restore_ccc_tooltip": {
+        "de": "Aktiviert nur Automatisierungen, die CareCenter selbst ausgeschaltet hat.",
+        "en": "Activates only automations that CareCenter disabled itself.",
+    },
+    "automations_restore_ccc_staggered": {
+        "de": "Alle von CCC ausgeschalteten Automatisierungen gestaffelt aktivieren (1 Minute Abstand beim Start)",
+        "en": "Stagger automations disabled by CCC (1 minute apart)",
+    },
+    "automations_restore_ccc_staggered_tooltip": {
+        "de": "Aktiviert die von CCC ausgeschalteten Automatisierungen nacheinander mit einer Minute Abstand.",
+        "en": "Activates automations disabled by CCC one after another, one minute apart.",
+    },
+    "automations_activate_all": {
+        "de": "Alle Automatisierungen sofort an",
+        "en": "Turn on all automations now",
+    },
+    "automations_activate_all_tooltip": {
+        "de": "Setzt jede gefundene Codex-Automatisierung sofort auf ACTIVE, auch wenn sie vorher nicht von CCC pausiert wurde.",
+        "en": "Sets every found Codex automation to ACTIVE immediately, even if CCC did not pause it.",
+    },
+    "automations_activate_all_staggered": {
+        "de": "Alle Automatisierungen gestaffelt an",
+        "en": "Stagger all automations on",
+    },
+    "automations_activate_all_staggered_tooltip": {
+        "de": "Setzt alle gefundenen Codex-Automatisierungen nacheinander mit einer Minute Abstand auf ACTIVE.",
+        "en": "Sets all found Codex automations to ACTIVE one after another, one minute apart.",
+    },
+    "automations_running": {
+        "de": "Eine Automationsaktion läuft bereits.",
+        "en": "An automation action is already running.",
+    },
+    "automations_busy": {
+        "de": "CareCenter arbeitet bereits. Bitte warte, bis der laufende Vorgang fertig ist.",
+        "en": "CareCenter is already working. Please wait until the current operation finishes.",
+    },
+    "automations_started": {
+        "de": "Automationsaktion gestartet …",
+        "en": "Automation action started ...",
+    },
+    "automations_prepare": {
+        "de": "Lese Codex-Automatisierungen …",
+        "en": "Reading Codex automations ...",
+    },
+    "automations_progress": {
+        "de": "Aktiviere {current}/{total}: {automation_id}",
+        "en": "Activating {current}/{total}: {automation_id}",
+    },
+    "automations_pause_done": {
+        "de": "{count} aktive Automatisierung(en) ausgeschaltet.",
+        "en": "Disabled {count} active automation(s).",
+    },
+    "automations_restore_done": {
+        "de": "{count} von CCC ausgeschaltete Automatisierung(en) aktiviert.",
+        "en": "Activated {count} automation(s) disabled by CCC.",
+    },
+    "automations_activate_all_done": {
+        "de": "{count} Automatisierung(en) aktiviert.",
+        "en": "Activated {count} automation(s).",
+    },
+    "automations_none": {
+        "de": "Keine passende Automatisierung gefunden.",
+        "en": "No matching automation found.",
+    },
+    "automations_partial": {
+        "de": "Teilweise abgeschlossen: {count} aktiviert/geändert, {errors} Fehler.",
+        "en": "Partially completed: {count} activated/changed, {errors} error(s).",
+    },
+    "automations_failed": {
+        "de": "Automationsaktion fehlgeschlagen: {errors} Fehler.",
+        "en": "Automation action failed: {errors} error(s).",
+    },
+    "automations_result_detail": {
+        "de": "Ziel: {target}; übersprungen: {skipped}; fehlend: {missing}",
+        "en": "Target: {target}; skipped: {skipped}; missing: {missing}",
+    },
+    "automations_toast_title": {
+        "de": "CareCenter – Automatisierungen",
+        "en": "CareCenter - automations",
+    },
     "diagnosis_start_blocker": {
         "de": "Startblockade erkannt (Status: {status}). Über 'Codex reparieren' beheben.",
         "en": "Start blocker detected (status: {status}). Fix via 'Repair Codex'.",

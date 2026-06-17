@@ -95,6 +95,18 @@ def test_language_helpers_normalize_and_label_values() -> None:
     assert language_label("en") == "Englisch"
 
 
+def test_automation_menu_translations_are_localized_with_umlauts() -> None:
+    set_language("de")
+    assert t("automations_menu") == "Automatisierungen"
+    assert "ausgeschalteten Automatisierungen" in t("automations_restore_ccc")
+    assert "gestaffelt" in t("automations_activate_all_staggered")
+
+    set_language("en")
+    assert t("automations_menu") == "Automations"
+    assert "disabled by CCC" in t("automations_restore_ccc")
+    set_language("de")
+
+
 # ---------------------------------------------------------------------------
 # Integration: i18n wirkt im echten Code-Pfad (nicht nur im Katalog)
 # ---------------------------------------------------------------------------

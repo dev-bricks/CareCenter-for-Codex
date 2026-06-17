@@ -246,3 +246,54 @@ def test_language_setting_persists_and_retranslates():
         for key in list(mocks):
             if key in sys.modules and sys.modules[key] is mocks[key]:
                 del sys.modules[key]
+
+
+def test_retranslate_menu_updates_automation_submenu_labels():
+    """Das Tray-Rechtsklickmenü enthält die neuen Automationsaktionen lokalisiert."""
+    mocks = _mock_pyside6()
+    try:
+        for key in list(sys.modules):
+            if "codex_logdatenbank_wartung.tray" in key:
+                del sys.modules[key]
+
+        from codex_logdatenbank_wartung.i18n import set_language
+        from codex_logdatenbank_wartung.tray import TrayController
+
+        controller = object.__new__(TrayController)
+        for attr in (
+            "open_action",
+            "status_action",
+            "maintenance_action",
+            "repair_action",
+            "safe_start_action",
+            "automations_pause_active_action",
+            "automations_restore_ccc_action",
+            "automations_restore_ccc_staggered_action",
+            "automations_activate_all_action",
+            "automations_activate_all_staggered_action",
+            "watchdog_action",
+            "quit_action",
+        ):
+            setattr(controller, attr, MagicMock())
+        controller.automations_menu = MagicMock()
+
+        set_language("de")
+        controller._retranslate_menu()
+
+        controller.automations_menu.setTitle.assert_called_once_with("Automatisierungen")
+        controller.automations_pause_active_action.setText.assert_called_once_with(
+            "Alle aktivierten Automatisierungen aus"
+        )
+        controller.automations_restore_ccc_action.setText.assert_called_once_with(
+            "Alle von CCC ausgeschalteten Automatisierungen wieder an"
+        )
+        controller.automations_activate_all_staggered_action.setText.assert_called_once_with(
+            "Alle Automatisierungen gestaffelt an"
+        )
+    finally:
+        for key in list(sys.modules):
+            if "codex_logdatenbank_wartung.tray" in key:
+                del sys.modules[key]
+        for key in list(mocks):
+            if key in sys.modules and sys.modules[key] is mocks[key]:
+                del sys.modules[key]

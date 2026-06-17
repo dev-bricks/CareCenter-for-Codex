@@ -16,6 +16,26 @@ set "SCANNER=%PROJECT_ROOT%\..\..\_tools\build_exclude_scanner.py"
 set "DIST_DIR=C:\_Local_DEV\codex-maintenance\bin"
 set "WORK_DIR=C:\_Local_DEV\codex_build\codex-logwartung"
 set "SPEC_DIR=C:\_Local_DEV\codex_build\codex-logwartung-spec"
+set "BUILD_VENV=C:\_Local_DEV\codex_build\codex-logwartung-venv"
+set "BUILD_PY=%BUILD_VENV%\Scripts\python.exe"
+set "SAFE_START_SOURCE=%PROJECT_ROOT%\..\REL-PUB_safe-start-for-codex"
+
+if not exist "%BUILD_PY%" (
+    echo [build] Erstelle Build-venv: %BUILD_VENV%
+    python -m venv "%BUILD_VENV%"
+    if errorlevel 1 pause & exit /b 1
+)
+
+set "PATH=%BUILD_VENV%\Scripts;%PATH%"
+python -m pip install --upgrade pip
+if errorlevel 1 pause & exit /b 1
+if exist "%SAFE_START_SOURCE%\pyproject.toml" (
+    echo [build] Installiere lokale Safe-Start-Quelle: %SAFE_START_SOURCE%
+    python -m pip install --upgrade "%SAFE_START_SOURCE%"
+    if errorlevel 1 pause & exit /b 1
+)
+python -m pip install --upgrade -e ".[build]"
+if errorlevel 1 pause & exit /b 1
 
 python -m compileall -q src tests
 if errorlevel 1 pause & exit /b 1

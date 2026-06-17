@@ -38,6 +38,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .automation_control import AutomationAction
 from .config import MaintenanceConfig
 from .health import RepairResult, diagnose, repair_start
 from .i18n import LANGUAGES, get_language, language_label, normalize_language, set_language, t
@@ -136,6 +137,35 @@ class SafeStartInstallWorker(QObject):
         from .safe_start_integration import install_safe_start_package
 
         self.finished.emit(install_safe_start_package())
+
+
+class AutomationControlWorker(QObject):
+    progress = Signal(object)
+    finished = Signal(object)
+
+    def __init__(self, config: MaintenanceConfig, action: AutomationAction) -> None:
+        super().__init__()
+        self.config = config
+        self.action = action
+
+    def run(self) -> None:
+        import time
+
+        from .automation_control import run_automation_action
+
+        def on_progress(current: int, total: int, automation_id: str) -> None:
+            self.progress.emit(
+                {"current": current, "total": total, "automation_id": automation_id}
+            )
+
+        result = run_automation_action(
+            self.config,
+            self.action,
+            sleeper=time.sleep,
+            progress=on_progress,
+            stagger_delay_seconds=60,
+        )
+        self.finished.emit(result)
 
 
 class FullRepairWorker(QObject):
@@ -626,6 +656,8 @@ class TrayController(QObject):
         self.store_worker: StoreRepairWorker | None = None
         self.safe_start_install_thread: QThread | None = None
         self.safe_start_install_worker: SafeStartInstallWorker | None = None
+        self.automation_thread: QThread | None = None
+        self.automation_worker: AutomationControlWorker | None = None
         self.full_repair_thread: QThread | None = None
         self.full_repair_worker: FullRepairWorker | None = None
         self.watchdog_thread: QThread | None = None
@@ -669,6 +701,27 @@ class TrayController(QObject):
         self.repair_action.triggered.connect(self.run_codex_repair)
         self.safe_start_action = QAction()
         self.safe_start_action.triggered.connect(self.show_safe_start_report)
+        self.automations_menu = QMenu()
+        self.automations_pause_active_action = QAction()
+        self.automations_pause_active_action.triggered.connect(
+            lambda: self.run_automation_action("pause-active")
+        )
+        self.automations_restore_ccc_action = QAction()
+        self.automations_restore_ccc_action.triggered.connect(
+            lambda: self.run_automation_action("restore-ccc")
+        )
+        self.automations_restore_ccc_staggered_action = QAction()
+        self.automations_restore_ccc_staggered_action.triggered.connect(
+            lambda: self.run_automation_action("restore-ccc-staggered")
+        )
+        self.automations_activate_all_action = QAction()
+        self.automations_activate_all_action.triggered.connect(
+            lambda: self.run_automation_action("activate-all")
+        )
+        self.automations_activate_all_staggered_action = QAction()
+        self.automations_activate_all_staggered_action.triggered.connect(
+            lambda: self.run_automation_action("activate-all-staggered")
+        )
         self.watchdog_action = QAction()
         self.watchdog_action.setCheckable(True)
         self.watchdog_action.setChecked(bool(self.config.watcher_enabled))
@@ -683,6 +736,14 @@ class TrayController(QObject):
         self.menu.addSeparator()
         self.menu.addAction(self.repair_action)
         self.menu.addAction(self.safe_start_action)
+        self.automations_menu.addAction(self.automations_pause_active_action)
+        self.automations_menu.addSeparator()
+        self.automations_menu.addAction(self.automations_restore_ccc_action)
+        self.automations_menu.addAction(self.automations_restore_ccc_staggered_action)
+        self.automations_menu.addSeparator()
+        self.automations_menu.addAction(self.automations_activate_all_action)
+        self.automations_menu.addAction(self.automations_activate_all_staggered_action)
+        self.menu.addMenu(self.automations_menu)
         self.menu.addSeparator()
         self.menu.addAction(self.watchdog_action)
         self.menu.addSeparator()
@@ -726,6 +787,25 @@ class TrayController(QObject):
         self.repair_action.setToolTip(t("repair_codex_tooltip"))
         self.safe_start_action.setText(t("safe_start_check"))
         self.safe_start_action.setToolTip(t("safe_start_tooltip"))
+        self.automations_menu.setTitle(t("automations_menu"))
+        self.automations_pause_active_action.setText(t("automations_pause_active"))
+        self.automations_pause_active_action.setToolTip(t("automations_pause_active_tooltip"))
+        self.automations_restore_ccc_action.setText(t("automations_restore_ccc"))
+        self.automations_restore_ccc_action.setToolTip(t("automations_restore_ccc_tooltip"))
+        self.automations_restore_ccc_staggered_action.setText(
+            t("automations_restore_ccc_staggered")
+        )
+        self.automations_restore_ccc_staggered_action.setToolTip(
+            t("automations_restore_ccc_staggered_tooltip")
+        )
+        self.automations_activate_all_action.setText(t("automations_activate_all"))
+        self.automations_activate_all_action.setToolTip(t("automations_activate_all_tooltip"))
+        self.automations_activate_all_staggered_action.setText(
+            t("automations_activate_all_staggered")
+        )
+        self.automations_activate_all_staggered_action.setToolTip(
+            t("automations_activate_all_staggered_tooltip")
+        )
         self.watchdog_action.setText(t("watchdog_menu"))
         self.watchdog_action.setToolTip(t("watchdog_tooltip"))
         self.quit_action.setText(t("quit"))
@@ -979,6 +1059,108 @@ class TrayController(QObject):
     def clear_safe_start_install_thread(self) -> None:
         self.safe_start_install_thread = None
         self.safe_start_install_worker = None
+
+    def run_automation_action(self, action: AutomationAction) -> None:
+        if self.automation_thread is not None:
+            self.tray.showMessage(
+                t("automations_toast_title"),
+                t("automations_running"),
+                QSystemTrayIcon.MessageIcon.Information,
+                3000,
+            )
+            self.show_window()
+            return
+        if self.running:
+            self.tray.showMessage(
+                t("automations_toast_title"),
+                t("automations_busy"),
+                QSystemTrayIcon.MessageIcon.Information,
+                4000,
+            )
+            self.show_window()
+            return
+
+        self.running = True
+        self.window.set_running(True)
+        self.window.set_state(t("automations_started"))
+        self.window.set_progress(0, t("automations_prepare"), True)
+        self.window.set_result("")
+        self.show_window()
+
+        self.automation_thread = QThread(self)
+        self.automation_worker = AutomationControlWorker(
+            MaintenanceConfig.load(self.config_path),
+            action,
+        )
+        self.automation_worker.moveToThread(self.automation_thread)
+        self.automation_thread.started.connect(self.automation_worker.run)
+        self.automation_worker.progress.connect(self.on_automation_progress)
+        self.automation_worker.finished.connect(self.on_automation_finished)
+        self.automation_worker.finished.connect(self.automation_thread.quit)
+        self.automation_worker.finished.connect(self.automation_worker.deleteLater)
+        self.automation_thread.finished.connect(self.automation_thread.deleteLater)
+        self.automation_thread.finished.connect(self.clear_automation_thread)
+        self.automation_thread.start()
+
+    def on_automation_progress(self, info: object) -> None:
+        data = info if isinstance(info, dict) else {}
+        message = t(
+            "automations_progress",
+            current=int(data.get("current") or 0),
+            total=int(data.get("total") or 0),
+            automation_id=str(data.get("automation_id") or "?"),
+        )
+        self.window.set_progress(0, message, True)
+        self.tray.setToolTip(f"CareCenter: {message}")
+
+    def on_automation_finished(self, result: object) -> None:
+        self.running = False
+        self.window.set_running(False)
+        self.window.set_progress(100, t("done"), False)
+
+        action = str(getattr(result, "action", ""))
+        status = str(getattr(result, "status", "failed"))
+        changed_count = int(getattr(result, "changed_count", 0))
+        errors = list(getattr(result, "errors", []) or [])
+        skipped = list(getattr(result, "skipped_ids", []) or [])
+        missing = list(getattr(result, "missing_ids", []) or [])
+        target_count = int(getattr(result, "target_count", 0))
+
+        if status == "failed":
+            summary = t("automations_failed", errors=len(errors))
+        elif status == "partial":
+            summary = t("automations_partial", count=changed_count, errors=len(errors))
+        elif changed_count == 0:
+            summary = t("automations_none")
+        elif action == "pause-active":
+            summary = t("automations_pause_done", count=changed_count)
+        elif action in {"restore-ccc", "restore-ccc-staggered"}:
+            summary = t("automations_restore_done", count=changed_count)
+        else:
+            summary = t("automations_activate_all_done", count=changed_count)
+
+        detail = t(
+            "automations_result_detail",
+            target=target_count,
+            skipped=len(skipped),
+            missing=len(missing),
+        )
+        if errors:
+            detail += "\n" + "\n".join(str(error) for error in errors[:5])
+
+        self.window.set_state(summary)
+        self.window.set_result(detail)
+        icon = (
+            QSystemTrayIcon.MessageIcon.Information
+            if status == "ok"
+            else QSystemTrayIcon.MessageIcon.Warning
+        )
+        self.tray.setToolTip(f"CareCenter: {summary}")
+        self.tray.showMessage(t("automations_toast_title"), summary, icon, 8000)
+
+    def clear_automation_thread(self) -> None:
+        self.automation_thread = None
+        self.automation_worker = None
 
     def show_diagnosis(self) -> None:
         report = diagnose(MaintenanceConfig.load(self.config_path))
@@ -1313,6 +1495,7 @@ class TrayController(QObject):
             or self.repair_thread is not None
             or self.store_thread is not None
             or self.safe_start_install_thread is not None
+            or getattr(self, "automation_thread", None) is not None
             or self.full_repair_thread is not None
             or self.start_repair_thread is not None
         )
