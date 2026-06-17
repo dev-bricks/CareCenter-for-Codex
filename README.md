@@ -22,6 +22,7 @@ On Windows, closing the Codex desktop window can leave a hung main process behin
 
 - Background start-prevention watcher: checks every 60 seconds whether Codex is closed and old start blockers remain. It never touches an active Codex session, the node-based Codex CLI, or a process tree that is still doing CPU work.
 - Tray settings with language switching: choose English or German in the Settings area. The choice is saved in `config.json` and the visible tray UI is relabeled immediately.
+- Tray automation controls: pause all currently active Codex automations, restore only automations disabled by CCC, or turn automations back on immediately or one-by-one with a one-minute spacing.
 - One-click Repair Codex action: runs a bounded escalation that stops as soon as Codex starts again. It begins with no-admin cleanup and only suggests admin restart, Store reinstall, or reboot when needed.
 - Safe and Fast maintenance modes:
   - Safe waits until the complete Codex process tree is idle, can be cancelled while waiting, closes Codex cleanly, runs maintenance, and restarts it.
@@ -33,7 +34,7 @@ On Windows, closing the Codex desktop window can leave a hung main process behin
 
 ## Screenshot
 
-The tray status window shows current state, removed-leftover count, progress, maintenance controls with Safe cancellation, Store actions, Safe Start actions, and settings.
+The tray status window shows current state, removed-leftover count, progress, maintenance controls with Safe cancellation, Store actions, Safe Start actions, automation controls, and settings.
 
 ![CareCenter status window](README/screenshots/main.png)
 
@@ -151,7 +152,7 @@ python -m ruff check src tests
 python -m compileall src tests
 ```
 
-The test suite covers maintenance safety, repair escalation, Safe Start integration, Store material validation, configuration loading, i18n, and tray language persistence.
+The test suite covers maintenance safety, repair escalation, Safe Start integration, automation control, Store material validation, configuration loading, i18n, and tray language persistence.
 
 ## License
 

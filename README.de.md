@@ -22,6 +22,7 @@ Unter Windows kann nach dem Schließen des Codex-Desktopfensters ein hängender 
 
 - Hintergrund-Wächter für Start-Prävention: prüft alle 60 Sekunden, ob Codex geschlossen ist und alte Startblocker übrig sind. Er berührt nie eine aktive Codex-Sitzung, nie die node-basierte Codex-CLI und nie einen Prozessbaum, der noch CPU-Arbeit leistet.
 - Spracheinstellung im Tray: Im Bereich Einstellungen kann zwischen Deutsch und Englisch gewechselt werden. Die Auswahl wird in `config.json` gespeichert und die sichtbare Tray-Oberfläche wird sofort neu beschriftet.
+- Automatisierungssteuerung im Tray: alle aktuell aktiven Codex-Automatisierungen ausschalten, nur von CCC ausgeschaltete Automatisierungen wieder aktivieren oder Automatisierungen sofort beziehungsweise mit einer Minute Abstand nacheinander einschalten.
 - Ein-Klick-Aktion „Codex reparieren“: startet eine begrenzte Eskalation, die stoppt, sobald Codex wieder startet. Zuerst läuft eine Reparatur ohne Adminrechte; Admin-Neustart, Store-Neuinstallation oder Reboot werden nur bei Bedarf vorgeschlagen.
 - Wartung in zwei Modi:
   - Safe wartet, bis der gesamte Codex-Prozessbaum im Leerlauf ist, lässt sich während des Wartens abbrechen, schließt Codex sauber, wartet und startet danach neu.
@@ -33,7 +34,7 @@ Unter Windows kann nach dem Schließen des Codex-Desktopfensters ein hängender 
 
 ## Screenshot
 
-Das Tray-Statusfenster zeigt aktuellen Zustand, Zähler für entfernte Reste, Fortschritt, Wartungsaktionen mit Safe-Abbruch, Store-Aktionen, Safe-Start-Aktionen und Einstellungen.
+Das Tray-Statusfenster zeigt aktuellen Zustand, Zähler für entfernte Reste, Fortschritt, Wartungsaktionen mit Safe-Abbruch, Store-Aktionen, Safe-Start-Aktionen, Automatisierungssteuerung und Einstellungen.
 
 ![CareCenter-Statusfenster](README/screenshots/main.png)
 
@@ -142,7 +143,7 @@ python -m ruff check src tests
 python -m compileall src tests
 ```
 
-Die Testsuite deckt Wartungssicherheit, Reparatur-Eskalation, Safe-Start-Integration, Store-Materialprüfung, Konfigurationsladen, i18n und persistente Tray-Sprachumschaltung ab.
+Die Testsuite deckt Wartungssicherheit, Reparatur-Eskalation, Safe-Start-Integration, Automatisierungssteuerung, Store-Materialprüfung, Konfigurationsladen, i18n und persistente Tray-Sprachumschaltung ab.
 
 ## Lizenz
 
