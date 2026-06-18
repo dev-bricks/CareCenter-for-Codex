@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Extended `store-materials` so it auto-detects the built EXE from `build_exe.bat`
+  (`DIST_DIR`) and also accepts a build directory via `--exe-path`.
 - Added a tray automation control submenu for pausing all active Codex automations, restoring only CCC-paused automations, and immediately or gradually activating all automations.
 - Added published `docs/privacy.md` and `docs/support.md` pages plus Store metadata for the planned GitHub Pages privacy/support URLs.
 - Extended the Store material preflight to warn when the published support/privacy pages are missing locally.

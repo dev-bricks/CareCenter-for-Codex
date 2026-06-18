@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -10,6 +11,7 @@ from urllib.parse import urlparse
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 STORE_PACKAGE_PATH = PROJECT_ROOT / "store_package.json"
+BUILD_SCRIPT_PATH = PROJECT_ROOT / "build_exe.bat"
 STORE_DOCS = (
     "STORE_LISTING.md",
     "PRIVACY_POLICY.md",
@@ -38,6 +40,7 @@ PLACEHOLDER_HOSTS = {
     "todo.invalid",
 }
 VERSION_PATTERN = re.compile(r"^\d+\.\d+\.\d+\.\d+$")
+DIST_DIR_PATTERN = re.compile(r'^\s*set\s+"DIST_DIR=(?P<value>[^"]+)"\s*$', re.IGNORECASE)
 
 
 @dataclass(slots=True)
@@ -165,26 +168,90 @@ def _check_published_store_docs(project_root: Path) -> StoreCheck:
     return StoreCheck("Store-Webseiten", "ok", ", ".join(PUBLISHED_STORE_DOCS))
 
 
-def _check_executable(payload: dict[str, object], exe_path: Path | None) -> StoreCheck:
+def _discover_build_dist_dir(project_root: Path) -> Path | None:
+    build_script = project_root / BUILD_SCRIPT_PATH.name
+    if not build_script.exists():
+        return None
+    try:
+        content = build_script.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    for line in content.splitlines():
+        match = DIST_DIR_PATTERN.match(line)
+        if not match:
+            continue
+        raw_value = os.path.expandvars(match.group("value").strip())
+        if not raw_value:
+            return None
+        dist_dir = Path(raw_value)
+        if not dist_dir.is_absolute():
+            dist_dir = (project_root / dist_dir).resolve()
+        return dist_dir
+    return None
+
+
+def _resolve_requested_executable(configured: str, exe_path: Path | None) -> Path | None:
+    if exe_path is None:
+        return None
+    if exe_path.suffix.lower() == ".exe":
+        return exe_path
+    return exe_path / configured
+
+
+def _candidate_executables(project_root: Path, configured: str) -> list[Path]:
+    candidates: list[Path] = []
+
+    dist_dir = _discover_build_dist_dir(project_root)
+    if dist_dir is not None:
+        candidates.append(dist_dir / configured)
+    candidates.append(project_root / configured)
+
+    unique_candidates: list[Path] = []
+    seen: set[Path] = set()
+    for candidate in candidates:
+        key = candidate.resolve()
+        if key in seen:
+            continue
+        seen.add(key)
+        unique_candidates.append(key)
+    return unique_candidates
+
+
+def _check_executable(project_root: Path, payload: dict[str, object], exe_path: Path | None) -> StoreCheck:
     configured = str(payload.get("executable", "")).strip()
     if not configured:
         return StoreCheck("Executable", "failed", "Kein EXE-Name konfiguriert.")
-    if exe_path is None:
+
+    resolved_path = _resolve_requested_executable(configured, exe_path)
+    if resolved_path is not None:
+        if resolved_path.name != configured:
+            return StoreCheck(
+                "Executable",
+                "failed",
+                f"EXE-Name stimmt nicht: erwartet {configured}, erhalten {resolved_path.name}",
+            )
+        if not resolved_path.exists():
+            return StoreCheck("Executable", "failed", f"EXE fehlt: {resolved_path}")
+        return StoreCheck("Executable", "ok", str(resolved_path.resolve()))
+
+    for candidate in _candidate_executables(project_root, configured):
+        if candidate.exists():
+            return StoreCheck("Executable", "ok", f"Automatisch gefunden: {candidate}")
+
+    candidates = _candidate_executables(project_root, configured)
+    if not candidates:
         return StoreCheck(
             "Executable",
             "warning",
-            f"Nur Name geprueft ({configured}); kein --exe-path uebergeben.",
+            f"Keine EXE-Autopfadregel gefunden; mit --exe-path {configured} oder dessen Ordner pruefen.",
         )
-
-    if exe_path.name != configured:
-        return StoreCheck(
-            "Executable",
-            "failed",
-            f"EXE-Name stimmt nicht: erwartet {configured}, erhalten {exe_path.name}",
-        )
-    if not exe_path.exists():
-        return StoreCheck("Executable", "failed", f"EXE fehlt: {exe_path}")
-    return StoreCheck("Executable", "ok", str(exe_path))
+    tried = ", ".join(str(candidate) for candidate in candidates)
+    return StoreCheck(
+        "Executable",
+        "warning",
+        "Keine gebaute EXE gefunden. Geprueft: "
+        f"{tried}. Mit --exe-path koennen Datei oder Build-Ordner explizit uebergeben werden.",
+    )
 
 
 def validate_store_materials(
@@ -204,5 +271,5 @@ def validate_store_materials(
     checks.append(_check_docs(project_root))
     checks.append(_check_published_store_docs(project_root))
     checks.append(_check_screenshot(project_root))
-    checks.append(_check_executable(payload, exe_path))
+    checks.append(_check_executable(project_root, payload, exe_path))
     return StoreMaterialsReport(checks)

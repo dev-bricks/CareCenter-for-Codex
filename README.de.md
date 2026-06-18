@@ -132,7 +132,10 @@ Validieren mit:
 
 ```powershell
 python -m codex_logdatenbank_wartung.cli store-materials
+python -m codex_logdatenbank_wartung.cli store-materials --exe-path C:\_Local_DEV\codex-maintenance\bin
 ```
+
+Ohne `--exe-path` versucht der Check, die gebaute EXE automatisch aus `build_exe.bat` (`DIST_DIR`) zu finden. Mit `--exe-path` kann entweder die konkrete `.exe` oder nur der Build-Ordner übergeben werden.
 
 ## Entwicklung
 

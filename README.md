@@ -141,7 +141,10 @@ Validate them with:
 
 ```powershell
 python -m codex_logdatenbank_wartung.cli store-materials
+python -m codex_logdatenbank_wartung.cli store-materials --exe-path C:\_Local_DEV\codex-maintenance\bin
 ```
+
+Without `--exe-path`, the check tries to discover the built EXE automatically from `build_exe.bat` (`DIST_DIR`). With `--exe-path`, you can pass either the exact `.exe` file or just the build directory.
 
 ## Development
 

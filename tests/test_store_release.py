@@ -48,6 +48,72 @@ def test_validate_store_materials_reports_ok_for_complete_materials(tmp_path: Pa
     assert report.status == "ok"
 
 
+def test_validate_store_materials_auto_detects_built_exe_from_build_script(tmp_path: Path) -> None:
+    dist_dir = tmp_path / "_local" / "bin"
+    dist_dir.mkdir(parents=True)
+    exe_path = dist_dir / "CareCenterForCodex.exe"
+    exe_path.write_bytes(b"exe")
+    (tmp_path / "build_exe.bat").write_text(
+        '@echo off\nset "DIST_DIR=' + str(dist_dir) + '"\n',
+        encoding="utf-8",
+    )
+    _write_store_files(
+        tmp_path,
+        {
+            "app_name": "CareCenter for Codex",
+            "publisher": "CN=01234567-89AB-CDEF-0123-456789ABCDEF",
+            "publisher_display": "Lukas Geiger",
+            "identity_name": "LukasGeiger.CareCenterForCodex",
+            "version": "0.6.2.0",
+            "description": "Offline Wartung und Reparatur fuer die Codex-Desktop-App.",
+            "executable": "CareCenterForCodex.exe",
+            "capabilities": "runFullTrust",
+            "category": "Developer Tools",
+            "age_rating": "3+",
+            "privacy_url": "https://lukas.example.org/privacy",
+            "support_url": "https://lukas.example.org/support",
+        },
+    )
+
+    report = validate_store_materials(project_root=tmp_path)
+
+    assert report.status == "ok"
+    executable_check = next(check for check in report.checks if check.name == "Executable")
+    assert executable_check.status == "ok"
+    assert str(exe_path.resolve()) in executable_check.message
+
+
+def test_validate_store_materials_accepts_build_directory_for_exe_path(tmp_path: Path) -> None:
+    dist_dir = tmp_path / "_local" / "bin"
+    dist_dir.mkdir(parents=True)
+    exe_path = dist_dir / "CareCenterForCodex.exe"
+    exe_path.write_bytes(b"exe")
+    _write_store_files(
+        tmp_path,
+        {
+            "app_name": "CareCenter for Codex",
+            "publisher": "CN=01234567-89AB-CDEF-0123-456789ABCDEF",
+            "publisher_display": "Lukas Geiger",
+            "identity_name": "LukasGeiger.CareCenterForCodex",
+            "version": "0.6.2.0",
+            "description": "Offline Wartung und Reparatur fuer die Codex-Desktop-App.",
+            "executable": "CareCenterForCodex.exe",
+            "capabilities": "runFullTrust",
+            "category": "Developer Tools",
+            "age_rating": "3+",
+            "privacy_url": "https://lukas.example.org/privacy",
+            "support_url": "https://lukas.example.org/support",
+        },
+    )
+
+    report = validate_store_materials(project_root=tmp_path, exe_path=dist_dir)
+
+    assert report.status == "ok"
+    executable_check = next(check for check in report.checks if check.name == "Executable")
+    assert executable_check.status == "ok"
+    assert executable_check.message == str(exe_path.resolve())
+
+
 def test_validate_store_materials_fails_without_runfulltrust(tmp_path: Path) -> None:
     _write_store_files(
         tmp_path,
