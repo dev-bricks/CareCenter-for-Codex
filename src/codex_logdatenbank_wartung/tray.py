@@ -163,7 +163,9 @@ class AutomationControlWorker(QObject):
             self.action,
             sleeper=time.sleep,
             progress=on_progress,
-            stagger_delay_seconds=60,
+            stagger_delay_seconds=max(
+                0, int(getattr(self.config, "automation_stagger_delay_seconds", 60))
+            ),
         )
         self.finished.emit(result)
 
@@ -701,6 +703,10 @@ class TrayController(QObject):
         self.repair_action.triggered.connect(self.run_codex_repair)
         self.safe_start_action = QAction()
         self.safe_start_action.triggered.connect(self.show_safe_start_report)
+        self.codex_safe_start_action = QAction()
+        self.codex_safe_start_action.triggered.connect(self.launch_codex_safe)
+        self.codex_start_action = QAction()
+        self.codex_start_action.triggered.connect(self.launch_codex_normal)
         self.automations_menu = QMenu()
         self.automations_pause_active_action = QAction()
         self.automations_pause_active_action.triggered.connect(
@@ -735,6 +741,8 @@ class TrayController(QObject):
         self.menu.addAction(self.maintenance_action)
         self.menu.addSeparator()
         self.menu.addAction(self.repair_action)
+        self.menu.addAction(self.codex_safe_start_action)
+        self.menu.addAction(self.codex_start_action)
         self.menu.addAction(self.safe_start_action)
         self.automations_menu.addAction(self.automations_pause_active_action)
         self.automations_menu.addSeparator()
@@ -787,6 +795,10 @@ class TrayController(QObject):
         self.repair_action.setToolTip(t("repair_codex_tooltip"))
         self.safe_start_action.setText(t("safe_start_check"))
         self.safe_start_action.setToolTip(t("safe_start_tooltip"))
+        self.codex_safe_start_action.setText(t("codex_safe_start"))
+        self.codex_safe_start_action.setToolTip(t("codex_safe_start_tooltip"))
+        self.codex_start_action.setText(t("codex_start"))
+        self.codex_start_action.setToolTip(t("codex_start_tooltip"))
         self.automations_menu.setTitle(t("automations_menu"))
         self.automations_pause_active_action.setText(t("automations_pause_active"))
         self.automations_pause_active_action.setToolTip(t("automations_pause_active_tooltip"))
@@ -823,6 +835,28 @@ class TrayController(QObject):
         self.window.set_zombie_count(self.zombie_kill_count)
         if not self.running:
             self.tray.setToolTip(t("tray_ready", app=APP_SHORT, count=self.zombie_kill_count))
+
+    def _manual_action_busy(self, *, ignore_start_repair: bool = False) -> bool:
+        """True, wenn eine mutierende Tray-Aktion bereits läuft."""
+        return (
+            bool(getattr(self, "running", False))
+            or getattr(self, "auto_thread", None) is not None
+            or getattr(self, "repair_thread", None) is not None
+            or getattr(self, "store_thread", None) is not None
+            or getattr(self, "safe_start_install_thread", None) is not None
+            or getattr(self, "automation_thread", None) is not None
+            or getattr(self, "full_repair_thread", None) is not None
+            or (not ignore_start_repair and getattr(self, "start_repair_thread", None) is not None)
+        )
+
+    def _show_manual_action_busy(self, title: str = "CareCenter") -> None:
+        self.tray.showMessage(
+            title,
+            t("carecenter_busy"),
+            QSystemTrayIcon.MessageIcon.Information,
+            3000,
+        )
+        self.show_window()
 
     # -- Autonome Wartung (Safe/Fast) -------------------------------------
 
@@ -937,6 +971,9 @@ class TrayController(QObject):
             )
             self.show_window()
             return
+        if self._manual_action_busy():
+            self._show_manual_action_busy(t("repair_codex"))
+            return
         self.running = True
         self.window.set_running(True)
         self.window.set_state(t("repair_light_state"))
@@ -971,7 +1008,7 @@ class TrayController(QObject):
             self.running = False  # run_full_repair verwaltet seinen eigenen Lauf-Zustand
             self.window.set_state(t("repair_escalating"))
             self.window.set_result(message)
-            self.run_full_repair()
+            self.run_full_repair(from_start_repair=True)
             return
 
         self.running = False
@@ -1010,6 +1047,74 @@ class TrayController(QObject):
             icon = QSystemTrayIcon.MessageIcon.Information
         self.tray.showMessage("CareCenter - Safe Start", message, icon, 7000)
 
+    def launch_codex_safe(self) -> None:
+        from .safe_start_integration import launch_safe_start_tray
+
+        if self._manual_action_busy():
+            self._show_manual_action_busy(t("codex_safe_start"))
+            return
+        result = launch_safe_start_tray(MaintenanceConfig.load(self.config_path))
+        ok = result.status in {"ok", "already-running"}
+        if result.status == "already-running":
+            summary = t("codex_safe_start_already_running")
+        else:
+            summary = t("codex_safe_start_ok") if ok else t("codex_safe_start_failed")
+        self.window.set_state(summary)
+        self.window.set_result(result.to_text())
+        self.show_window()
+        self.tray.showMessage(
+            "CareCenter - Safe Start",
+            summary,
+            QSystemTrayIcon.MessageIcon.Information
+            if ok
+            else QSystemTrayIcon.MessageIcon.Warning,
+            7000,
+        )
+
+    def launch_codex_normal(self) -> None:
+        from .safe_start_integration import restore_safe_start_latest, safe_start_gate_active
+
+        if self._manual_action_busy():
+            self._show_manual_action_busy(t("codex_start"))
+            return
+        config = MaintenanceConfig.load(self.config_path)
+        if safe_start_gate_active(config):
+            result = restore_safe_start_latest(config)
+            ok = result.status in {"ok", "nothing-to-do"}
+            summary = (
+                t("codex_start_restored_safe_start")
+                if ok
+                else t("codex_start_restore_failed")
+            )
+            self.window.set_state(summary)
+            self.window.set_result(result.to_text())
+            self.show_window()
+            self.tray.showMessage(
+                "CareCenter",
+                summary,
+                QSystemTrayIcon.MessageIcon.Information
+                if ok
+                else QSystemTrayIcon.MessageIcon.Warning,
+                7000,
+            )
+            return
+
+        from .orchestrator import default_launcher
+
+        ok, message = default_launcher(config)()
+        summary = t("codex_start_ok") if ok else t("codex_start_failed")
+        self.window.set_state(summary)
+        self.window.set_result(message)
+        self.show_window()
+        self.tray.showMessage(
+            "CareCenter",
+            summary,
+            QSystemTrayIcon.MessageIcon.Information
+            if ok
+            else QSystemTrayIcon.MessageIcon.Warning,
+            5000,
+        )
+
     def install_safe_start(self) -> None:
         if self.safe_start_install_thread is not None:
             self.tray.showMessage(
@@ -1018,6 +1123,9 @@ class TrayController(QObject):
                 QSystemTrayIcon.MessageIcon.Information,
                 3000,
             )
+            return
+        if self._manual_action_busy():
+            self._show_manual_action_busy("CareCenter - Safe Start")
             return
         self.running = True
         self.window.set_running(True)
@@ -1182,6 +1290,11 @@ class TrayController(QObject):
                 QSystemTrayIcon.MessageIcon.Information, 3000,
             )
             return
+        if self._manual_action_busy():
+            self._show_manual_action_busy(t("repair_done_title"))
+            return
+        self.running = True
+        self.window.set_running(True)
         self.window.set_state(t("repair_running_state"))
         self.window.set_progress(0, t("repair_searching"), True)
         self.repair_thread = QThread(self)
@@ -1196,6 +1309,8 @@ class TrayController(QObject):
         self.repair_thread.start()
 
     def on_repair_finished(self, result: RepairResult) -> None:
+        self.running = False
+        self.window.set_running(False)
         self.window.set_progress(100, t("repair_done"), False)
         self.window.set_state(t("repair_state_status", status=result.status))
         self.tray.showMessage(
@@ -1216,6 +1331,9 @@ class TrayController(QObject):
                 t("store_repair"), t("repair_running"),
                 QSystemTrayIcon.MessageIcon.Information, 3000,
             )
+            return
+        if self._manual_action_busy():
+            self._show_manual_action_busy(t("store_repair"))
             return
         self.running = True
         self.window.set_running(True)
@@ -1285,13 +1403,16 @@ class TrayController(QObject):
 
     # -- Volle Codex-Start-Reparatur (OHNE UAC, begrenzt: 1 sanfter Versuch + 1 Fallback) --
 
-    def run_full_repair(self) -> None:
+    def run_full_repair(self, *, from_start_repair: bool = False) -> None:
         if self.full_repair_thread is not None:
             self.tray.showMessage(
                 t("repair_full"), t("repair_running"),
                 QSystemTrayIcon.MessageIcon.Information, 3000,
             )
             self.show_window()
+            return
+        if self._manual_action_busy(ignore_start_repair=from_start_repair):
+            self._show_manual_action_busy(t("repair_full"))
             return
         self.running = True
         self.window.set_running(True)
@@ -1533,10 +1654,12 @@ class TrayController(QObject):
 
     def _stop_watchdog(self) -> None:
         if self.watchdog_worker is not None:
-            self.watchdog_worker.request_stop()  # nur Flag setzen (thread-safe)
+            self.watchdog_worker.reaped.disconnect()
+            self.watchdog_worker.audit_finding.disconnect()
+            self.watchdog_worker.request_stop()
         if self.watchdog_thread is not None:
             self.watchdog_thread.quit()
-            self.watchdog_thread.wait(2000)
+            self.watchdog_thread.wait(8000)
             self.watchdog_thread = None
             self.watchdog_worker = None
 

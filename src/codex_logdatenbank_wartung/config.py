@@ -126,6 +126,9 @@ class MaintenanceConfig:
     safe_start_catchup_min_period_hours: int = 24
     safe_start_storm_window_minutes: int = 10
     safe_start_storm_release_threshold: int = 3
+    # Abstand fuer CareCenter-eigene gestaffelte Automations-Freigaben.
+    # Safe Start selbst nutzt seine eigene config.json (Default dort: 3 sofort, dann 5 Minuten).
+    automation_stagger_delay_seconds: int = 60
     # Config-Audit: erkennt Duplikate und ungenutzte MCP-Server/Plugins in config.toml.
     # Modus: "notify" = nur melden, "auto" = automatisch bereinigen/deaktivieren.
     audit_duplicate_mcp: str = "notify"  # "off", "notify", "auto"

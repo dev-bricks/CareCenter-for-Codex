@@ -4,6 +4,17 @@
 
 - Extended `store-materials` so it auto-detects the built EXE from `build_exe.bat`
   (`DIST_DIR`) and also accepts a build directory via `--exe-path`.
+- Added tray entries for starting Codex normally and starting it through Safe Start for Codex.
+- Made CareCenter's staggered automation reactivation delay configurable via
+  `automation_stagger_delay_seconds` (default: 60 seconds).
+- Safe Start launches from CareCenter now reuse the Safe Start config when present and fall back
+  to a one-minute release interval when no Safe Start config exists.
+- Fixed the direct tray start guards: pressing "Codex safe starten" while Safe Start is already
+  gating is now a no-op, and pressing "Codex starten" during an active Safe Start restores the
+  automations paused by Safe Start without opening another Codex window.
+- Added a shared busy guard for mutating tray actions so direct Codex starts, Safe Start install,
+  Codex repair, Store repair, and full repair cannot be triggered while another CareCenter action
+  is already running.
 - Added a tray automation control submenu for pausing all active Codex automations, restoring only CCC-paused automations, and immediately or gradually activating all automations.
 - Added published `docs/privacy.md` and `docs/support.md` pages plus Store metadata for the planned GitHub Pages privacy/support URLs.
 - Extended the Store material preflight to warn when the published support/privacy pages are missing locally.

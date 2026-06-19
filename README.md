@@ -22,7 +22,8 @@ On Windows, closing the Codex desktop window can leave a hung main process behin
 
 - Background start-prevention watcher: checks every 60 seconds whether Codex is closed and old start blockers remain. It never touches an active Codex session, the node-based Codex CLI, or a process tree that is still doing CPU work.
 - Tray settings with language switching: choose English or German in the Settings area. The choice is saved in `config.json` and the visible tray UI is relabeled immediately.
-- Tray automation controls: pause all currently active Codex automations, restore only automations disabled by CCC, or turn automations back on immediately or one-by-one with a one-minute spacing.
+- Tray automation controls: pause all currently active Codex automations, restore only automations disabled by CCC, or turn automations back on immediately or gradually. The spacing is configurable via `automation_stagger_delay_seconds` (default: 60 seconds).
+- Direct tray starts: "Codex safe starten" launches Safe Start for Codex in its own tray and reuses its `config.json`; if that config is missing, CareCenter uses a 1-minute interval for that launch. If Safe Start is already gating, the second safe-start click is a no-op. "Codex starten" starts Codex normally without the Safe Start gate; while Safe Start is active, CareCenter only restores the automations paused by Safe Start and does not open another Codex window.
 - One-click Repair Codex action: runs a bounded escalation that stops as soon as Codex starts again. It begins with no-admin cleanup and only suggests admin restart, Store reinstall, or reboot when needed.
 - Safe and Fast maintenance modes:
   - Safe waits until the complete Codex process tree is idle, can be cancelled while waiting, closes Codex cleanly, runs maintenance, and restarts it.
@@ -30,7 +31,7 @@ On Windows, closing the Codex desktop window can leave a hung main process behin
 - Store tools: repair a stuck Microsoft Store update path and open the Store reinstall page for Codex.
 - Conservative database maintenance: backup including WAL/SHM, integrity check on the backup, WAL checkpoint, `PRAGMA optimize`, `VACUUM`, and limited backup retention.
 - Status window with progress bar, live tray tooltip, and persistent audit logs.
-- Safe Start for Codex is shipped as a dependency and can be installed or updated from the CareCenter window or CLI. CareCenter uses it for release bursts, start storms, and catch-up hints.
+- Safe Start for Codex is shipped as a dependency and can be installed or updated from the CareCenter window, tray, or CLI. CareCenter uses it for release bursts, start storms, and catch-up hints.
 
 ## Screenshot
 

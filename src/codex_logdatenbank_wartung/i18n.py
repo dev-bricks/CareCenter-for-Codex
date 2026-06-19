@@ -77,6 +77,10 @@ _CATALOG: dict[str, dict[Language, str]] = {
         "de": "Öffnet das Fenster mit den Wartungs-Buttons (Safe/Fast: DB-Wartung).",
         "en": "Open the window with maintenance buttons (Safe/Fast: DB maintenance).",
     },
+    "carecenter_busy": {
+        "de": "CareCenter führt bereits eine Aktion aus.",
+        "en": "CareCenter is already running an action.",
+    },
     "maintenance_running": {"de": "Eine Wartung läuft bereits.", "en": "Maintenance already running."},
     "maintenance_safe_label": {"de": "Safe-Modus", "en": "Safe mode"},
     "maintenance_fast_label": {"de": "Fast-Modus", "en": "Fast mode"},
@@ -301,6 +305,50 @@ _CATALOG: dict[str, dict[Language, str]] = {
     "safe_start_ok": {
         "de": "Keine Safe-Start-Auffälligkeiten.",
         "en": "No Safe Start findings.",
+    },
+    "codex_safe_start": {
+        "de": "Codex safe starten",
+        "en": "Start Codex safely",
+    },
+    "codex_safe_start_tooltip": {
+        "de": "Startet Safe Start for Codex im eigenen Tray. Nutzt dessen config.json; falls sie fehlt, nimmt CareCenter 1 Minute Abstand.",
+        "en": "Starts Safe Start for Codex in its own tray. Uses its config.json; if missing, CareCenter uses a 1-minute interval.",
+    },
+    "codex_safe_start_ok": {
+        "de": "Codex-Safe-Start wurde gestartet.",
+        "en": "Codex Safe Start was launched.",
+    },
+    "codex_safe_start_already_running": {
+        "de": "Safe Start läuft bereits; kein zweiter Start wurde ausgelöst.",
+        "en": "Safe Start is already running; no second launch was triggered.",
+    },
+    "codex_safe_start_failed": {
+        "de": "Codex-Safe-Start konnte nicht gestartet werden.",
+        "en": "Codex Safe Start could not be launched.",
+    },
+    "codex_start": {
+        "de": "Codex starten",
+        "en": "Start Codex",
+    },
+    "codex_start_tooltip": {
+        "de": "Startet Codex normal ohne Safe-Start-Gate.",
+        "en": "Starts Codex normally without the Safe Start gate.",
+    },
+    "codex_start_ok": {
+        "de": "Codex wurde gestartet.",
+        "en": "Codex was launched.",
+    },
+    "codex_start_restored_safe_start": {
+        "de": "Safe Start war aktiv; Automatisierungen wurden zurückgegeben. Codex wurde nicht erneut gestartet.",
+        "en": "Safe Start was active; automations were restored. Codex was not launched again.",
+    },
+    "codex_start_restore_failed": {
+        "de": "Safe-Start-Restore fehlgeschlagen. Codex wurde nicht gestartet.",
+        "en": "Safe Start restore failed. Codex was not launched.",
+    },
+    "codex_start_failed": {
+        "de": "Codex konnte nicht gestartet werden.",
+        "en": "Codex could not be launched.",
     },
     # -- Automation control --
     "automations_menu": {"de": "Automatisierungen", "en": "Automations"},
