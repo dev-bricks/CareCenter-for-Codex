@@ -10,7 +10,7 @@ import time
 import traceback
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Literal
 
@@ -106,6 +106,82 @@ def is_onedrive_path(path: Path) -> bool:
 
 def database_sidecars(db_path: Path) -> list[Path]:
     return [db_path, Path(str(db_path) + "-wal"), Path(str(db_path) + "-shm")]
+
+
+# Timestamp-Spalten werden nach Name erkannt (Groß-/Kleinschreibung ignoriert).
+# "ts" ist der echte Spaltenname in logs_2.sqlite (verifiziert 2026-06-28).
+_TS_COLUMN_NAMES = frozenset(
+    ("timestamp", "created_at", "created", "started_at", "ended_at", "time", "date", "ts")
+)
+
+
+def _table_names(conn: sqlite3.Connection) -> list[str]:
+    """Alle Nutztabellen aus sqlite_master (ohne SQLite-interne Tabellen)."""
+    rows = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+    ).fetchall()
+    return [row[0] for row in rows]
+
+
+def _column_info(conn: sqlite3.Connection, table: str) -> list[tuple[str, str]]:
+    """Name und Typ aller Spalten einer Tabelle via PRAGMA table_info."""
+    # PRAGMA table_info liefert: cid, name, type, notnull, dflt_value, pk
+    rows = conn.execute(f"PRAGMA table_info([{table}])").fetchall()
+    return [(row[1], row[2]) for row in rows]
+
+
+def _detect_ts_column(columns: list[tuple[str, str]]) -> tuple[str, str] | None:
+    """Erste Timestamp-Spalte nach Name, oder None wenn keine gefunden."""
+    for name, col_type in columns:
+        if name.lower() in _TS_COLUMN_NAMES:
+            return name, col_type
+    return None
+
+
+def _cutoff_value(col_type: str, archive_days: int) -> int | str:
+    """Cutoff-Wert passend zum Spaltentyp.
+
+    INTEGER/BIGINT: Unix-Timestamp in Sekunden (wie logs_2.sqlite ts-Spalte).
+    Alle anderen Typen (TEXT, TIMESTAMP, REAL): ISO-String ohne Zeitzone,
+    lexikografisch vergleichbar (YYYY-MM-DDTHH:MM:SS).
+    """
+    cutoff_dt = datetime.now() - timedelta(days=archive_days)
+    upper = col_type.upper()
+    if upper.startswith("INT") or upper in ("BIGINT", "INTEGER"):
+        return int(cutoff_dt.timestamp())
+    return cutoff_dt.isoformat(timespec="seconds")
+
+
+def _archive_table(
+    conn: sqlite3.Connection,
+    table: str,
+    ts_col: str,
+    cutoff: object,
+    archive_file: Path,
+    *,
+    dry_run: bool = False,
+) -> int:
+    """Archiviert ältere Zeilen einer Tabelle in eine JSONL-Datei.
+
+    Write-then-delete: JSONL-Schreiben vor dem DELETE, damit kein Datenverlust
+    möglich ist, wenn das DELETE fehlschlägt oder die Verbindung abbricht.
+    Committet pro Tabelle — ein Fehler in Tabelle B rollt Tabelle A nicht zurück.
+    Im Dry-Run-Modus werden Zeilen nur gezählt, nichts verändert.
+    """
+    cur = conn.execute(f"SELECT * FROM [{table}] WHERE [{ts_col}] < ?", (cutoff,))
+    col_names = [desc[0] for desc in cur.description]
+    rows = cur.fetchall()
+    if not rows or dry_run:
+        return len(rows)
+    archive_file.parent.mkdir(parents=True, exist_ok=True)
+    with archive_file.open("a", encoding="utf-8") as fh:
+        for row in rows:
+            fh.write(
+                json.dumps(dict(zip(col_names, row)), ensure_ascii=False, default=str) + "\n"
+            )
+    conn.execute(f"DELETE FROM [{table}] WHERE [{ts_col}] < ?", (cutoff,))
+    conn.commit()  # pro Tabelle committen — Fehler in anderer Tabelle rollt dies nicht zurück
+    return len(rows)
 
 
 class MaintenanceLock:
@@ -243,15 +319,11 @@ class MaintenanceRunner:
             if self.config.backup_state_db:
                 result.add(t("step_state_backup"), "planned", t("state_backup_planned"))
             result.add(t("step_integrity"), "planned", t("integrity_planned"))
+            self.archive_old_logs(result)  # erkennt result.dry_run, liest DB read-only
             if self.config.allow_optimize:
                 result.add(t("step_optimize"), "planned", t("optimize_planned"))
             if self.config.allow_vacuum:
                 result.add(t("step_vacuum"), "planned", t("vacuum_planned"))
-            result.add(
-                t("step_archive"),
-                "skipped",
-                t("archive_skipped"),
-            )
             return
 
         with MaintenanceLock(self.config.lock_path) as lock:
@@ -380,17 +452,73 @@ class MaintenanceRunner:
 
     def archive_old_logs(self, result: MaintenanceResult) -> None:
         if not self.config.allow_archive_old_logs:
-            result.add(
-                t("step_archive"),
-                "skipped",
-                t("archive_disabled"),
-            )
+            result.add(t("step_archive"), "skipped", t("archive_disabled"))
             return
-        result.add(
-            t("step_archive"),
-            "skipped",
-            t("archive_not_implemented"),
-        )
+        if self.config.archive_days <= 0:
+            result.add(t("step_archive"), "skipped", t("archive_no_days"))
+            return
+
+        self._emit("archive", t("archive_progress"), 63, indeterminate=True)
+        archive_dir = self.config.archive_path
+        db_path = self.config.db_path
+
+        if result.dry_run:
+            # Nur zählen, nichts schreiben (read-only Verbindung).
+            uri = f"file:{db_path.as_posix()}?mode=ro"
+            total_count = 0
+            with sqlite3.connect(uri, uri=True, timeout=30) as conn:
+                for table in _table_names(conn):
+                    cols = _column_info(conn, table)
+                    ts_hit = _detect_ts_column(cols)
+                    if ts_hit is None:
+                        continue
+                    ts_col, col_type = ts_hit
+                    cutoff = _cutoff_value(col_type, self.config.archive_days)
+                    total_count += _archive_table(
+                        conn, table, ts_col, cutoff,
+                        archive_dir / f"{table}.jsonl", dry_run=True,
+                    )
+            msg = (
+                t("archive_dry_run", count=total_count) if total_count else t("archive_nothing")
+            )
+            result.add(t("step_archive"), "planned", msg)
+            return
+
+        # Live-Lauf: erst JSONL schreiben, dann aus DB löschen (Write-then-delete).
+        archived_total = 0
+        archived_tables = 0
+        errors: list[str] = []
+        conn = sqlite3.connect(str(db_path), timeout=60)
+        try:
+            for table in _table_names(conn):
+                cols = _column_info(conn, table)
+                ts_hit = _detect_ts_column(cols)
+                if ts_hit is None:
+                    continue
+                ts_col, col_type = ts_hit
+                cutoff = _cutoff_value(col_type, self.config.archive_days)
+                archive_file = archive_dir / f"{table}.jsonl"
+                try:
+                    count = _archive_table(conn, table, ts_col, cutoff, archive_file)
+                    if count:
+                        archived_total += count
+                        archived_tables += 1
+                except Exception as exc:
+                    with contextlib.suppress(Exception):
+                        conn.rollback()
+                    errors.append(t("archive_table_error", table=table, error=exc))
+        finally:
+            conn.close()
+
+        if errors:
+            result.add(t("step_archive"), "failed", "; ".join(errors))
+        elif archived_total:
+            result.add(
+                t("step_archive"), "ok",
+                t("archive_result", archived=archived_total, tables=archived_tables),
+            )
+        else:
+            result.add(t("step_archive"), "ok", t("archive_nothing"))
 
     def optimize_and_vacuum(self, db_path: Path, result: MaintenanceResult) -> None:
         with sqlite3.connect(db_path, timeout=60) as connection:

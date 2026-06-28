@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Added schema-aware log archiving: `archive_old_logs` now detects timestamp columns via
+  `PRAGMA table_info`, writes rows to per-table JSONL files before deletion (write-then-delete,
+  no data loss on failure), commits per table, and supports dry-run and idempotent re-runs.
+  New `archive_dir` config field, 7 new i18n keys, 17 regression tests.
+- Moved the default CareCenter data root to `%LOCALAPPDATA%\CareCenterForCodex` for
+  new installations, while automatically reusing existing legacy data under
+  `C:\_Local_DEV\codex-maintenance`.
+- Removed the last hardcoded tray startup error log path and aligned CLI defaults
+  for `--config` and `schedule --script-path` with the dynamic data root.
 - Extended `store-materials` so it auto-detects the built EXE from `build_exe.bat`
   (`DIST_DIR`) and also accepts a build directory via `--exe-path`.
 - Added tray entries for starting Codex normally and starting it through Safe Start for Codex.

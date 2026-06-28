@@ -8,12 +8,28 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+DEFAULT_DATA_DIR_NAME = "CareCenterForCodex"
+LEGACY_LOCAL_ROOT = Path(r"C:\_Local_DEV\codex-maintenance")
+
+
+def _local_appdata() -> Path:
+    return Path(os.environ.get("LOCALAPPDATA") or (Path.home() / "AppData" / "Local"))
+
 
 def local_root() -> Path:
-    """Daten-Root; überschreibbar via CCC_DATA_ROOT (Tests, alternative Installationspfade)."""
+    """Daten-Root mit Env-Override, AppData-Default und Legacy-Fallback.
+
+    Neue Installationen nutzen `%LOCALAPPDATA%\\CareCenterForCodex`, damit die
+    Veröffentlichung keinen benutzerspezifischen oder manuell vorbereiteten Pfad
+    voraussetzt. Bestehende lokale Setups unter `C:\\_Local_DEV\\codex-maintenance`
+    bleiben kompatibel, solange dieser Legacy-Pfad bereits existiert.
+    """
     if env := os.environ.get("CCC_DATA_ROOT"):
         return Path(env)
-    return Path(r"C:\_Local_DEV\codex-maintenance")
+    appdata_root = _local_appdata() / DEFAULT_DATA_DIR_NAME
+    if appdata_root.exists() or not LEGACY_LOCAL_ROOT.exists():
+        return appdata_root
+    return LEGACY_LOCAL_ROOT
 
 
 def default_config_path() -> Path:
@@ -32,10 +48,6 @@ def default_codex_home() -> Path:
 
 def default_database_path() -> Path:
     return default_codex_home() / "logs_2.sqlite"
-
-
-def _local_appdata() -> Path:
-    return Path(os.environ.get("LOCALAPPDATA") or (Path.home() / "AppData" / "Local"))
 
 
 def _roaming_appdata() -> Path:
@@ -90,6 +102,7 @@ class MaintenanceConfig:
     allow_wal_checkpoint: bool = True
     allow_archive_old_logs: bool = False
     archive_days: int = 0
+    archive_dir: str = field(default_factory=lambda: str(local_root() / "archive"))
     language: str = "de"
     # Hintergrund-Waechter (Start-Praevention): tickt periodisch read-only und raeumt bei
     # GESCHLOSSENEM Codex haengende Reste (Ghost-Hauptprozesse ohne Renderer + verwaistes
@@ -227,6 +240,10 @@ class MaintenanceConfig:
     @property
     def backup_path(self) -> Path:
         return Path(self.backup_dir).expanduser()
+
+    @property
+    def archive_path(self) -> Path:
+        return Path(self.archive_dir).expanduser()
 
     @property
     def logs_path(self) -> Path:

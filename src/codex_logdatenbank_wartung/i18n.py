@@ -787,6 +787,34 @@ _CATALOG: dict[str, dict[Language, str]] = {
         "de": "Archivierung ist freigegeben, aber noch nicht schemaspezifisch implementiert.",
         "en": "Archiving is allowed but not yet implemented for this schema.",
     },
+    "archive_progress": {
+        "de": "Archivierung alter Log-Einträge …",
+        "en": "Archiving old log entries ...",
+    },
+    "archive_dry_run": {
+        "de": "{count} Eintrag/Einträge würden archiviert.",
+        "en": "{count} entry/entries would be archived.",
+    },
+    "archive_no_days": {
+        "de": "archive_days nicht konfiguriert; Archivierung übersprungen.",
+        "en": "archive_days not configured; archiving skipped.",
+    },
+    "archive_result": {
+        "de": "{archived} Eintrag/Einträge archiviert ({tables} Tabelle(n)).",
+        "en": "{archived} entry/entries archived ({tables} table(s)).",
+    },
+    "archive_table_result": {
+        "de": "Tabelle '{table}': {count} Eintrag/Einträge.",
+        "en": "Table '{table}': {count} entry/entries.",
+    },
+    "archive_nothing": {
+        "de": "Keine archivierbaren Einträge gefunden (alle Einträge aktuell).",
+        "en": "No archivable entries found (all entries are current).",
+    },
+    "archive_table_error": {
+        "de": "Tabelle '{table}': Archivierungsfehler — {error}",
+        "en": "Table '{table}': archiving error — {error}",
+    },
     "wal_progress": {"de": "WAL-Checkpoint …", "en": "WAL checkpoint ..."},
     "wal_ok": {
         "de": "PRAGMA wal_checkpoint(TRUNCATE) ausgeführt (Ergebnis {row}).",
