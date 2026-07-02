@@ -21,6 +21,15 @@ PUBLISHED_STORE_DOCS = (
     "docs/privacy.md",
     "docs/support.md",
 )
+PAGES_WORKFLOW_PATH = Path(".github") / "workflows" / "pages.yml"
+PAGES_BUILD_SCRIPT_PATH = Path("scripts") / "build_store_pages.py"
+PAGES_WORKFLOW_MARKERS = (
+    "actions/configure-pages@",
+    "actions/upload-pages-artifact@",
+    "actions/deploy-pages@",
+    "pages: write",
+    "id-token: write",
+)
 REQUIRED_FIELDS = (
     "app_name",
     "publisher",
@@ -157,15 +166,61 @@ def _check_screenshot(project_root: Path) -> StoreCheck:
     )
 
 
-def _check_published_store_docs(project_root: Path) -> StoreCheck:
+def _check_pages_routes(payload: dict[str, object]) -> list[str]:
+    expected_paths = {
+        "privacy_url": "/carecenter-for-codex/privacy",
+        "support_url": "/carecenter-for-codex/support",
+    }
+    problems: list[str] = []
+    for field, expected_path in expected_paths.items():
+        raw = str(payload.get(field, "")).strip()
+        if not raw:
+            continue
+        parsed = urlparse(raw)
+        path = parsed.path.rstrip("/").lower()
+        if path != expected_path:
+            problems.append(f"{field} endet nicht auf {expected_path}")
+    return problems
+
+
+def _check_published_store_docs(project_root: Path, payload: dict[str, object]) -> StoreCheck:
+    problems: list[str] = []
     missing = [name for name in PUBLISHED_STORE_DOCS if not (project_root / name).exists()]
     if missing:
-        return StoreCheck(
-            "Store-Webseiten",
-            "warning",
-            "Fehlen fuer GitHub-Pages-Pfade: " + ", ".join(missing),
-        )
-    return StoreCheck("Store-Webseiten", "ok", ", ".join(PUBLISHED_STORE_DOCS))
+        problems.append("GitHub-Pages-Quelldokumente fehlen: " + ", ".join(missing))
+
+    build_script = project_root / PAGES_BUILD_SCRIPT_PATH
+    if not build_script.exists():
+        problems.append(f"Pages-Builder fehlt: {PAGES_BUILD_SCRIPT_PATH.as_posix()}")
+
+    workflow = project_root / PAGES_WORKFLOW_PATH
+    if not workflow.exists():
+        problems.append(f"Pages-Workflow fehlt: {PAGES_WORKFLOW_PATH.as_posix()}")
+    else:
+        try:
+            workflow_text = workflow.read_text(encoding="utf-8")
+        except OSError as exc:
+            problems.append(f"Pages-Workflow unlesbar: {exc}")
+        else:
+            missing_markers = [marker for marker in PAGES_WORKFLOW_MARKERS if marker not in workflow_text]
+            if missing_markers:
+                problems.append("Pages-Workflow unvollstaendig: " + ", ".join(missing_markers))
+
+    problems.extend(_check_pages_routes(payload))
+
+    if problems:
+        return StoreCheck("Store-Webseiten", "warning", "; ".join(problems))
+    return StoreCheck(
+        "Store-Webseiten",
+        "ok",
+        ", ".join(
+            [
+                *PUBLISHED_STORE_DOCS,
+                PAGES_BUILD_SCRIPT_PATH.as_posix(),
+                PAGES_WORKFLOW_PATH.as_posix(),
+            ]
+        ),
+    )
 
 
 def _discover_build_dist_dir(project_root: Path) -> Path | None:
@@ -269,7 +324,7 @@ def validate_store_materials(
     checks.append(_check_capabilities(payload))
     checks.append(_check_urls(payload))
     checks.append(_check_docs(project_root))
-    checks.append(_check_published_store_docs(project_root))
+    checks.append(_check_published_store_docs(project_root, payload))
     checks.append(_check_screenshot(project_root))
     checks.append(_check_executable(project_root, payload, exe_path))
     return StoreMaterialsReport(checks)

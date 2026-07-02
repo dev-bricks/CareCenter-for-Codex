@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Added a GitHub Pages pipeline for the planned Windows Store privacy/support URLs:
+  `scripts/build_store_pages.py` builds static `/privacy/` and `/support/` pages from
+  the existing Store documents, `.github/workflows/pages.yml` deploys them with the
+  official Pages Actions, and `store-materials` now warns if the Pages builder,
+  workflow, or route contract is missing.
 - Added Fast maintenance loop mode with 2/3/5/7/10/12/24-hour intervals: each cycle runs
   Fast maintenance, pauses currently active Codex automations, restarts Codex even if it
   was not running at cycle start, then restores only those paused automations in 60-second

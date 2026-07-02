@@ -17,6 +17,31 @@ def _write_store_files(project_root: Path, payload: dict[str, object]) -> None:
     docs_dir.mkdir(parents=True, exist_ok=True)
     for name in ("privacy.md", "support.md"):
         (docs_dir / name).write_text(f"# {name}\n", encoding="utf-8")
+    scripts_dir = project_root / "scripts"
+    scripts_dir.mkdir(parents=True, exist_ok=True)
+    (scripts_dir / "build_store_pages.py").write_text("print('build pages')\n", encoding="utf-8")
+    workflow_dir = project_root / ".github" / "workflows"
+    workflow_dir.mkdir(parents=True, exist_ok=True)
+    (workflow_dir / "pages.yml").write_text(
+        "\n".join(
+            [
+                "jobs:",
+                "  build:",
+                "    steps:",
+                "      - uses: actions/configure-pages@v5",
+                "      - uses: actions/upload-pages-artifact@v5",
+                "  deploy:",
+                "    permissions:",
+                "      actions: read",
+                "      pages: write",
+                "      id-token: write",
+                "    steps:",
+                "      - uses: actions/deploy-pages@v5",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
     screenshot = project_root / "README" / "screenshots"
     screenshot.mkdir(parents=True, exist_ok=True)
     (screenshot / "main.png").write_bytes(b"png")
@@ -38,8 +63,8 @@ def test_validate_store_materials_reports_ok_for_complete_materials(tmp_path: Pa
             "capabilities": "runFullTrust",
             "category": "Developer Tools",
             "age_rating": "3+",
-            "privacy_url": "https://lukas.example.org/privacy",
-            "support_url": "https://lukas.example.org/support",
+            "privacy_url": "https://dev-bricks.github.io/CareCenter-for-Codex/privacy",
+            "support_url": "https://dev-bricks.github.io/CareCenter-for-Codex/support",
         },
     )
 
@@ -70,8 +95,8 @@ def test_validate_store_materials_auto_detects_built_exe_from_build_script(tmp_p
             "capabilities": "runFullTrust",
             "category": "Developer Tools",
             "age_rating": "3+",
-            "privacy_url": "https://lukas.example.org/privacy",
-            "support_url": "https://lukas.example.org/support",
+            "privacy_url": "https://dev-bricks.github.io/CareCenter-for-Codex/privacy",
+            "support_url": "https://dev-bricks.github.io/CareCenter-for-Codex/support",
         },
     )
 
@@ -101,8 +126,8 @@ def test_validate_store_materials_accepts_build_directory_for_exe_path(tmp_path:
             "capabilities": "runFullTrust",
             "category": "Developer Tools",
             "age_rating": "3+",
-            "privacy_url": "https://lukas.example.org/privacy",
-            "support_url": "https://lukas.example.org/support",
+            "privacy_url": "https://dev-bricks.github.io/CareCenter-for-Codex/privacy",
+            "support_url": "https://dev-bricks.github.io/CareCenter-for-Codex/support",
         },
     )
 
@@ -128,8 +153,8 @@ def test_validate_store_materials_fails_without_runfulltrust(tmp_path: Path) -> 
             "capabilities": "internetClient",
             "category": "Developer Tools",
             "age_rating": "3+",
-            "privacy_url": "https://lukas.example.org/privacy",
-            "support_url": "https://lukas.example.org/support",
+            "privacy_url": "https://dev-bricks.github.io/CareCenter-for-Codex/privacy",
+            "support_url": "https://dev-bricks.github.io/CareCenter-for-Codex/support",
         },
     )
 
@@ -178,8 +203,8 @@ def test_validate_store_materials_warns_without_published_store_docs(tmp_path: P
             "capabilities": "runFullTrust",
             "category": "Developer Tools",
             "age_rating": "3+",
-            "privacy_url": "https://lukas.example.org/privacy",
-            "support_url": "https://lukas.example.org/support",
+            "privacy_url": "https://dev-bricks.github.io/CareCenter-for-Codex/privacy",
+            "support_url": "https://dev-bricks.github.io/CareCenter-for-Codex/support",
         },
     )
     (tmp_path / "docs" / "support.md").unlink()
@@ -188,3 +213,32 @@ def test_validate_store_materials_warns_without_published_store_docs(tmp_path: P
 
     assert report.status == "warning"
     assert any(check.name == "Store-Webseiten" and check.status == "warning" for check in report.checks)
+
+
+def test_validate_store_materials_warns_without_pages_workflow(tmp_path: Path) -> None:
+    _write_store_files(
+        tmp_path,
+        {
+            "app_name": "CareCenter for Codex",
+            "publisher": "CN=01234567-89AB-CDEF-0123-456789ABCDEF",
+            "publisher_display": "Lukas Geiger",
+            "identity_name": "LukasGeiger.CareCenterForCodex",
+            "version": "0.6.2.0",
+            "description": "Offline Wartung und Reparatur fuer die Codex-Desktop-App.",
+            "executable": "CareCenterForCodex.exe",
+            "capabilities": "runFullTrust",
+            "category": "Developer Tools",
+            "age_rating": "3+",
+            "privacy_url": "https://dev-bricks.github.io/CareCenter-for-Codex/privacy",
+            "support_url": "https://dev-bricks.github.io/CareCenter-for-Codex/support",
+        },
+    )
+    (tmp_path / ".github" / "workflows" / "pages.yml").unlink()
+
+    report = validate_store_materials(project_root=tmp_path)
+
+    assert report.status == "warning"
+    assert any(
+        check.name == "Store-Webseiten" and "Pages-Workflow fehlt" in check.message
+        for check in report.checks
+    )

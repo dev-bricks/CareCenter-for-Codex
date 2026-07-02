@@ -151,6 +151,14 @@ python -m codex_logdatenbank_wartung.cli store-materials --exe-path C:\_Local_DE
 
 Without `--exe-path`, the check tries to discover the built EXE automatically from `build_exe.bat` (`DIST_DIR`). With `--exe-path`, you can pass either the exact `.exe` file or just the build directory.
 
+The Store privacy/support URLs are prepared for GitHub Pages. Build the static artifact locally with:
+
+```powershell
+python scripts\build_store_pages.py --output _site
+```
+
+The workflow `.github/workflows/pages.yml` publishes the generated `/privacy/` and `/support/` routes after GitHub Pages is configured to use GitHub Actions for this repository.
+
 ## Development
 
 ```powershell
