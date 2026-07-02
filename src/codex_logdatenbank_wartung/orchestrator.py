@@ -24,7 +24,7 @@ from __future__ import annotations
 import subprocess
 import time as _time
 from collections.abc import Callable
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime, timedelta
 from typing import Literal
 
@@ -52,6 +52,7 @@ Sleeper = Callable[[float], None]
 Clock = Callable[[], datetime]
 ProgressFn = Callable[["AutoProgress"], None]
 CancelFn = Callable[[], bool]
+LOOP_CLOSE_RETRY_REASONS = frozenset({"codex-not-closed", "codex-active-after-close"})
 
 
 @dataclass(slots=True)
@@ -85,6 +86,7 @@ class AutoMaintainResult:
     status: str
     mode: Mode
     dry_run: bool
+    block_reason: str = ""
     waited: bool = False
     closed_codex: bool = False
     restarted_codex: bool = False
@@ -102,8 +104,55 @@ class AutoMaintainResult:
             f"Status: {self.status}",
             f"Modus: {self.mode}",
             f"Dry-Run: {self.dry_run}",
+            f"Blockgrund: {self.block_reason or '-'}",
             f"Gewartet: {self.waited}; Codex beendet: {self.closed_codex}; "
             f"Codex neu gestartet: {self.restarted_codex}",
+            "Schritte:",
+        ]
+        for step in self.steps:
+            lines.append(f"  - [{step.status}] {step.name}: {step.message}")
+        if self.maintenance:
+            lines.append(f"Wartung: {self.maintenance.get('status')}")
+        return "\n".join(lines)
+
+
+@dataclass(slots=True)
+class FastLoopCycleResult:
+    """Ein kompletter Loop-Zyklus: Fast-Wartung, Automationen takten, Codex neu starten."""
+
+    status: str
+    dry_run: bool
+    interval_hours: int = 0
+    codex_present_at_start: bool = False
+    closed_codex: bool = False
+    restarted_codex: bool = False
+    safe_fallback_used: bool = False
+    loop_counter_reset_allowed: bool = False
+    maintenance_attempts: int = 0
+    close_retry_count: int = 0
+    paused_automations: int = 0
+    restored_automations: int = 0
+    maintenance: dict[str, object] | None = None
+    steps: list[AutoStep] = field(default_factory=list)
+
+    def add(self, name: str, status: str, message: str) -> None:
+        self.steps.append(AutoStep(name, status, message))
+
+    def to_dict(self) -> dict[str, object]:
+        return asdict(self)
+
+    def to_text(self) -> str:
+        lines = [
+            f"Status: {self.status}",
+            f"Dry-Run: {self.dry_run}",
+            f"Intervall: {self.interval_hours}h",
+            f"Codex beim Start erkannt: {self.codex_present_at_start}",
+            f"Codex beendet: {self.closed_codex}; Codex neu gestartet: {self.restarted_codex}",
+            f"Safe-Fallback genutzt: {self.safe_fallback_used}; "
+            f"Erfolg+Restart setzt Loop-Zaehler neu: {self.loop_counter_reset_allowed}",
+            f"Wartungsversuche: {self.maintenance_attempts}; Close-Retries: {self.close_retry_count}",
+            f"Automatisierungen pausiert: {self.paused_automations}; "
+            f"wieder aktiviert: {self.restored_automations}",
             "Schritte:",
         ]
         for step in self.steps:
@@ -273,6 +322,7 @@ def auto_maintain(
                 )
                 if clock() >= deadline:
                     result.status = "blocked"
+                    result.block_reason = "idle-timeout"
                     result.add(
                         "Warten", "blocked",
                         t(
@@ -300,6 +350,7 @@ def auto_maintain(
     if act.present:
         if not effective_allow:
             result.status = "blocked"
+            result.block_reason = "close-not-allowed"
             result.add(
                 t("step_codex_running"), "blocked",
                 t("auto_close_blocked"),
@@ -329,6 +380,7 @@ def auto_maintain(
         if guard.present:
             if guard.active:
                 result.status = "blocked"
+                result.block_reason = "codex-active-after-close"
                 result.add("Abbruch", "blocked", t("auto_abort_active"))
                 emit("blocked", t("auto_abort_active_short"), 100)
                 return result
@@ -337,6 +389,7 @@ def auto_maintain(
             sleeper(2)
             if observe_fn().present:
                 result.status = "blocked"
+                result.block_reason = "codex-not-closed"
                 result.add("Abbruch", "blocked", t("auto_abort_not_closed"))
                 emit("blocked", t("auto_abort_not_closed_short"), 100)
                 return result
@@ -374,6 +427,224 @@ def auto_maintain(
                 ).strip(),
             )
 
+    emit(result.status, t("done"), 100)
+    return result
+
+
+def fast_maintenance_loop_cycle(
+    config: MaintenanceConfig,
+    *,
+    execute: bool = False,
+    interval_hours: int | None = None,
+    observe_fn: ObserveFn | None = None,
+    killer: Killer | None = None,
+    graceful_closer: Closer | None = None,
+    launcher: Launcher | None = None,
+    maintain_fn: MaintainFn | None = None,
+    pause_fn: Callable[[], object] | None = None,
+    restore_fn: Callable[[], object] | None = None,
+    sleeper: Sleeper = _time.sleep,
+    progress: ProgressFn | None = None,
+    cancel_requested: CancelFn | None = None,
+) -> FastLoopCycleResult:
+    """Fuehre genau einen Loop-Zyklus aus.
+
+    Der Zyklus nutzt absichtlich ``auto_maintain(..., mode="fast")`` ohne dessen
+    eingebauten Restart. So bleibt die Reihenfolge kontrolliert:
+
+    1. Fast-Wartung.
+    2. Falls Fast-Close-Retries scheitern: Safe als verlaengerter Nachholversuch.
+    3. Erst nach erfolgreicher Wartung: aktive Automatisierungen pausieren und merken.
+    4. Codex neu starten, auch wenn Codex vor dem Zyklus nicht lief.
+    5. Genau die von CareCenter pausierten Automatisierungen im 60-Sekunden-Takt
+       wieder aktivieren.
+
+    Safe ist kein Dauerzustand: Die Tray-Schicht kann den Nachholversuch per
+    ``cancel_requested`` abbrechen, wenn das naechste regulaere Fast-Intervall
+    faellig wird.
+    """
+    from .automation_control import (
+        activate_carecenter_paused_automations,
+        pause_active_automations,
+    )
+    from .health import default_tree_killer
+
+    observe_fn = observe_fn or (lambda: observe_activity(config, sleeper=sleeper))
+    killer = killer or default_tree_killer
+    graceful_closer = graceful_closer or default_graceful_closer
+    launcher = launcher or default_launcher(config)
+    cancel_requested = cancel_requested or (lambda: False)
+    hours = int(interval_hours if interval_hours is not None else config.fast_loop_interval_hours)
+    result = FastLoopCycleResult(
+        status="ok",
+        dry_run=not execute,
+        interval_hours=hours,
+    )
+
+    def emit(phase: str, message: str, percent: int, indeterminate: bool = False) -> None:
+        if progress is not None:
+            progress(AutoProgress(phase, message, max(0, min(100, percent)), indeterminate))
+
+    emit("loop-assess", t("fast_loop_assess"), 0, True)
+    first_activity = observe_fn()
+    result.codex_present_at_start = first_activity.present
+    first_observation_used = False
+
+    def loop_observe() -> CodexActivity:
+        nonlocal first_observation_used
+        if not first_observation_used:
+            first_observation_used = True
+            return first_activity
+        return observe_fn()
+
+    loop_config = replace(config, restart_codex_after=False)
+    retry_attempts = max(0, int(getattr(config, "fast_loop_close_retry_attempts", 3)))
+    retry_delay = max(0, int(getattr(config, "fast_loop_close_retry_delay_seconds", 15)))
+    max_attempts = retry_attempts + 1
+    maintenance: AutoMaintainResult | None = None
+    for attempt in range(1, max_attempts + 1):
+        result.maintenance_attempts = attempt
+        maintenance = auto_maintain(
+            loop_config,
+            mode="fast",
+            execute=execute,
+            allow_close=True,
+            observe_fn=loop_observe,
+            killer=killer,
+            graceful_closer=graceful_closer,
+            launcher=launcher,
+            maintain_fn=maintain_fn,
+            sleeper=sleeper,
+            progress=progress,
+            cancel_requested=cancel_requested,
+        )
+        if maintenance.status != "blocked" or maintenance.block_reason not in LOOP_CLOSE_RETRY_REASONS:
+            break
+        if attempt >= max_attempts:
+            break
+        result.close_retry_count += 1
+        retry_message = t(
+            "fast_loop_close_retry",
+            attempt=attempt + 1,
+            max_attempts=max_attempts,
+            seconds=retry_delay,
+        )
+        result.add("Codex beenden Retry", "retry", retry_message)
+        emit("loop-close-retry", retry_message, 68, True)
+        sleeper(float(retry_delay))
+    if maintenance is None:
+        result.status = "failed"
+        result.add("Fast-Wartung", "failed", "Kein Wartungsversuch ausgeführt.")
+        emit(result.status, t("done"), 100)
+        return result
+
+    if (
+        maintenance.status == "blocked"
+        and maintenance.block_reason in LOOP_CLOSE_RETRY_REASONS
+        and bool(getattr(config, "fast_loop_safe_fallback_enabled", True))
+    ):
+        result.safe_fallback_used = True
+        message = t("fast_loop_safe_fallback")
+        result.add("Safe-Fallback", "retry", message)
+        emit("loop-safe-fallback", message, 69, True)
+        maintenance = auto_maintain(
+            loop_config,
+            mode="safe",
+            execute=execute,
+            allow_close=True,
+            observe_fn=observe_fn,
+            killer=killer,
+            graceful_closer=graceful_closer,
+            launcher=launcher,
+            maintain_fn=maintain_fn,
+            sleeper=sleeper,
+            progress=progress,
+            cancel_requested=cancel_requested,
+        )
+        result.maintenance_attempts += 1
+
+    result.maintenance = maintenance.to_dict()
+    result.closed_codex = result.closed_codex or maintenance.closed_codex
+    maintenance_label = "Safe-Wartung" if result.safe_fallback_used else "Fast-Wartung"
+    result.add(
+        maintenance_label,
+        maintenance.status,
+        f"Auto-Maintain abgeschlossen: {maintenance.status}",
+    )
+    if maintenance.status not in {"ok", "dry-run"}:
+        result.status = maintenance.status
+        emit(result.status, t("done"), 100)
+        return result
+
+    if not execute:
+        result.status = "dry-run"
+        result.add(
+            "Automatisierungen",
+            "planned",
+            "Aktive Automatisierungen wuerden pausiert und im 60-Sekunden-Takt wieder aktiviert.",
+        )
+        result.add(
+            "Neustart",
+            "planned",
+            "Codex wuerde nach der Wartung neu gestartet, auch wenn es vorher nicht lief.",
+        )
+        emit("dry-run", t("done"), 100)
+        return result
+
+    emit("loop-pause", t("fast_loop_pause"), 70, True)
+    paused = pause_fn() if pause_fn is not None else pause_active_automations(config)
+    pause_status = str(getattr(paused, "status", "ok"))
+    result.paused_automations = int(getattr(paused, "changed_count", 0))
+    result.add(
+        "Automatisierungen pausieren",
+        pause_status,
+        f"{result.paused_automations} aktive Automatisierung(en) ausgeschaltet.",
+    )
+
+    emit("loop-restart", t("fast_loop_restart"), 78, True)
+    ok, message = launcher()
+    appeared = False
+    if ok:
+        tries = max(1, int(config.restart_verify_seconds / max(1, config.activity_poll_seconds)))
+        for _ in range(tries):
+            sleeper(config.activity_poll_seconds)
+            check = observe_fn()
+            if check.present and check.renderer_present:
+                appeared = True
+                break
+    result.restarted_codex = appeared
+    if appeared:
+        result.add("Neustart", "ok", t("auto_restart_ok", message=message).strip())
+    else:
+        result.add(
+            "Neustart",
+            "warn",
+            t("auto_restart_warn", seconds=config.restart_verify_seconds, message=message).strip(),
+        )
+
+    emit("loop-restore", t("fast_loop_restore"), 86, True)
+    restored = restore_fn() if restore_fn is not None else activate_carecenter_paused_automations(
+        config,
+        staggered=True,
+        delay_seconds=60,
+        sleeper=sleeper,
+    )
+    restore_status = str(getattr(restored, "status", "ok"))
+    result.restored_automations = int(getattr(restored, "changed_count", 0))
+    result.add(
+        "Automatisierungen aktivieren",
+        restore_status,
+        f"{result.restored_automations} zuvor aktive Automatisierung(en) gestaffelt aktiviert.",
+    )
+
+    statuses = {pause_status, restore_status}
+    if "failed" in statuses:
+        result.status = "failed"
+    elif "partial" in statuses or not result.restarted_codex:
+        result.status = "partial"
+    else:
+        result.status = "ok"
+    result.loop_counter_reset_allowed = result.status == "ok" and result.restarted_codex
     emit(result.status, t("done"), 100)
     return result
 

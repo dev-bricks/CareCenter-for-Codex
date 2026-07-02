@@ -42,12 +42,20 @@ from .automation_control import AutomationAction
 from .config import MaintenanceConfig
 from .health import RepairResult, diagnose, repair_start
 from .i18n import LANGUAGES, get_language, language_label, normalize_language, set_language, t
-from .orchestrator import AutoMaintainResult, AutoProgress, Mode, auto_maintain
+from .orchestrator import (
+    AutoMaintainResult,
+    AutoProgress,
+    FastLoopCycleResult,
+    Mode,
+    auto_maintain,
+    fast_maintenance_loop_cycle,
+)
 from .single_instance import SingleInstanceGuard
 from .store_repair import StoreRepairResult, open_store_page, repair_store_codex
 from .watchdog import run_watchdog_tick
 
 ICON_FILENAME = "CareCenterForCodex.ico"
+FAST_LOOP_INTERVAL_HOURS = (2, 3, 5, 7, 10, 12, 24)
 
 # Produktname (Brand zuerst, "Codex" nur als Zweckangabe -> markenrechtlich nominative use).
 # Interner Paket-/Ordnername bleibt unveraendert.
@@ -102,6 +110,34 @@ class AutoMaintainWorker(QObject):
             execute=True,
             sleeper=self._sleep,
             allow_close=True,  # expliziter Tray-Klick = Zustimmung zum Schließen
+            progress=lambda update: self.progress.emit(update),
+            cancel_requested=self._cancel_requested.is_set,
+        )
+        self.finished.emit(result)
+
+
+class FastLoopWorker(QObject):
+    progress = Signal(object)  # AutoProgress
+    finished = Signal(object)  # FastLoopCycleResult
+
+    def __init__(self, config: MaintenanceConfig, interval_hours: int) -> None:
+        super().__init__()
+        self.config = config
+        self.interval_hours = interval_hours
+        self._cancel_requested = Event()
+
+    def request_cancel(self) -> None:
+        self._cancel_requested.set()
+
+    def _sleep(self, seconds: float) -> None:
+        self._cancel_requested.wait(max(0.0, seconds))
+
+    def run(self) -> None:
+        result = fast_maintenance_loop_cycle(
+            self.config,
+            execute=True,
+            interval_hours=self.interval_hours,
+            sleeper=self._sleep,
             progress=lambda update: self.progress.emit(update),
             cancel_requested=self._cancel_requested.is_set,
         )
@@ -411,6 +447,8 @@ class StatusWindow(QWidget):
     request_safe = Signal()
     request_fast = Signal()
     request_cancel_auto = Signal()
+    request_loop_start = Signal(int)
+    request_loop_stop = Signal()
     request_diagnose = Signal()
     request_codex_repair = Signal()
     request_store_repair = Signal()
@@ -420,6 +458,7 @@ class StatusWindow(QWidget):
     audit_requested = Signal()
     mcp_mode_changed = Signal(str)
     plugin_mode_changed = Signal(str)
+    loop_interval_changed = Signal(int)
     language_changed = Signal(str)
 
     def __init__(self) -> None:
@@ -427,6 +466,7 @@ class StatusWindow(QWidget):
         self.setWindowTitle(APP_NAME)
         self.setMinimumWidth(470)
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
+        self._loop_enabled = False
 
         layout = QVBoxLayout(self)
         self.state_label = QLabel(t("ready"))
@@ -474,6 +514,27 @@ class StatusWindow(QWidget):
         maint_row.addWidget(self.fast_button)
         maint_row.addWidget(self.cancel_auto_button)
         layout.addLayout(maint_row)
+
+        self.loop_group = QGroupBox()
+        loop_layout = QVBoxLayout(self.loop_group)
+        loop_interval_row = QHBoxLayout()
+        self.loop_interval_label = QLabel()
+        loop_interval_row.addWidget(self.loop_interval_label)
+        self.loop_interval_combo = QComboBox()
+        for hours in FAST_LOOP_INTERVAL_HOURS:
+            self.loop_interval_combo.addItem(t("fast_loop_interval_hours", hours=hours), hours)
+        self.loop_interval_combo.currentIndexChanged.connect(self._on_loop_interval_index_changed)
+        loop_interval_row.addWidget(self.loop_interval_combo)
+        loop_layout.addLayout(loop_interval_row)
+        loop_button_row = QHBoxLayout()
+        self.loop_start_button = QPushButton()
+        self.loop_start_button.clicked.connect(self._emit_loop_start)
+        self.loop_stop_button = QPushButton()
+        self.loop_stop_button.clicked.connect(self.request_loop_stop)
+        loop_button_row.addWidget(self.loop_start_button)
+        loop_button_row.addWidget(self.loop_stop_button)
+        loop_layout.addLayout(loop_button_row)
+        layout.addWidget(self.loop_group)
 
         # Store-Werkzeuge (Vorschläge/Notfall): meist als Vorschlag aus der Eskalation,
         # hier zusätzlich direkt erreichbar.
@@ -541,6 +602,39 @@ class StatusWindow(QWidget):
     def request_audit(self) -> None:
         self.audit_requested.emit()
 
+    def _selected_loop_interval(self) -> int:
+        value = self.loop_interval_combo.currentData()
+        try:
+            hours = int(value)
+        except (TypeError, ValueError):
+            hours = 3
+        return hours if hours in FAST_LOOP_INTERVAL_HOURS else 3
+
+    def _emit_loop_start(self) -> None:
+        self.request_loop_start.emit(self._selected_loop_interval())
+
+    def _on_loop_interval_index_changed(self, index: int) -> None:
+        value = self.loop_interval_combo.itemData(index)
+        try:
+            hours = int(value)
+        except (TypeError, ValueError):
+            return
+        if hours in FAST_LOOP_INTERVAL_HOURS:
+            self.loop_interval_changed.emit(hours)
+
+    def set_loop_settings(self, enabled: bool, interval_hours: int) -> None:
+        self._loop_enabled = bool(enabled)
+        self.loop_interval_combo.blockSignals(True)
+        target = interval_hours if interval_hours in FAST_LOOP_INTERVAL_HOURS else 3
+        for index in range(self.loop_interval_combo.count()):
+            if self.loop_interval_combo.itemData(index) == target:
+                self.loop_interval_combo.setCurrentIndex(index)
+                break
+        self.loop_interval_combo.blockSignals(False)
+        self.loop_interval_combo.setEnabled(not enabled)
+        self.loop_start_button.setEnabled(not enabled)
+        self.loop_stop_button.setEnabled(enabled)
+
     def set_audit_settings(self, mcp_mode: str, plugin_mode: str) -> None:
         """Setzt die Combo-Werte ohne Signals auszuloesen."""
         self.mcp_combo.blockSignals(True)
@@ -589,6 +683,20 @@ class StatusWindow(QWidget):
         self.safe_start_report_button.setToolTip(t("safe_start_tooltip"))
         self.safe_start_install_button.setText(t("safe_start_install"))
         self.safe_start_install_button.setToolTip(t("safe_start_install_tooltip"))
+        self.loop_group.setTitle(t("fast_loop_group"))
+        self.loop_interval_label.setText(t("fast_loop_interval"))
+        self.loop_interval_combo.blockSignals(True)
+        for index in range(self.loop_interval_combo.count()):
+            hours = self.loop_interval_combo.itemData(index)
+            self.loop_interval_combo.setItemText(
+                index,
+                t("fast_loop_interval_hours", hours=hours),
+            )
+        self.loop_interval_combo.blockSignals(False)
+        self.loop_start_button.setText(t("fast_loop_start"))
+        self.loop_start_button.setToolTip(t("fast_loop_start_tooltip"))
+        self.loop_stop_button.setText(t("fast_loop_stop"))
+        self.loop_stop_button.setToolTip(t("fast_loop_stop_tooltip"))
         self.settings_group.setTitle(f"{t('settings_group')}: {t('settings_config_audit')}")
         self.language_label_widget.setText(t("settings_language"))
         self.language_combo.setToolTip(t("settings_language_tooltip"))
@@ -622,6 +730,9 @@ class StatusWindow(QWidget):
         ):
             button.setEnabled(not running)
         self.cancel_auto_button.setEnabled(running and can_cancel)
+        self.loop_start_button.setEnabled((not running) and not self._loop_enabled)
+        self.loop_stop_button.setEnabled(self._loop_enabled)
+        self.loop_interval_combo.setEnabled((not running) and not self._loop_enabled)
 
     def set_cancel_enabled(self, enabled: bool) -> None:
         self.cancel_auto_button.setEnabled(enabled)
@@ -652,6 +763,10 @@ class TrayController(QObject):
         self.running = False
         self.auto_thread: QThread | None = None
         self.auto_worker: AutoMaintainWorker | None = None
+        self.fast_loop_thread: QThread | None = None
+        self.fast_loop_worker: FastLoopWorker | None = None
+        self.fast_loop_due_pending = False
+        self.fast_loop_safe_fallback_active = False
         self.repair_thread: QThread | None = None
         self.repair_worker: RepairWorker | None = None
         self.store_thread: QThread | None = None
@@ -674,6 +789,9 @@ class TrayController(QObject):
         self.window.request_safe.connect(lambda: self.run_auto("safe"))
         self.window.request_fast.connect(lambda: self.run_auto("fast"))
         self.window.request_cancel_auto.connect(self.cancel_auto)
+        self.window.request_loop_start.connect(self.start_fast_loop)
+        self.window.request_loop_stop.connect(self.stop_fast_loop)
+        self.window.loop_interval_changed.connect(self.on_fast_loop_interval_changed)
         self.window.request_diagnose.connect(self.show_diagnosis)
         self.window.request_codex_repair.connect(self.run_codex_repair)
         self.window.request_store_repair.connect(self.run_store_repair)
@@ -686,6 +804,10 @@ class TrayController(QObject):
         self.window.audit_requested.connect(self.run_config_audit)
         self.window.set_audit_settings(self.config.audit_duplicate_mcp, self.config.audit_unused_plugins)
         self.window.set_language_setting(self.config.language)
+        self.window.set_loop_settings(
+            bool(self.config.fast_loop_enabled),
+            int(getattr(self.config, "fast_loop_interval_hours", 3)),
+        )
 
         # Bewusst schlankes Tray-Menue: EIN Reparatur-Eintrag (Eskalation), der Rest
         # (Diagnose, Wartung, Store) liegt als Buttons im Status-Fenster.
@@ -699,6 +821,12 @@ class TrayController(QObject):
         self.status_action.triggered.connect(self.show_window)
         self.maintenance_action = QAction()
         self.maintenance_action.triggered.connect(self.show_window)
+        self.fast_loop_start_action = QAction()
+        self.fast_loop_start_action.triggered.connect(
+            lambda: self.start_fast_loop(int(getattr(self.config, "fast_loop_interval_hours", 3)))
+        )
+        self.fast_loop_stop_action = QAction()
+        self.fast_loop_stop_action.triggered.connect(self.stop_fast_loop)
         self.repair_action = QAction()
         self.repair_action.triggered.connect(self.run_codex_repair)
         self.safe_start_action = QAction()
@@ -728,6 +856,8 @@ class TrayController(QObject):
         self.automations_activate_all_staggered_action.triggered.connect(
             lambda: self.run_automation_action("activate-all-staggered")
         )
+        self.mark_runs_read_action = QAction()
+        self.mark_runs_read_action.triggered.connect(self.mark_runs_read)
         self.watchdog_action = QAction()
         self.watchdog_action.setCheckable(True)
         self.watchdog_action.setChecked(bool(self.config.watcher_enabled))
@@ -739,6 +869,8 @@ class TrayController(QObject):
         self.menu.addAction(self.open_action)
         self.menu.addAction(self.status_action)
         self.menu.addAction(self.maintenance_action)
+        self.menu.addAction(self.fast_loop_start_action)
+        self.menu.addAction(self.fast_loop_stop_action)
         self.menu.addSeparator()
         self.menu.addAction(self.repair_action)
         self.menu.addAction(self.codex_safe_start_action)
@@ -751,6 +883,8 @@ class TrayController(QObject):
         self.automations_menu.addSeparator()
         self.automations_menu.addAction(self.automations_activate_all_action)
         self.automations_menu.addAction(self.automations_activate_all_staggered_action)
+        self.automations_menu.addSeparator()
+        self.automations_menu.addAction(self.mark_runs_read_action)
         self.menu.addMenu(self.automations_menu)
         self.menu.addSeparator()
         self.menu.addAction(self.watchdog_action)
@@ -765,11 +899,18 @@ class TrayController(QObject):
         self.timer.start()
         self.refresh_idle_tooltip()
 
+        self.fast_loop_timer = QTimer(self)
+        self.fast_loop_timer.setSingleShot(True)
+        self.fast_loop_timer.timeout.connect(self.run_fast_loop_cycle)
+        self._apply_fast_loop_timer()
+        self._sync_fast_loop_controls()
+
         # Hintergrund-Waechter (Start-Praevention) starten; sauberes Stoppen beim Beenden.
         self._start_watchdog()
         app = QApplication.instance()
         if app is not None:
             app.aboutToQuit.connect(self._stop_watchdog)
+            app.aboutToQuit.connect(self._stop_fast_loop_timer)
 
     # -- Tray-Interaktion -------------------------------------------------
 
@@ -791,6 +932,10 @@ class TrayController(QObject):
         self.status_action.setText(t("show_status_progress"))
         self.maintenance_action.setText(t("maintenance"))
         self.maintenance_action.setToolTip(t("maintenance_action_tooltip"))
+        self.fast_loop_start_action.setText(t("fast_loop_start"))
+        self.fast_loop_start_action.setToolTip(t("fast_loop_start_tooltip"))
+        self.fast_loop_stop_action.setText(t("fast_loop_stop"))
+        self.fast_loop_stop_action.setToolTip(t("fast_loop_stop_tooltip"))
         self.repair_action.setText(t("repair_codex"))
         self.repair_action.setToolTip(t("repair_codex_tooltip"))
         self.safe_start_action.setText(t("safe_start_check"))
@@ -818,6 +963,13 @@ class TrayController(QObject):
         self.automations_activate_all_staggered_action.setToolTip(
             t("automations_activate_all_staggered_tooltip")
         )
+        # Bewusst roh-deutsch (kein i18n-Key) -- analog zum Automations-Anomalie-Detektor,
+        # dessen Meldungen die Display-Schicht ebenfalls roh-deutsch rendert.
+        self.mark_runs_read_action.setText("Automations-Ergebnisse als gelesen markieren")
+        self.mark_runs_read_action.setToolTip(
+            "Leert den Ungelesen-Zähler der Codex-Automations-Läufe "
+            "(setzt alle als gelesen). Nur bei geschlossenem Codex."
+        )
         self.watchdog_action.setText(t("watchdog_menu"))
         self.watchdog_action.setToolTip(t("watchdog_tooltip"))
         self.quit_action.setText(t("quit"))
@@ -841,6 +993,7 @@ class TrayController(QObject):
         return (
             bool(getattr(self, "running", False))
             or getattr(self, "auto_thread", None) is not None
+            or getattr(self, "fast_loop_thread", None) is not None
             or getattr(self, "repair_thread", None) is not None
             or getattr(self, "store_thread", None) is not None
             or getattr(self, "safe_start_install_thread", None) is not None
@@ -951,6 +1104,183 @@ class TrayController(QObject):
     def clear_auto_thread(self) -> None:
         self.auto_thread = None
         self.auto_worker = None
+
+    # -- Loop-Modus -------------------------------------------------------
+
+    def _validated_fast_loop_interval(self, interval_hours: int | None = None) -> int:
+        try:
+            hours = int(interval_hours if interval_hours is not None else self.config.fast_loop_interval_hours)
+        except (TypeError, ValueError):
+            hours = 3
+        return hours if hours in FAST_LOOP_INTERVAL_HOURS else 3
+
+    def _fast_loop_interval_seconds(self) -> int:
+        return self._validated_fast_loop_interval() * 60 * 60
+
+    def _schedule_fast_loop_timer(self, delay_seconds: int | None = None) -> None:
+        if not hasattr(self, "fast_loop_timer"):
+            return
+        if not bool(getattr(self.config, "fast_loop_enabled", False)):
+            self.fast_loop_timer.stop()
+            return
+        delay = self._fast_loop_interval_seconds() if delay_seconds is None else max(1, int(delay_seconds))
+        self.fast_loop_timer.setInterval(delay * 1000)
+        self.fast_loop_timer.start()
+
+    def _reset_fast_loop_timer(self) -> None:
+        self.fast_loop_due_pending = False
+        self._schedule_fast_loop_timer()
+
+    def _apply_fast_loop_timer(self) -> None:
+        if not hasattr(self, "fast_loop_timer"):
+            return
+        if bool(getattr(self.config, "fast_loop_enabled", False)):
+            self._schedule_fast_loop_timer()
+        else:
+            self.fast_loop_due_pending = False
+            self.fast_loop_timer.stop()
+
+    def _sync_fast_loop_controls(self) -> None:
+        enabled = bool(getattr(self.config, "fast_loop_enabled", False))
+        hours = self._validated_fast_loop_interval()
+        self.window.set_loop_settings(enabled, hours)
+        if hasattr(self, "fast_loop_start_action"):
+            self.fast_loop_start_action.setEnabled(not enabled)
+        if hasattr(self, "fast_loop_stop_action"):
+            self.fast_loop_stop_action.setEnabled(enabled)
+
+    def on_fast_loop_interval_changed(self, interval_hours: int) -> None:
+        self.config.fast_loop_interval_hours = self._validated_fast_loop_interval(interval_hours)
+        with contextlib.suppress(OSError):
+            self.config.save(self.config_path)
+        self._apply_fast_loop_timer()
+        self._sync_fast_loop_controls()
+
+    def start_fast_loop(self, interval_hours: int | None = None) -> None:
+        hours = self._validated_fast_loop_interval(interval_hours)
+        self.config.fast_loop_interval_hours = hours
+        self.config.fast_loop_enabled = True
+        with contextlib.suppress(OSError):
+            self.config.save(self.config_path)
+        self._apply_fast_loop_timer()
+        self._sync_fast_loop_controls()
+        self.tray.showMessage(
+            t("fast_loop_toast_title"),
+            t("fast_loop_scheduled", hours=hours),
+            QSystemTrayIcon.MessageIcon.Information,
+            5000,
+        )
+        self.run_fast_loop_cycle()
+
+    def stop_fast_loop(self) -> None:
+        self.config.fast_loop_enabled = False
+        with contextlib.suppress(OSError):
+            self.config.save(self.config_path)
+        self._apply_fast_loop_timer()
+        self._sync_fast_loop_controls()
+        self.tray.showMessage(
+            t("fast_loop_toast_title"),
+            t("fast_loop_disabled"),
+            QSystemTrayIcon.MessageIcon.Information,
+            4000,
+        )
+
+    def run_fast_loop_cycle(self) -> None:
+        if self.fast_loop_thread is not None:
+            self.fast_loop_due_pending = True
+            if self.fast_loop_safe_fallback_active and self.fast_loop_worker is not None:
+                self.fast_loop_worker.request_cancel()
+                self.tray.showMessage(
+                    t("fast_loop_toast_title"),
+                    t("fast_loop_safe_fallback_due"),
+                    QSystemTrayIcon.MessageIcon.Information,
+                    5000,
+                )
+                self.show_window()
+                return
+            self.tray.showMessage(
+                t("fast_loop_toast_title"),
+                t("fast_loop_already_running"),
+                QSystemTrayIcon.MessageIcon.Information,
+                3000,
+            )
+            self.show_window()
+            return
+        if self._manual_action_busy():
+            self.fast_loop_due_pending = True
+            self.tray.showMessage(
+                t("fast_loop_toast_title"),
+                t("fast_loop_skipped_busy"),
+                QSystemTrayIcon.MessageIcon.Information,
+                5000,
+            )
+            return
+
+        self.running = True
+        self.fast_loop_safe_fallback_active = False
+        hours = self._validated_fast_loop_interval()
+        self.window.set_running(True)
+        self.window.set_loop_settings(bool(self.config.fast_loop_enabled), hours)
+        self.window.set_state(t("fast_loop_running"))
+        self.window.set_progress(0, t("maintenance_prepare"), True)
+        self.window.set_result("")
+        self.show_window()
+
+        self.fast_loop_thread = QThread(self)
+        self.fast_loop_worker = FastLoopWorker(MaintenanceConfig.load(self.config_path), hours)
+        self.fast_loop_worker.moveToThread(self.fast_loop_thread)
+        self.fast_loop_thread.started.connect(self.fast_loop_worker.run)
+        self.fast_loop_worker.progress.connect(self.on_fast_loop_progress)
+        self.fast_loop_worker.finished.connect(self.on_fast_loop_finished)
+        self.fast_loop_worker.finished.connect(self.fast_loop_thread.quit)
+        self.fast_loop_worker.finished.connect(self.fast_loop_worker.deleteLater)
+        self.fast_loop_thread.finished.connect(self.fast_loop_thread.deleteLater)
+        self.fast_loop_thread.finished.connect(self.clear_fast_loop_thread)
+        self.fast_loop_thread.start()
+
+    def on_fast_loop_progress(self, update: AutoProgress) -> None:
+        self.window.set_progress(update.percent, update.message, update.indeterminate)
+        if update.phase == "loop-safe-fallback":
+            self.fast_loop_safe_fallback_active = True
+            self._reset_fast_loop_timer()
+        short = update.message if len(update.message) < 60 else update.message[:57] + "…"
+        self.tray.setToolTip(f"CareCenter Loop: {short} ({update.percent}%)")
+
+    def on_fast_loop_finished(self, result: FastLoopCycleResult) -> None:
+        self.running = False
+        self.window.set_running(False)
+        self._sync_fast_loop_controls()
+        self.window.set_progress(100, t("done"), False)
+        summary = {
+            "ok": t("fast_loop_done_ok"),
+            "partial": t("fast_loop_done_partial"),
+            "failed": t("fast_loop_done_failed"),
+            "blocked": t("maintenance_done_blocked"),
+            "cancelled": t("maintenance_done_cancelled"),
+        }.get(result.status, t("maintenance_done_other", status=result.status))
+        self.window.set_state(summary)
+        self.window.set_result(result.to_text())
+        if result.loop_counter_reset_allowed:
+            self._reset_fast_loop_timer()
+        icon = (
+            QSystemTrayIcon.MessageIcon.Information
+            if result.status == "ok"
+            else QSystemTrayIcon.MessageIcon.Warning
+        )
+        self.tray.setToolTip(f"CareCenter: {summary}")
+        self.tray.showMessage(t("fast_loop_toast_title"), summary, icon, 8000)
+
+    def clear_fast_loop_thread(self) -> None:
+        self.fast_loop_thread = None
+        self.fast_loop_worker = None
+        self.fast_loop_safe_fallback_active = False
+        if self.fast_loop_due_pending and bool(getattr(self.config, "fast_loop_enabled", False)):
+            self.fast_loop_due_pending = False
+            QTimer.singleShot(0, self.run_fast_loop_cycle)
+
+    def _stop_fast_loop_timer(self) -> None:
+        if hasattr(self, "fast_loop_timer"):
+            self.fast_loop_timer.stop()
 
     # -- Diagnose & Reparatur --------------------------------------------
 
@@ -1269,6 +1599,34 @@ class TrayController(QObject):
     def clear_automation_thread(self) -> None:
         self.automation_thread = None
         self.automation_worker = None
+
+    def mark_runs_read(self) -> None:
+        """Ungelesen-Zähler der Codex-Automations-Läufe leeren (alle als gelesen markieren).
+
+        Synchron (schnelle Datei-Operation, analog zu ``launch_codex_normal``): Prozessschutz,
+        lesen/parsen, Backup, atomar schreiben. Bricht ab, wenn Codex läuft. Bewusst roh-deutsch
+        (kein i18n) -- konsistent mit dem Automations-Anomalie-Detektor.
+        """
+        from .mark_runs_read import mark_all_automation_runs_read
+
+        if self._manual_action_busy():
+            self._show_manual_action_busy("CareCenter - Automatisierungen")
+            return
+        result = mark_all_automation_runs_read(MaintenanceConfig.load(self.config_path))
+        self.window.set_state(result.message or result.status)
+        self.window.set_result(result.to_text())
+        self.show_window()
+        icon = (
+            QSystemTrayIcon.MessageIcon.Information
+            if result.status in {"ok", "nothing"}
+            else QSystemTrayIcon.MessageIcon.Warning
+        )
+        self.tray.showMessage(
+            t("automations_toast_title"),
+            result.message or result.status,
+            icon,
+            7000,
+        )
 
     def show_diagnosis(self) -> None:
         report = diagnose(MaintenanceConfig.load(self.config_path))
@@ -1613,6 +1971,7 @@ class TrayController(QObject):
         return (
             self.running
             or self.auto_thread is not None
+            or getattr(self, "fast_loop_thread", None) is not None
             or self.repair_thread is not None
             or self.store_thread is not None
             or self.safe_start_install_thread is not None

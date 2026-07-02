@@ -10,6 +10,7 @@ Erkennt:
 from __future__ import annotations
 
 import contextlib
+import json
 import re
 import shutil
 import sqlite3
@@ -229,8 +230,112 @@ class EmptyThread:
     created_at: str
 
 
+def _quote_identifier(name: str) -> str:
+    return '"' + name.replace('"', '""') + '"'
+
+
+def _table_columns(conn: sqlite3.Connection, table: str) -> list[str]:
+    return [str(row["name"]) for row in conn.execute(f"PRAGMA table_info({_quote_identifier(table)})")]
+
+
+def _first_column(columns: set[str], candidates: tuple[str, ...]) -> str | None:
+    for candidate in candidates:
+        if candidate in columns:
+            return candidate
+    return None
+
+
+def _json_blankish(value: object) -> bool:
+    if value is None:
+        return True
+    if isinstance(value, str):
+        return value.strip() == ""
+    if isinstance(value, list):
+        return all(_json_blankish(item) for item in value)
+    if isinstance(value, dict):
+        if not value:
+            return True
+        content_keys = {
+            "content", "text", "message", "body", "prompt", "response",
+            "input", "output", "value", "parts",
+        }
+        relevant = [
+            child for key, child in value.items()
+            if str(key).lower() in content_keys
+        ]
+        if relevant:
+            return all(_json_blankish(child) for child in relevant)
+        return all(_json_blankish(child) for child in value.values())
+    return False
+
+
+def _blank_message_value(value: object) -> bool:
+    if value is None:
+        return True
+    if isinstance(value, bytes):
+        try:
+            value = value.decode("utf-8", errors="replace")
+        except OSError:
+            return False
+    if isinstance(value, str):
+        stripped = value.strip()
+        if stripped == "":
+            return True
+        if stripped[:1] in "[{":
+            try:
+                return _json_blankish(json.loads(stripped))
+            except ValueError:
+                return False
+    return False
+
+
+def _content_columns(columns: set[str]) -> list[str]:
+    strong = [
+        column for column in (
+            "first_user_message", "content", "text", "message", "body",
+            "prompt", "response",
+        )
+        if column in columns
+    ]
+    if strong:
+        return strong
+    return [
+        column for column in ("payload", "data", "json", "value")
+        if column in columns
+    ]
+
+
+def _token_empty(row: sqlite3.Row, columns: set[str]) -> bool:
+    token_columns = [
+        column for column in (
+            "total_tokens", "token_count", "tokens", "input_tokens", "output_tokens",
+        )
+        if column in columns
+    ]
+    if not token_columns:
+        return True
+    for column in token_columns:
+        value = row[column]
+        if value not in (None, 0, "0", ""):
+            return False
+    return True
+
+
+def _row_empty_message(row: sqlite3.Row, content_columns: list[str]) -> bool:
+    if not content_columns:
+        return False
+    return all(_blank_message_value(row[column]) for column in content_columns)
+
+
+def _select_rows(conn: sqlite3.Connection, table: str, columns: set[str], *, limit: int) -> list[sqlite3.Row]:
+    order_column = _first_column(columns, ("created_at", "updated_at", "timestamp", "ts"))
+    order_sql = f" ORDER BY {_quote_identifier(order_column)} DESC" if order_column else ""
+    query = f"SELECT * FROM {_quote_identifier(table)}{order_sql} LIMIT {int(limit)}"
+    return list(conn.execute(query))
+
+
 def find_empty_threads(config: MaintenanceConfig) -> list[EmptyThread]:
-    """Findet Threads in state_5.sqlite ohne User-Message / mit 0 Tokens (#19969).
+    """Findet leere Threads/Nachrichten in state_5.sqlite (#19969-Signatur).
 
     Liest read-only; keine Modifikation an state_5.sqlite.
     """
@@ -243,32 +348,77 @@ def find_empty_threads(config: MaintenanceConfig) -> list[EmptyThread]:
         conn = sqlite3.connect(f"file:{state_path}?mode=ro", uri=True)
         conn.row_factory = sqlite3.Row
 
-        # Tabellen-Existenz pruefen (Schema kann sich aendern)
-        tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-        if "threads" not in tables:
-            conn.close()
-            return []
+        tables = [str(row[0]) for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")]
+        seen_ids: set[str] = set()
 
-        # Threads mit 0 total_tokens oder ohne first_user_message
-        cursor = conn.execute("""
-            SELECT id, name, created_at
-            FROM threads
-            WHERE (total_tokens IS NULL OR total_tokens = 0)
-              AND (first_user_message IS NULL OR first_user_message = '')
-            ORDER BY created_at DESC
-            LIMIT 100
-        """)
-        for row in cursor:
-            empty.append(EmptyThread(
-                thread_id=str(row["id"]),
-                name=str(row["name"] or ""),
-                created_at=str(row["created_at"] or ""),
-            ))
+        if "threads" in tables:
+            columns = set(_table_columns(conn, "threads"))
+            id_column = _first_column(columns, ("id", "thread_id", "conversation_id", "chat_id"))
+            name_column = _first_column(columns, ("name", "title", "summary"))
+            created_column = _first_column(columns, ("created_at", "updated_at", "timestamp", "ts"))
+            content_columns = _content_columns(columns)
+            token_columns_present = any(
+                column in columns
+                for column in (
+                    "total_tokens", "token_count", "tokens", "input_tokens", "output_tokens",
+                )
+            )
+            if id_column is not None:
+                for row in _select_rows(conn, "threads", columns, limit=500):
+                    if not token_columns_present and not content_columns:
+                        break
+                    if not _token_empty(row, columns):
+                        continue
+                    if content_columns and not _row_empty_message(row, content_columns):
+                        continue
+                    thread_id = str(row[id_column] or "")
+                    if not thread_id or thread_id in seen_ids:
+                        continue
+                    seen_ids.add(thread_id)
+                    empty.append(EmptyThread(
+                        thread_id=thread_id,
+                        name=str(row[name_column] or "") if name_column else "",
+                        created_at=str(row[created_column] or "") if created_column else "",
+                    ))
+
+        message_table_hints = ("message", "messages", "item", "items", "event", "events", "turn", "turns")
+        for table in tables:
+            if table == "threads" or not any(hint in table.lower() for hint in message_table_hints):
+                continue
+            columns = set(_table_columns(conn, table))
+            content_columns = _content_columns(columns)
+            if not content_columns:
+                continue
+            thread_column = _first_column(
+                columns,
+                ("thread_id", "conversation_id", "chat_id", "session_id", "parent_id", "thread"),
+            )
+            id_column = thread_column or _first_column(columns, ("id", "message_id"))
+            if id_column is None:
+                continue
+            name_column = _first_column(columns, ("name", "title", "summary"))
+            created_column = _first_column(columns, ("created_at", "updated_at", "timestamp", "ts"))
+            for row in _select_rows(conn, table, columns, limit=1000):
+                if not _row_empty_message(row, content_columns):
+                    continue
+                thread_id = str(row[id_column] or "")
+                if not thread_id or thread_id in seen_ids:
+                    continue
+                seen_ids.add(thread_id)
+                empty.append(EmptyThread(
+                    thread_id=thread_id,
+                    name=str(row[name_column] or "") if name_column else table,
+                    created_at=str(row[created_column] or "") if created_column else "",
+                ))
+                if len(empty) >= 100:
+                    break
+            if len(empty) >= 100:
+                break
         conn.close()
     except (sqlite3.Error, OSError):
         pass
 
-    return empty
+    return empty[:100]
 
 
 def audit_threads(config: MaintenanceConfig) -> AuditReport:

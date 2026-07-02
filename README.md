@@ -23,6 +23,8 @@ On Windows, closing the Codex desktop window can leave a hung main process behin
 - Background start-prevention watcher: checks every 60 seconds whether Codex is closed and old start blockers remain. It never touches an active Codex session, the node-based Codex CLI, or a process tree that is still doing CPU work.
 - Tray settings with language switching: choose English or German in the Settings area. The choice is saved in `config.json` and the visible tray UI is relabeled immediately.
 - Tray automation controls: pause all currently active Codex automations, restore only automations disabled by CCC, or turn automations back on immediately or gradually. The spacing is configurable via `automation_stagger_delay_seconds` (default: 60 seconds).
+- Mark automation results as read: clears matching unread thread/chat/conversation state entries from `.codex-global-state.json` while Codex is closed, with a backup and atomic write.
+- Loop mode: choose 2, 3, 5, 7, 10, 12, or 24 hours. Each regular due cycle starts with Fast maintenance and retries Codex close failures up to three times by default. If closing still fails, Safe becomes an extended catch-up attempt and the normal loop timer starts over; if Safe finishes before that timer expires, the timer starts again from the successful maintenance plus verified Codex restart. If the timer expires while Safe is still waiting, Safe is cancelled and the next regular Fast cycle starts. Automations are paused only after maintenance has succeeded, and only those paused automations are restored in 60-second windows.
 - Direct tray starts: "Codex safe starten" launches Safe Start for Codex in its own tray and reuses its `config.json`; if that config is missing, CareCenter uses a 1-minute interval for that launch. If Safe Start is already gating, the second safe-start click is a no-op. "Codex starten" starts Codex normally without the Safe Start gate; while Safe Start is active, CareCenter only restores the automations paused by Safe Start and does not open another Codex window.
 - One-click Repair Codex action: runs a bounded escalation that stops as soon as Codex starts again. It begins with no-admin cleanup and only suggests admin restart, Store reinstall, or reboot when needed.
 - Safe and Fast maintenance modes:
@@ -35,7 +37,7 @@ On Windows, closing the Codex desktop window can leave a hung main process behin
 
 ## Screenshot
 
-The tray status window shows current state, removed-leftover count, progress, maintenance controls with Safe cancellation, Store actions, Safe Start actions, automation controls, and settings.
+The tray status window shows current state, removed-leftover count, progress, maintenance controls with Safe cancellation, Loop mode, Store actions, Safe Start actions, automation controls, and settings.
 
 ![CareCenter status window](README/screenshots/main.png)
 
@@ -80,6 +82,8 @@ python -m codex_logdatenbank_wartung.cli repair --execute
 python -m codex_logdatenbank_wartung.cli dry-run
 python -m codex_logdatenbank_wartung.cli maintain --execute
 python -m codex_logdatenbank_wartung.cli auto-maintain --mode safe --execute
+python -m codex_logdatenbank_wartung.cli fast-loop-cycle --execute
+python -m codex_logdatenbank_wartung.cli mark-runs-read --dry-run
 python -m codex_logdatenbank_wartung.cli store-repair --level repair --execute
 python -m codex_logdatenbank_wartung.cli store-materials
 python -m codex_logdatenbank_wartung.cli safe-start-report
@@ -94,13 +98,13 @@ The CLI reads `language` from `config.json` for runtime reports. The tray settin
 Configuration, logs, and backups live outside cloud-synced folders by default:
 
 ```text
-config:   C:\_Local_DEV\codex-maintenance\config.json
-logs:     C:\_Local_DEV\codex-maintenance\logs\
-backups:  C:\_Local_DEV\codex-maintenance\backups\
+config:   %LOCALAPPDATA%\CareCenterForCodex\config.json
+logs:     %LOCALAPPDATA%\CareCenterForCodex\logs\
+backups:  %LOCALAPPDATA%\CareCenterForCodex\backups\
 database: %USERPROFILE%\.codex\logs_2.sqlite
 ```
 
-Codex paths are detected from `%LOCALAPPDATA%`, `%APPDATA%`, and `CODEX_HOME`. You can override them in `config.json`.
+Codex paths are detected from `%LOCALAPPDATA%`, `%APPDATA%`, and `CODEX_HOME`. New installs also place CareCenter data under `%LOCALAPPDATA%\CareCenterForCodex` by default. Existing local setups under `C:\_Local_DEV\codex-maintenance\` are reused automatically as a legacy fallback. You can override every path in `config.json`.
 
 To use a different data root (useful in tests or alternative installations), set `CCC_DATA_ROOT` before launching:
 
@@ -109,7 +113,7 @@ $env:CCC_DATA_ROOT = "D:\my-codex-maintenance"
 python -m codex_logdatenbank_wartung.cli tray
 ```
 
-When set, `config.json`, `logs\`, and `backups\` are placed under that path instead of the default `C:\_Local_DEV\codex-maintenance\`.
+When set, `config.json`, `logs\`, and `backups\` are placed under that path instead of the default `%LOCALAPPDATA%\CareCenterForCodex\`.
 
 ## Safety Model
 

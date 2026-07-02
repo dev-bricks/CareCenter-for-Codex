@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- Added Fast maintenance loop mode with 2/3/5/7/10/12/24-hour intervals: each cycle runs
+  Fast maintenance, pauses currently active Codex automations, restarts Codex even if it
+  was not running at cycle start, then restores only those paused automations in 60-second
+  windows. If Codex cannot be closed fully, the loop retries the close/maintenance attempt;
+  after exhausted close retries it switches to Safe catch-up and resets the regular timer.
+  If Safe succeeds before the next regular interval, the timer resets again after successful
+  maintenance plus verified restart; if that interval expires first, Safe is cancelled and
+  the next Fast cycle starts. Automations are paused only after maintenance has succeeded.
+- Broadened "mark automation runs read" so it clears all matching unread thread/chat/
+  conversation Atom states instead of only `unread-thread-ids-by-host-v1`.
+- Fixed empty-message detection in the config audit: whitespace-only first messages and
+  empty JSON payloads in message tables are now detected read-only.
 - Added schema-aware log archiving: `archive_old_logs` now detects timestamp columns via
   `PRAGMA table_info`, writes rows to per-table JSONL files before deletion (write-then-delete,
   no data loss on failure), commits per table, and supports dry-run and idempotent re-runs.

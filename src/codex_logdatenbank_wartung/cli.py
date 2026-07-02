@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 from typing import Protocol
 
-from .config import DEFAULT_CONFIG_PATH, MaintenanceConfig
+from .config import MaintenanceConfig, default_config_path, local_root
 from .i18n import normalize_language, set_language, t
 from .maintenance import MaintenanceRunner
 from .processes import describe_processes, find_codex_processes
@@ -103,6 +103,30 @@ def cmd_auto_maintain(args: argparse.Namespace) -> int:
     return {"ok": 0, "dry-run": 0, "blocked": 2, "cancelled": 130, "failed": 1}.get(
         result.status, 0
     )
+
+
+def cmd_fast_loop_cycle(args: argparse.Namespace) -> int:
+    from .orchestrator import fast_maintenance_loop_cycle
+
+    config = load_config(args)
+    try:
+        result = fast_maintenance_loop_cycle(
+            config,
+            execute=args.execute,
+            interval_hours=args.interval_hours,
+        )
+    except KeyboardInterrupt:
+        print(t("auto_cancelled_short"))
+        return 130
+    print(result.to_text())
+    return {
+        "ok": 0,
+        "dry-run": 0,
+        "partial": 2,
+        "blocked": 2,
+        "cancelled": 130,
+        "failed": 1,
+    }.get(result.status, 1)
 
 
 def cmd_store_repair(args: argparse.Namespace) -> int:
@@ -245,6 +269,15 @@ def cmd_safe_start_install(args: argparse.Namespace) -> int:
     return 0 if result.status == "ok" else 1
 
 
+def cmd_mark_runs_read(args: argparse.Namespace) -> int:
+    from .mark_runs_read import mark_all_automation_runs_read
+
+    config = load_config(args)
+    result = mark_all_automation_runs_read(config, dry_run=args.dry_run)
+    print(result.to_text())
+    return {"ok": 0, "nothing": 0, "blocked": 2, "failed": 1}.get(result.status, 1)
+
+
 def cmd_tray(args: argparse.Namespace) -> int:
     from .tray import run_tray
 
@@ -293,7 +326,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--config",
-        default=str(DEFAULT_CONFIG_PATH),
+        default=str(default_config_path()),
         help="Pfad zur lokalen Konfigurationsdatei.",
     )
 
@@ -353,6 +386,23 @@ def build_parser() -> argparse.ArgumentParser:
         help="Codex bei Bedarf schließen erlauben (sonst gilt config.auto_close_codex, default AUS).",
     )
     auto_parser.set_defaults(func=cmd_auto_maintain)
+
+    fast_loop_parser = subparsers.add_parser(
+        "fast-loop-cycle",
+        help="Einen Loop-Zyklus ausführen: Fast-Wartung, aktive Automationen pausieren, Codex neu starten, gestaffelt reaktivieren.",
+    )
+    fast_loop_parser.add_argument(
+        "--execute", action="store_true",
+        help="Wirklich ausführen. Ohne diese Option nur Dry-Run.",
+    )
+    fast_loop_parser.add_argument(
+        "--interval-hours",
+        type=int,
+        choices=[2, 3, 5, 7, 10, 12, 24],
+        default=None,
+        help="Dokumentiertes Loop-Intervall für Ausgabe/Planung.",
+    )
+    fast_loop_parser.set_defaults(func=cmd_fast_loop_cycle)
 
     store_parser = subparsers.add_parser(
         "store-repair",
@@ -439,6 +489,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
     safe_start_install_parser.set_defaults(func=cmd_safe_start_install)
 
+    mark_runs_parser = subparsers.add_parser(
+        "mark-runs-read",
+        help="Automations-Ergebnisse als gelesen markieren (Ungelesen-Zähler leeren). "
+             "Nur bei geschlossenem Codex.",
+    )
+    mark_runs_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Nur zählen und melden, nichts schreiben.",
+    )
+    mark_runs_parser.set_defaults(func=cmd_mark_runs_read)
+
     tray_parser = subparsers.add_parser("tray", help="Systemtray-App starten.")
     tray_parser.set_defaults(func=cmd_tray)
 
@@ -453,7 +515,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     schedule_parser.add_argument(
         "--script-path",
-        default=r"C:\_Local_DEV\codex-maintenance\run-maintenance.cmd",
+        default=str(local_root() / "run-maintenance.cmd"),
         help="Pfad fuer das lokale Hilfsskript des geplanten Tasks.",
     )
     schedule_subparsers = schedule_parser.add_subparsers(dest="schedule_command", required=True)

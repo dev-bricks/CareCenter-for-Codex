@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from datetime import datetime, timedelta
+from types import SimpleNamespace
 from typing import Any
 
 from codex_logdatenbank_wartung.config import MaintenanceConfig
@@ -9,6 +10,7 @@ from codex_logdatenbank_wartung.maintenance import MaintenanceResult, ResultStat
 from codex_logdatenbank_wartung.orchestrator import (
     CodexActivity,
     auto_maintain,
+    fast_maintenance_loop_cycle,
     observe_activity,
 )
 from codex_logdatenbank_wartung.processes import ProcessInfo
@@ -250,6 +252,309 @@ def test_fast_mode_closes_without_explicit_allow_close_flag() -> None:
     assert calls == [True]
     assert res.closed_codex is True
     assert res.waited is False
+
+
+def test_fast_loop_cycle_restarts_even_when_codex_was_absent() -> None:
+    config = make_config(restart_verify_seconds=1, activity_poll_seconds=0)
+    k = _kit()
+    mfn, calls = fake_maintain()
+    pause = SimpleNamespace(status="ok", changed_count=2)
+    restore = SimpleNamespace(status="ok", changed_count=2)
+    seq = [
+        CodexActivity(present=False, active=False),  # Loop-Start
+        CodexActivity(present=False, active=False),  # Refresh vor Close
+        CodexActivity(present=False, active=False),  # Guard vor Wartung
+        CodexActivity(present=True, active=False, renderer_present=True, main_pids=[101]),
+    ]
+
+    res = fast_maintenance_loop_cycle(
+        config,
+        execute=True,
+        interval_hours=3,
+        observe_fn=observe_sequence(seq),
+        killer=k["killer"],
+        graceful_closer=k["closer"],
+        launcher=k["launcher"],
+        maintain_fn=mfn,
+        pause_fn=lambda: pause,
+        restore_fn=lambda: restore,
+        sleeper=noop_sleep,
+    )
+
+    assert calls == [True]
+    assert k["closed"] == []
+    assert k["launched"] == [True]
+    assert res.codex_present_at_start is False
+    assert res.restarted_codex is True
+    assert res.paused_automations == 2
+    assert res.restored_automations == 2
+    assert res.status == "ok"
+
+
+def test_fast_loop_cycle_pauses_before_restart_and_restores_stagger_target() -> None:
+    config = make_config(restart_verify_seconds=1, activity_poll_seconds=0)
+    k = _kit()
+    events: list[str] = []
+
+    def maintain() -> MaintenanceResult:
+        events.append("maintain")
+        return MaintenanceResult(
+            status="ok", dry_run=False, started_at="t", ended_at="t", database_path="x"
+        )
+
+    def pause() -> SimpleNamespace:
+        events.append("pause")
+        return SimpleNamespace(status="ok", changed_count=1)
+
+    def launch() -> tuple[bool, str]:
+        events.append("launch")
+        return (True, "ok")
+
+    def restore() -> SimpleNamespace:
+        events.append("restore")
+        return SimpleNamespace(status="ok", changed_count=1)
+
+    seq = [
+        CodexActivity(present=True, active=True, cpu_percent=200, main_pids=[100]),
+        CodexActivity(present=True, active=True, main_pids=[100]),
+        CodexActivity(present=False, active=False),
+        CodexActivity(present=False, active=False),
+        CodexActivity(present=True, active=False, renderer_present=True, main_pids=[101]),
+    ]
+
+    res = fast_maintenance_loop_cycle(
+        config,
+        execute=True,
+        interval_hours=5,
+        observe_fn=observe_sequence(seq),
+        killer=k["killer"],
+        graceful_closer=k["closer"],
+        launcher=launch,
+        maintain_fn=maintain,
+        pause_fn=pause,
+        restore_fn=restore,
+        sleeper=noop_sleep,
+    )
+
+    assert k["closed"] == [100]
+    assert events == ["maintain", "pause", "launch", "restore"]
+    assert res.closed_codex is True
+    assert res.restarted_codex is True
+    assert res.status == "ok"
+
+
+def test_fast_loop_retries_when_codex_does_not_close_first_time() -> None:
+    config = make_config(
+        restart_verify_seconds=1,
+        activity_poll_seconds=0,
+        fast_loop_close_retry_attempts=2,
+        fast_loop_close_retry_delay_seconds=0,
+    )
+    k = _kit()
+    mfn, calls = fake_maintain()
+    sleeps: list[float] = []
+    pause = SimpleNamespace(status="ok", changed_count=1)
+    restore = SimpleNamespace(status="ok", changed_count=1)
+    seq = [
+        CodexActivity(present=True, active=True, cpu_percent=200, main_pids=[100]),
+        # Versuch 1: Close + Kill reicht nicht, Guard findet Codex weiter.
+        CodexActivity(present=True, active=True, main_pids=[100]),
+        CodexActivity(present=True, active=False, main_pids=[100]),
+        CodexActivity(present=True, active=False, main_pids=[100]),
+        CodexActivity(present=True, active=False, main_pids=[100]),
+        # Versuch 2: Codex laesst sich schliessen, Wartung laeuft.
+        CodexActivity(present=True, active=False, main_pids=[100]),
+        CodexActivity(present=True, active=False, main_pids=[100]),
+        CodexActivity(present=False, active=False),
+        CodexActivity(present=False, active=False),
+        CodexActivity(present=True, active=False, renderer_present=True, main_pids=[101]),
+    ]
+
+    res = fast_maintenance_loop_cycle(
+        config,
+        execute=True,
+        interval_hours=3,
+        observe_fn=observe_sequence(seq),
+        killer=k["killer"],
+        graceful_closer=k["closer"],
+        launcher=k["launcher"],
+        maintain_fn=mfn,
+        pause_fn=lambda: pause,
+        restore_fn=lambda: restore,
+        sleeper=lambda seconds: sleeps.append(seconds),
+    )
+
+    assert calls == [True]
+    assert res.status == "ok"
+    assert res.maintenance_attempts == 2
+    assert res.close_retry_count == 1
+    assert k["closed"] == [100, 100]
+    assert k["killed"] == [100, 100]
+    assert k["launched"] == [True]
+    assert 0.0 in sleeps
+
+
+def test_fast_loop_stops_after_close_retries_are_exhausted() -> None:
+    config = make_config(
+        restart_verify_seconds=1,
+        activity_poll_seconds=0,
+        fast_loop_close_retry_attempts=1,
+        fast_loop_close_retry_delay_seconds=0,
+        fast_loop_safe_fallback_enabled=False,
+    )
+    k = _kit()
+    mfn, calls = fake_maintain()
+    pause_called: list[bool] = []
+    restore_called: list[bool] = []
+    seq = [
+        CodexActivity(present=True, active=True, cpu_percent=200, main_pids=[100]),
+        CodexActivity(present=True, active=True, main_pids=[100]),
+        CodexActivity(present=True, active=False, main_pids=[100]),
+        CodexActivity(present=True, active=False, main_pids=[100]),
+        CodexActivity(present=True, active=False, main_pids=[100]),
+        CodexActivity(present=True, active=False, main_pids=[100]),
+        CodexActivity(present=True, active=False, main_pids=[100]),
+        CodexActivity(present=True, active=False, main_pids=[100]),
+        CodexActivity(present=True, active=False, main_pids=[100]),
+    ]
+
+    res = fast_maintenance_loop_cycle(
+        config,
+        execute=True,
+        interval_hours=3,
+        observe_fn=observe_sequence(seq),
+        killer=k["killer"],
+        graceful_closer=k["closer"],
+        launcher=k["launcher"],
+        maintain_fn=mfn,
+        pause_fn=lambda: pause_called.append(True),
+        restore_fn=lambda: restore_called.append(True),
+        sleeper=noop_sleep,
+    )
+
+    assert res.status == "blocked"
+    assert res.maintenance_attempts == 2
+    assert res.close_retry_count == 1
+    assert calls == []
+    assert pause_called == []
+    assert restore_called == []
+    assert k["launched"] == []
+
+
+def test_fast_loop_uses_safe_fallback_after_close_retries_are_exhausted() -> None:
+    config = make_config(
+        restart_verify_seconds=1,
+        activity_poll_seconds=0,
+        fast_loop_close_retry_attempts=1,
+        fast_loop_close_retry_delay_seconds=0,
+        idle_wait_timeout_seconds=30,
+    )
+    k = _kit()
+    mfn, calls = fake_maintain()
+    pause = SimpleNamespace(status="ok", changed_count=1)
+    restore = SimpleNamespace(status="ok", changed_count=1)
+    seq = [
+        # Fast attempt 1: close failure.
+        CodexActivity(present=True, active=True, cpu_percent=200, main_pids=[100]),
+        CodexActivity(present=True, active=True, main_pids=[100]),
+        CodexActivity(present=True, active=False, main_pids=[100]),
+        CodexActivity(present=True, active=False, main_pids=[100]),
+        CodexActivity(present=True, active=False, main_pids=[100]),
+        # Fast attempt 2: close failure again, retries exhausted.
+        CodexActivity(present=True, active=True, main_pids=[100]),
+        CodexActivity(present=True, active=True, main_pids=[100]),
+        CodexActivity(present=True, active=False, main_pids=[100]),
+        CodexActivity(present=True, active=False, main_pids=[100]),
+        CodexActivity(present=True, active=False, main_pids=[100]),
+        # Safe fallback: now idle/closeable, maintenance can run.
+        CodexActivity(present=True, active=False, main_pids=[100]),
+        CodexActivity(present=True, active=False, main_pids=[100]),
+        CodexActivity(present=False, active=False),
+        CodexActivity(present=False, active=False),
+        # Loop restart verification.
+        CodexActivity(present=True, active=False, renderer_present=True, main_pids=[101]),
+    ]
+
+    res = fast_maintenance_loop_cycle(
+        config,
+        execute=True,
+        interval_hours=3,
+        observe_fn=observe_sequence(seq),
+        killer=k["killer"],
+        graceful_closer=k["closer"],
+        launcher=k["launcher"],
+        maintain_fn=mfn,
+        pause_fn=lambda: pause,
+        restore_fn=lambda: restore,
+        sleeper=noop_sleep,
+    )
+
+    assert calls == [True]
+    assert res.status == "ok"
+    assert res.safe_fallback_used is True
+    assert res.loop_counter_reset_allowed is True
+    assert res.maintenance_attempts == 3
+    assert res.close_retry_count == 1
+    assert k["closed"] == [100, 100, 100]
+    assert k["killed"] == [100, 100, 100, 100]
+    assert k["launched"] == [True]
+
+
+def test_fast_loop_safe_fallback_can_be_cancelled_by_next_due_fast_cycle() -> None:
+    config = make_config(
+        restart_verify_seconds=1,
+        activity_poll_seconds=0,
+        fast_loop_close_retry_attempts=1,
+        fast_loop_close_retry_delay_seconds=0,
+        idle_wait_timeout_seconds=30,
+    )
+    k = _kit()
+    mfn, calls = fake_maintain()
+    pause_called: list[bool] = []
+    restore_called: list[bool] = []
+    cancel = {"requested": False}
+    seq = [
+        # Fast attempt 1: close failure.
+        CodexActivity(present=True, active=True, cpu_percent=200, main_pids=[100]),
+        CodexActivity(present=True, active=True, main_pids=[100]),
+        CodexActivity(present=True, active=False, main_pids=[100]),
+        CodexActivity(present=True, active=False, main_pids=[100]),
+        CodexActivity(present=True, active=False, main_pids=[100]),
+        # Fast attempt 2: close failure again, retries exhausted.
+        CodexActivity(present=True, active=True, main_pids=[100]),
+        CodexActivity(present=True, active=True, main_pids=[100]),
+        CodexActivity(present=True, active=False, main_pids=[100]),
+        CodexActivity(present=True, active=False, main_pids=[100]),
+        CodexActivity(present=True, active=False, main_pids=[100]),
+    ]
+
+    def progress(update) -> None:
+        if update.phase == "loop-safe-fallback":
+            cancel["requested"] = True
+
+    res = fast_maintenance_loop_cycle(
+        config,
+        execute=True,
+        interval_hours=3,
+        observe_fn=observe_sequence(seq),
+        killer=k["killer"],
+        graceful_closer=k["closer"],
+        launcher=k["launcher"],
+        maintain_fn=mfn,
+        pause_fn=lambda: pause_called.append(True),
+        restore_fn=lambda: restore_called.append(True),
+        sleeper=noop_sleep,
+        progress=progress,
+        cancel_requested=lambda: cancel["requested"],
+    )
+
+    assert res.status == "cancelled"
+    assert res.safe_fallback_used is True
+    assert res.loop_counter_reset_allowed is False
+    assert calls == []
+    assert pause_called == []
+    assert restore_called == []
+    assert k["launched"] == []
 
 
 def test_safe_mode_waits_before_blocking_when_no_allow() -> None:

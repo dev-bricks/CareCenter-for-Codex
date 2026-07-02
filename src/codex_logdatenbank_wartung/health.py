@@ -22,6 +22,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
 
+from .automation_control import find_automation_anomalies
 from .config import MaintenanceConfig
 from .processes import (
     ProcessProvider,
@@ -70,6 +71,8 @@ class HealthReport:
     badstate_files: list[str] = field(default_factory=list)
     codex_exe_present: bool = True
     update_leftovers: list[str] = field(default_factory=list)
+    nested_automations: list[str] = field(default_factory=list)
+    duplicate_automation_ids: list[str] = field(default_factory=list)
     issues: list[HealthIssue] = field(default_factory=list)
 
     def add(self, code: str, severity: Severity, message: str, *, fixable: bool = False) -> None:
@@ -96,6 +99,10 @@ class HealthReport:
         lines.append(f"Codex-Installation intakt (Codex.exe vorhanden): {self.codex_exe_present}")
         if self.update_leftovers:
             lines.append(f"Update-Reste: {', '.join(self.update_leftovers)}")
+        if self.nested_automations:
+            lines.append(f"Verschachtelte Automationen: {', '.join(self.nested_automations)}")
+        if self.duplicate_automation_ids:
+            lines.append(f"Doppelte Automations-IDs: {', '.join(self.duplicate_automation_ids)}")
         lines.append("Befunde:")
         if self.issues:
             for issue in self.issues:
@@ -188,6 +195,12 @@ def diagnose(
     codex_exe_present = Path(config.codex_executable).exists()
     update_leftovers = _find_update_leftovers(config)
 
+    # Automations-Anomalien: verwaiste/verschachtelte Ordner und id-Duplikate, die ein
+    # rekursiver Scan in der Codex-App doppelt zaehlt. Read-only, separat von load_automations.
+    anomalies = find_automation_anomalies(config)
+    nested_automations = [str(item.path) for item in anomalies.nested]
+    duplicate_automation_ids = [item.id for item in anomalies.duplicate_ids]
+
     report = HealthReport(
         status="ok",
         checked_at=_iso_now(),
@@ -203,6 +216,8 @@ def diagnose(
         badstate_files=badstate_files,
         codex_exe_present=codex_exe_present,
         update_leftovers=update_leftovers,
+        nested_automations=nested_automations,
+        duplicate_automation_ids=duplicate_automation_ids,
     )
 
     if zombie_main_pids:
@@ -261,6 +276,29 @@ def diagnose(
             "warn",
             f"{len(update_leftovers)} Update-Rest/-Marker im Installations-/Profilpfad gefunden "
             "(evtl. hängengebliebenes Update).",
+        )
+    if anomalies.nested:
+        paths = ", ".join(str(item.path) for item in anomalies.nested)
+        report.add(
+            "verschachtelte-automation",
+            "warn",
+            f"{len(anomalies.nested)} verschachtelte(r) Automations-Ordner (Tiefe > 1) in "
+            f"~/.codex/automations gefunden: {paths}. Ein rekursiver Scan zählt diese doppelt; "
+            "verwaisten/verschachtelten Automations-Ordner aus ~/.codex/automations herausnehmen "
+            "(z. B. nach ~/.codex/_orphan-automations-quarantine verschieben).",
+        )
+    if anomalies.duplicate_ids:
+        details = "; ".join(
+            f"{item.id} ({', '.join(str(path) for path in item.paths)})"
+            for item in anomalies.duplicate_ids
+        )
+        report.add(
+            "automation-id-duplikat",
+            "warn",
+            f"{len(anomalies.duplicate_ids)} doppelte Automations-ID(s) in "
+            f"~/.codex/automations gefunden: {details}. Die Codex-App zählt die Automation "
+            "dadurch doppelt; den überzähligen/verwaisten Automations-Ordner aus "
+            "~/.codex/automations herausnehmen.",
         )
 
     report.status = "ok"

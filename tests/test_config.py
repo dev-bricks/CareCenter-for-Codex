@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import codex_logdatenbank_wartung.config as config_module
 from codex_logdatenbank_wartung.config import MaintenanceConfig
 
 
@@ -75,6 +76,28 @@ def test_load_accepts_int_for_float_field(tmp_path: Path) -> None:
     )
 
 
+def test_load_persists_fast_loop_fields(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        json.dumps({
+            "fast_loop_enabled": True,
+            "fast_loop_interval_hours": 7,
+            "fast_loop_close_retry_attempts": 2,
+            "fast_loop_close_retry_delay_seconds": 5,
+            "fast_loop_safe_fallback_enabled": True,
+        }),
+        encoding="utf-8",
+    )
+
+    config = MaintenanceConfig.load(config_path)
+
+    assert config.fast_loop_enabled is True
+    assert config.fast_loop_interval_hours == 7
+    assert config.fast_loop_close_retry_attempts == 2
+    assert config.fast_loop_close_retry_delay_seconds == 5
+    assert config.fast_loop_safe_fallback_enabled is True
+
+
 def test_load_rejects_bool_for_int_field(tmp_path: Path) -> None:
     """bool darf nicht als gueltiger int-Wert durchgehen (bool ist int-Unterklasse).
 
@@ -126,3 +149,26 @@ def test_ccc_data_root_env_var(tmp_path: Path, monkeypatch) -> None:
     loaded = MaintenanceConfig.load()
     assert loaded.backup_dir == str(tmp_path / "backups")
     assert (tmp_path / "config.json").exists()  # load() legte config.json unter redirected root an
+
+
+def test_local_root_defaults_to_localappdata_for_new_installations(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.delenv("CCC_DATA_ROOT", raising=False)
+    legacy_root = tmp_path / "legacy-root"
+    local_appdata = tmp_path / "LocalAppData"
+    monkeypatch.setattr(config_module, "LEGACY_LOCAL_ROOT", legacy_root)
+    monkeypatch.setattr(config_module, "_local_appdata", lambda: local_appdata)
+
+    assert config_module.local_root() == local_appdata / config_module.DEFAULT_DATA_DIR_NAME
+
+
+def test_local_root_prefers_existing_legacy_root(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.delenv("CCC_DATA_ROOT", raising=False)
+    legacy_root = tmp_path / "legacy-root"
+    legacy_root.mkdir()
+    local_appdata = tmp_path / "LocalAppData"
+    monkeypatch.setattr(config_module, "LEGACY_LOCAL_ROOT", legacy_root)
+    monkeypatch.setattr(config_module, "_local_appdata", lambda: local_appdata)
+
+    assert config_module.local_root() == legacy_root

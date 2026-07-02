@@ -220,6 +220,51 @@ def test_find_empty_threads_detects_zero_token_threads():
         assert empty[0].thread_id == "t1"
 
 
+def test_find_empty_threads_detects_whitespace_only_first_message():
+    with tempfile.TemporaryDirectory() as tmp:
+        config = _make_config(Path(tmp), state_db=True)
+        db_path = config.state_db_path
+        conn = sqlite3.connect(str(db_path))
+        conn.execute(
+            "INSERT INTO threads (id, name, created_at, total_tokens, first_user_message) "
+            "VALUES ('t1', 'Whitespace', '2026-05-31', 0, '   \n\t')"
+        )
+        conn.commit()
+        conn.close()
+
+        empty = find_empty_threads(config)
+        assert len(empty) == 1
+        assert empty[0].thread_id == "t1"
+
+
+def test_find_empty_threads_detects_empty_message_payload_table():
+    with tempfile.TemporaryDirectory() as tmp:
+        config = _make_config(Path(tmp))
+        db_path = config.state_db_path
+        conn = sqlite3.connect(str(db_path))
+        conn.execute("""
+            CREATE TABLE messages (
+                id TEXT PRIMARY KEY,
+                thread_id TEXT,
+                created_at TEXT,
+                payload TEXT
+            )
+        """)
+        conn.execute(
+            "INSERT INTO messages (id, thread_id, created_at, payload) VALUES (?, ?, ?, ?)",
+            ("m1", "thread-empty", "2026-05-31", '{"role":"user","content":""}'),
+        )
+        conn.execute(
+            "INSERT INTO messages (id, thread_id, created_at, payload) VALUES (?, ?, ?, ?)",
+            ("m2", "thread-full", "2026-05-31", '{"role":"user","content":"Hello"}'),
+        )
+        conn.commit()
+        conn.close()
+
+        empty = find_empty_threads(config)
+        assert [item.thread_id for item in empty] == ["thread-empty"]
+
+
 def test_find_empty_threads_handles_missing_db():
     with tempfile.TemporaryDirectory() as tmp:
         config = _make_config(Path(tmp))

@@ -140,6 +140,68 @@ _CATALOG: dict[str, dict[Language, str]] = {
     "detail_closed_codex": {"de": "Codex beendet", "en": "closed Codex"},
     "detail_restarted_codex": {"de": "Codex neu gestartet", "en": "restarted Codex"},
     "detail_maintenance_status": {"de": "Wartung: {status}", "en": "Maintenance: {status}"},
+    "fast_loop_group": {"de": "Loop-Modus", "en": "Loop mode"},
+    "fast_loop_interval": {"de": "Intervall:", "en": "Interval:"},
+    "fast_loop_interval_hours": {"de": "{hours} Stunden", "en": "{hours} hours"},
+    "fast_loop_start": {"de": "Loop starten", "en": "Start loop"},
+    "fast_loop_stop": {"de": "Loop stoppen", "en": "Stop loop"},
+    "fast_loop_start_tooltip": {
+        "de": "Aktiviert den periodischen Fast-Wartungsloop. Der erste Zyklus startet sofort.",
+        "en": "Enables the periodic fast maintenance loop. The first cycle starts immediately.",
+    },
+    "fast_loop_stop_tooltip": {
+        "de": "Stoppt nur künftige Loop-Zyklen. Ein bereits laufender Zyklus wird sauber beendet.",
+        "en": "Stops future loop cycles only. A running cycle finishes cleanly.",
+    },
+    "fast_loop_scheduled": {
+        "de": "Loop aktiv: alle {hours} Stunden.",
+        "en": "Loop enabled: every {hours} hours.",
+    },
+    "fast_loop_disabled": {"de": "Loop gestoppt.", "en": "Loop stopped."},
+    "fast_loop_running": {
+        "de": "Loop-Zyklus läuft: Fast-Wartung, Codex-Neustart, gestaffelte Automationen.",
+        "en": "Loop cycle running: fast maintenance, Codex restart, staggered automations.",
+    },
+    "fast_loop_already_running": {
+        "de": "Ein Loop-Zyklus läuft bereits.",
+        "en": "A loop cycle is already running.",
+    },
+    "fast_loop_toast_title": {"de": "CareCenter – Loop-Modus", "en": "CareCenter - loop mode"},
+    "fast_loop_done_ok": {"de": "Loop-Zyklus abgeschlossen.", "en": "Loop cycle completed."},
+    "fast_loop_done_partial": {
+        "de": "Loop-Zyklus teilweise abgeschlossen. Details im Fenster.",
+        "en": "Loop cycle partially completed. See window for details.",
+    },
+    "fast_loop_done_failed": {
+        "de": "Loop-Zyklus fehlgeschlagen. Details im Fenster.",
+        "en": "Loop cycle failed. See window for details.",
+    },
+    "fast_loop_skipped_busy": {
+        "de": "Loop-Zyklus übersprungen: CareCenter ist bereits beschäftigt.",
+        "en": "Loop cycle skipped: CareCenter is already busy.",
+    },
+    "fast_loop_assess": {"de": "Loop prüft Codex-Zustand …", "en": "Loop checking Codex state ..."},
+    "fast_loop_pause": {
+        "de": "Pausiere aktuell aktive Automatisierungen …",
+        "en": "Pausing currently active automations ...",
+    },
+    "fast_loop_restart": {"de": "Starte Codex neu …", "en": "Restarting Codex ..."},
+    "fast_loop_restore": {
+        "de": "Aktiviere Automatisierungen gestaffelt im 60-Sekunden-Takt …",
+        "en": "Re-enabling automations staggered every 60 seconds ...",
+    },
+    "fast_loop_close_retry": {
+        "de": "Codex ließ sich nicht vollständig beenden. Retry {attempt}/{max_attempts} in {seconds}s …",
+        "en": "Codex could not be closed fully. Retry {attempt}/{max_attempts} in {seconds}s ...",
+    },
+    "fast_loop_safe_fallback": {
+        "de": "Fast-Beenden blieb blockiert. Starte Safe-Nachholung bis zum nächsten regulären Fast-Termin …",
+        "en": "Fast close stayed blocked. Starting Safe catch-up until the next regular Fast interval ...",
+    },
+    "fast_loop_safe_fallback_due": {
+        "de": "Reguläres Loop-Intervall ist fällig. Safe-Nachholung wird beendet; danach startet Fast erneut.",
+        "en": "Regular loop interval is due. Safe catch-up is being stopped; Fast will run again next.",
+    },
     "codex_active_no_close": {
         "de": "Codex läuft und Schließen ist nicht freigegeben.",
         "en": "Codex is running and closing is not permitted.",

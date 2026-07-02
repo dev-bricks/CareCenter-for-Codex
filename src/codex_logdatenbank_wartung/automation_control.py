@@ -43,6 +43,44 @@ class AutomationRecord:
 
 
 @dataclass(slots=True)
+class AutomationFinding:
+    """Eine im Baum gefundene ``automation.toml`` mit Tiefe relativ zu ``automations/``."""
+
+    id: str
+    path: Path
+    depth: int
+
+    @property
+    def nested(self) -> bool:
+        return self.depth > 1
+
+
+@dataclass(slots=True)
+class NestedAutomation:
+    id: str
+    path: Path
+    depth: int
+
+
+@dataclass(slots=True)
+class DuplicateAutomationId:
+    id: str
+    paths: list[Path]
+
+
+@dataclass(slots=True)
+class AutomationAnomalyReport:
+    """Read-only Befund ueber verschachtelte und id-duplizierte Automationen."""
+
+    nested: list[NestedAutomation] = field(default_factory=list)
+    duplicate_ids: list[DuplicateAutomationId] = field(default_factory=list)
+
+    @property
+    def has_anomalies(self) -> bool:
+        return bool(self.nested) or bool(self.duplicate_ids)
+
+
+@dataclass(slots=True)
 class AutomationControlResult:
     action: AutomationAction
     status: str
@@ -114,6 +152,56 @@ def load_automations(config: MaintenanceConfig) -> list[AutomationRecord]:
             )
         )
     return records
+
+
+def find_automation_anomalies(config: MaintenanceConfig) -> AutomationAnomalyReport:
+    """Read-only Detektor fuer verschachtelte und id-duplizierte Automationen.
+
+    Sucht ALLE ``automation.toml`` unter ``automations/`` (rekursiv, robust gegen
+    beliebige Verschachtelung), bestimmt ihre Tiefe und gruppiert die ``id``-Werte:
+
+    * **verschachtelt** = Tiefe > 1 (ein verwaister Duplikat-Ordner wie
+      ``automations/sync-check/sync-check/automation.toml``). Solche Ordner werden
+      vom Tiefe-1-Scan (``load_automations``) nicht verwaltet, laufen also unsichtbar.
+    * **doppelte id** = derselbe ``id``-Wert in mehreren ``automation.toml`` (ueber
+      alle Tiefenebenen). Ein rekursiver Scan in der Codex-App zaehlt die Automation
+      dadurch doppelt.
+
+    Aendert nichts auf der Platte und laesst ``load_automations`` (Tiefe 1) unberuehrt.
+    """
+    report = AutomationAnomalyReport()
+    root = automations_dir(config)
+    if not root.exists():
+        return report
+
+    findings: list[AutomationFinding] = []
+    for toml_path in sorted(root.rglob("automation.toml")):
+        try:
+            data = _read_toml(toml_path)
+        except (OSError, tomlkit.exceptions.ParseError):
+            continue
+        try:
+            depth = len(toml_path.parent.relative_to(root).parts)
+        except ValueError:
+            continue
+        automation_id = _quoted_string(data.get("id")) or toml_path.parent.name
+        findings.append(AutomationFinding(id=automation_id, path=toml_path, depth=depth))
+
+    report.nested = [
+        NestedAutomation(id=finding.id, path=finding.path, depth=finding.depth)
+        for finding in findings
+        if finding.nested
+    ]
+
+    by_id: dict[str, list[Path]] = {}
+    for finding in findings:
+        by_id.setdefault(finding.id, []).append(finding.path)
+    report.duplicate_ids = [
+        DuplicateAutomationId(id=automation_id, paths=sorted(paths))
+        for automation_id, paths in sorted(by_id.items())
+        if len(paths) > 1
+    ]
+    return report
 
 
 def load_carecenter_paused_ids(config: MaintenanceConfig) -> list[str]:

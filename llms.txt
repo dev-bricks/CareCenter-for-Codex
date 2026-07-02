@@ -18,9 +18,13 @@ Important boundaries:
 - It targets Windows 10/11 and the Codex desktop app.
 - It never runs database maintenance while Codex processes are detected.
 - It stores config, logs, locks, and backups locally under
-  C:\_Local_DEV\codex-maintenance by default.
+  %LOCALAPPDATA%\CareCenterForCodex by default, with automatic reuse of the
+  legacy path C:\_Local_DEV\codex-maintenance when it already exists.
 - It should not manipulate the node-based Codex CLI except through explicit
   read-only/audit paths.
+- Loop mode treats Fast as the regular maintenance point. Safe is only an
+  extended catch-up attempt after Fast close retries fail; if the next interval
+  becomes due before Safe succeeds, Safe is cancelled and Fast starts again.
 
 Primary commands:
 - python -m codex_logdatenbank_wartung.cli status
@@ -30,6 +34,8 @@ Primary commands:
 - python -m codex_logdatenbank_wartung.cli repair --dry-run
 - python -m codex_logdatenbank_wartung.cli repair --execute
 - python -m codex_logdatenbank_wartung.cli auto-maintain --mode safe --execute
+- python -m codex_logdatenbank_wartung.cli fast-loop-cycle --execute
+- python -m codex_logdatenbank_wartung.cli mark-runs-read --dry-run
 - python -m codex_logdatenbank_wartung.cli store-repair --level repair --execute
 - python -m codex_logdatenbank_wartung.cli store-materials
 - python -m codex_logdatenbank_wartung.cli safe-start-report
@@ -37,7 +43,7 @@ Primary commands:
 - python -m codex_logdatenbank_wartung.cli schedule install --interval-minutes 180
 
 Environment variables:
-- CCC_DATA_ROOT: override the default data directory (default: C:\_Local_DEV\codex-maintenance)
+- CCC_DATA_ROOT: override the default data directory (default: %LOCALAPPDATA%\CareCenterForCodex)
 
 Verification:
 - python -m compileall -q src tests
@@ -51,4 +57,4 @@ Public documentation:
 - STORE_LISTING.md, PRIVACY_POLICY.md, SUPPORT.md: Store release materials
 - SECURITY.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md: community health files
 
-Last-checked: 2026-06-12
+Last-checked: 2026-06-22

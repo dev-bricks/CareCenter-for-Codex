@@ -72,6 +72,11 @@ def _bare_controller(klass, config_path: Path, config, *, running: bool = False)
     controller.running = running
     controller.auto_thread = None
     controller.auto_worker = None
+    controller.fast_loop_thread = None
+    controller.fast_loop_worker = None
+    controller.fast_loop_timer = MagicMock()
+    controller.fast_loop_due_pending = False
+    controller.fast_loop_safe_fallback_active = False
     controller.repair_thread = None
     controller.repair_worker = None
     controller.store_thread = None
@@ -374,6 +379,8 @@ def test_retranslate_menu_updates_automation_submenu_labels():
             "open_action",
             "status_action",
             "maintenance_action",
+            "fast_loop_start_action",
+            "fast_loop_stop_action",
             "repair_action",
             "safe_start_action",
             "codex_safe_start_action",
@@ -383,6 +390,7 @@ def test_retranslate_menu_updates_automation_submenu_labels():
             "automations_restore_ccc_staggered_action",
             "automations_activate_all_action",
             "automations_activate_all_staggered_action",
+            "mark_runs_read_action",
             "watchdog_action",
             "quit_action",
         ):
@@ -392,7 +400,13 @@ def test_retranslate_menu_updates_automation_submenu_labels():
         set_language("de")
         controller._retranslate_menu()
 
+        controller.mark_runs_read_action.setText.assert_called_once_with(
+            "Automations-Ergebnisse als gelesen markieren"
+        )
+
         controller.automations_menu.setTitle.assert_called_once_with("Automatisierungen")
+        controller.fast_loop_start_action.setText.assert_called_once_with("Loop starten")
+        controller.fast_loop_stop_action.setText.assert_called_once_with("Loop stoppen")
         controller.codex_safe_start_action.setText.assert_called_once_with("Codex safe starten")
         controller.codex_start_action.setText.assert_called_once_with("Codex starten")
         controller.automations_pause_active_action.setText.assert_called_once_with(
@@ -404,6 +418,147 @@ def test_retranslate_menu_updates_automation_submenu_labels():
         controller.automations_activate_all_staggered_action.setText.assert_called_once_with(
             "Alle Automatisierungen gestaffelt an"
         )
+    finally:
+        for key in list(sys.modules):
+            if "codex_logdatenbank_wartung.tray" in key:
+                del sys.modules[key]
+        for key in list(mocks):
+            if key in sys.modules and sys.modules[key] is mocks[key]:
+                del sys.modules[key]
+
+
+def test_fast_loop_safe_fallback_progress_resets_timer():
+    """Beim Wechsel in Safe-Fallback beginnt der Loop-Zaehler neu."""
+    mocks = _mock_pyside6()
+    try:
+        for key in list(sys.modules):
+            if "codex_logdatenbank_wartung.tray" in key:
+                del sys.modules[key]
+
+        from codex_logdatenbank_wartung.config import MaintenanceConfig
+        from codex_logdatenbank_wartung.orchestrator import AutoProgress
+        from codex_logdatenbank_wartung.tray import TrayController
+
+        with tempfile.TemporaryDirectory() as tmp:
+            config_path = Path(tmp) / "config.json"
+            config = MaintenanceConfig(fast_loop_enabled=True, fast_loop_interval_hours=3)
+            config.save(config_path)
+            controller = _bare_controller(TrayController, config_path, config)
+            controller.fast_loop_due_pending = True
+
+            controller.on_fast_loop_progress(
+                AutoProgress("loop-safe-fallback", "Safe", 69, True)
+            )
+
+            assert controller.fast_loop_due_pending is False
+            controller.fast_loop_timer.setInterval.assert_called_with(3 * 60 * 60 * 1000)
+            controller.fast_loop_timer.start.assert_called()
+    finally:
+        for key in list(sys.modules):
+            if "codex_logdatenbank_wartung.tray" in key:
+                del sys.modules[key]
+        for key in list(mocks):
+            if key in sys.modules and sys.modules[key] is mocks[key]:
+                del sys.modules[key]
+
+
+def test_fast_loop_due_while_running_is_marked_pending():
+    """Ein faelliger Loop-Tick waehrend eines laufenden Zyklus wird nicht verworfen."""
+    mocks = _mock_pyside6()
+    try:
+        for key in list(sys.modules):
+            if "codex_logdatenbank_wartung.tray" in key:
+                del sys.modules[key]
+
+        from codex_logdatenbank_wartung.config import MaintenanceConfig
+        from codex_logdatenbank_wartung.tray import TrayController
+
+        with tempfile.TemporaryDirectory() as tmp:
+            config_path = Path(tmp) / "config.json"
+            config = MaintenanceConfig(fast_loop_enabled=True)
+            config.save(config_path)
+            controller = _bare_controller(TrayController, config_path, config)
+            controller.fast_loop_thread = MagicMock()
+
+            controller.run_fast_loop_cycle()
+
+            assert controller.fast_loop_due_pending is True
+            controller.tray.showMessage.assert_called()
+    finally:
+        for key in list(sys.modules):
+            if "codex_logdatenbank_wartung.tray" in key:
+                del sys.modules[key]
+        for key in list(mocks):
+            if key in sys.modules and sys.modules[key] is mocks[key]:
+                del sys.modules[key]
+
+
+def test_fast_loop_due_during_safe_fallback_cancels_safe_catchup():
+    """Wenn der neue reguläre Termin fällig wird, wird Safe-Nachholung beendet."""
+    mocks = _mock_pyside6()
+    try:
+        for key in list(sys.modules):
+            if "codex_logdatenbank_wartung.tray" in key:
+                del sys.modules[key]
+
+        from codex_logdatenbank_wartung.config import MaintenanceConfig
+        from codex_logdatenbank_wartung.tray import TrayController
+
+        with tempfile.TemporaryDirectory() as tmp:
+            config_path = Path(tmp) / "config.json"
+            config = MaintenanceConfig(fast_loop_enabled=True)
+            config.save(config_path)
+            controller = _bare_controller(TrayController, config_path, config)
+            controller.fast_loop_thread = MagicMock()
+            controller.fast_loop_worker = MagicMock()
+            controller.fast_loop_safe_fallback_active = True
+
+            controller.run_fast_loop_cycle()
+
+            assert controller.fast_loop_due_pending is True
+            controller.fast_loop_worker.request_cancel.assert_called_once_with()
+            controller.tray.showMessage.assert_called()
+    finally:
+        for key in list(sys.modules):
+            if "codex_logdatenbank_wartung.tray" in key:
+                del sys.modules[key]
+        for key in list(mocks):
+            if key in sys.modules and sys.modules[key] is mocks[key]:
+                del sys.modules[key]
+
+
+def test_fast_loop_successful_restart_resets_timer_again():
+    """Nach Wartungserfolg plus Restart beginnt der Loop-Zaehler erneut neu."""
+    mocks = _mock_pyside6()
+    try:
+        for key in list(sys.modules):
+            if "codex_logdatenbank_wartung.tray" in key:
+                del sys.modules[key]
+
+        from codex_logdatenbank_wartung.config import MaintenanceConfig
+        from codex_logdatenbank_wartung.orchestrator import FastLoopCycleResult
+        from codex_logdatenbank_wartung.tray import TrayController
+
+        with tempfile.TemporaryDirectory() as tmp:
+            config_path = Path(tmp) / "config.json"
+            config = MaintenanceConfig(fast_loop_enabled=True, fast_loop_interval_hours=5)
+            config.save(config_path)
+            controller = _bare_controller(TrayController, config_path, config)
+            controller.fast_loop_due_pending = True
+
+            controller.on_fast_loop_finished(
+                FastLoopCycleResult(
+                    status="ok",
+                    dry_run=False,
+                    interval_hours=5,
+                    restarted_codex=True,
+                    loop_counter_reset_allowed=True,
+                )
+            )
+
+            assert controller.fast_loop_due_pending is False
+            controller.fast_loop_timer.setInterval.assert_called_with(5 * 60 * 60 * 1000)
+            controller.fast_loop_timer.start.assert_called()
     finally:
         for key in list(sys.modules):
             if "codex_logdatenbank_wartung.tray" in key:

@@ -23,6 +23,8 @@ Unter Windows kann nach dem Schließen des Codex-Desktopfensters ein hängender 
 - Hintergrund-Wächter für Start-Prävention: prüft alle 60 Sekunden, ob Codex geschlossen ist und alte Startblocker übrig sind. Er berührt nie eine aktive Codex-Sitzung, nie die node-basierte Codex-CLI und nie einen Prozessbaum, der noch CPU-Arbeit leistet.
 - Spracheinstellung im Tray: Im Bereich Einstellungen kann zwischen Deutsch und Englisch gewechselt werden. Die Auswahl wird in `config.json` gespeichert und die sichtbare Tray-Oberfläche wird sofort neu beschriftet.
 - Automatisierungssteuerung im Tray: alle aktuell aktiven Codex-Automatisierungen ausschalten, nur von CCC ausgeschaltete Automatisierungen wieder aktivieren oder Automatisierungen sofort beziehungsweise gestaffelt nacheinander einschalten. Der Abstand ist über `automation_stagger_delay_seconds` konfigurierbar (Standard: 60 Sekunden).
+- Automations-Ergebnisse als gelesen markieren: leert passende unread Thread-/Chat-/Conversation-States aus `.codex-global-state.json`, nur bei geschlossenem Codex, mit Backup und atomarem Schreiben.
+- Loop-Modus: 2, 3, 5, 7, 10, 12 oder 24 Stunden wählen. Jeder regulär fällige Zyklus startet mit Fast-Wartung und wiederholt fehlgeschlagene Codex-Beenden-Versuche standardmäßig bis zu dreimal. Wenn das Beenden weiter scheitert, wird Safe zum verlängerten Nachholversuch und der normale Loop-Zähler beginnt neu; wenn Safe vor Ablauf dieses Zählers erfolgreich fertig wird, beginnt der Zähler erneut ab Wartungserfolg plus verifiziertem Codex-Neustart. Läuft der Zähler ab, während Safe noch wartet, wird Safe beendet und der nächste reguläre Fast-Zyklus startet. Automatisierungen werden erst nach erfolgreicher Wartung pausiert und nur diese pausierten Automatisierungen in 60-Sekunden-Fenstern zurückgegeben.
 - Direkte Tray-Starts: „Codex safe starten“ startet Safe Start for Codex im eigenen Tray und übernimmt dessen `config.json`; fehlt diese Config, nutzt CareCenter für diesen Start 1 Minute Abstand. Läuft Safe Start bereits, passiert kein zweiter Start. „Codex starten“ startet Codex normal ohne Safe-Start-Gate; ist Safe Start gerade aktiv, gibt CareCenter nur die von Safe Start pausierten Automatisierungen zurück und öffnet kein weiteres Codex-Fenster.
 - Ein-Klick-Aktion „Codex reparieren“: startet eine begrenzte Eskalation, die stoppt, sobald Codex wieder startet. Zuerst läuft eine Reparatur ohne Adminrechte; Admin-Neustart, Store-Neuinstallation oder Reboot werden nur bei Bedarf vorgeschlagen.
 - Wartung in zwei Modi:
@@ -35,7 +37,7 @@ Unter Windows kann nach dem Schließen des Codex-Desktopfensters ein hängender 
 
 ## Screenshot
 
-Das Tray-Statusfenster zeigt aktuellen Zustand, Zähler für entfernte Reste, Fortschritt, Wartungsaktionen mit Safe-Abbruch, Store-Aktionen, Safe-Start-Aktionen, Automatisierungssteuerung und Einstellungen.
+Das Tray-Statusfenster zeigt aktuellen Zustand, Zähler für entfernte Reste, Fortschritt, Wartungsaktionen mit Safe-Abbruch, Loop-Modus, Store-Aktionen, Safe-Start-Aktionen, Automatisierungssteuerung und Einstellungen.
 
 ![CareCenter-Statusfenster](README/screenshots/main.png)
 
@@ -80,6 +82,8 @@ python -m codex_logdatenbank_wartung.cli repair --execute
 python -m codex_logdatenbank_wartung.cli dry-run
 python -m codex_logdatenbank_wartung.cli maintain --execute
 python -m codex_logdatenbank_wartung.cli auto-maintain --mode safe --execute
+python -m codex_logdatenbank_wartung.cli fast-loop-cycle --execute
+python -m codex_logdatenbank_wartung.cli mark-runs-read --dry-run
 python -m codex_logdatenbank_wartung.cli store-repair --level repair --execute
 python -m codex_logdatenbank_wartung.cli store-materials
 python -m codex_logdatenbank_wartung.cli safe-start-report
@@ -94,13 +98,13 @@ Die CLI liest `language` aus `config.json` für Laufzeitberichte. Der vorgesehen
 Konfiguration, Logs und Backups liegen standardmäßig außerhalb von Cloud-Sync-Ordnern:
 
 ```text
-config:   C:\_Local_DEV\codex-maintenance\config.json
-logs:     C:\_Local_DEV\codex-maintenance\logs\
-backups:  C:\_Local_DEV\codex-maintenance\backups\
+config:   %LOCALAPPDATA%\CareCenterForCodex\config.json
+logs:     %LOCALAPPDATA%\CareCenterForCodex\logs\
+backups:  %LOCALAPPDATA%\CareCenterForCodex\backups\
 database: %USERPROFILE%\.codex\logs_2.sqlite
 ```
 
-Codex-Pfade werden aus `%LOCALAPPDATA%`, `%APPDATA%` und `CODEX_HOME` erkannt. Sie können in `config.json` überschrieben werden.
+Codex-Pfade werden aus `%LOCALAPPDATA%`, `%APPDATA%` und `CODEX_HOME` erkannt. Neue Installationen legen auch die CareCenter-Daten standardmäßig unter `%LOCALAPPDATA%\CareCenterForCodex` ab. Bestehende lokale Setups unter `C:\_Local_DEV\codex-maintenance\` werden als Legacy-Fallback automatisch weiterverwendet. Alle Pfade lassen sich in `config.json` überschreiben.
 
 ## Sicherheitsmodell
 

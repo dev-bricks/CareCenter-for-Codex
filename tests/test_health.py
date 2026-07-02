@@ -3,6 +3,8 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
+import tomlkit
+
 from codex_logdatenbank_wartung.config import MaintenanceConfig
 from codex_logdatenbank_wartung.health import diagnose, repair_start
 from codex_logdatenbank_wartung.processes import ProcessInfo
@@ -157,6 +159,58 @@ def test_diagnose_install_ok_when_exe_present(tmp_path: Path) -> None:
     report = diagnose(config, lambda: [])
     assert report.codex_exe_present is True
     assert not any(issue.code == "codex-exe-fehlt" for issue in report.issues)
+
+
+def write_automation(codex_home: Path, rel_parts: tuple[str, ...], automation_id: str) -> Path:
+    folder = codex_home.joinpath("automations", *rel_parts)
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / "automation.toml"
+    doc = tomlkit.document()
+    doc["id"] = automation_id
+    doc["name"] = f"Automation {automation_id}"
+    doc["status"] = "ACTIVE"
+    path.write_text(tomlkit.dumps(doc), encoding="utf-8")
+    return path
+
+
+def test_diagnose_warns_on_nested_automation(tmp_path: Path) -> None:
+    # codex_home = parent der DB = tmp_path -> automations/ landet unter tmp_path.
+    config = make_config(tmp_path)
+    write_automation(tmp_path, ("sync-check",), "sync-check")
+    write_automation(tmp_path, ("sync-check", "sync-check"), "sync-check")
+
+    report = diagnose(config, lambda: [])
+
+    assert any(issue.code == "verschachtelte-automation" for issue in report.issues)
+    # Identische id auf zwei Ebenen -> auch als Duplikat erkannt.
+    assert any(issue.code == "automation-id-duplikat" for issue in report.issues)
+    assert report.nested_automations
+    assert report.status in {"warn", "critical"}
+
+
+def test_diagnose_warns_on_duplicate_automation_id(tmp_path: Path) -> None:
+    config = make_config(tmp_path)
+    write_automation(tmp_path, ("folder-a",), "dupe")
+    write_automation(tmp_path, ("folder-b",), "dupe")
+
+    report = diagnose(config, lambda: [])
+
+    assert any(issue.code == "automation-id-duplikat" for issue in report.issues)
+    assert "dupe" in report.duplicate_automation_ids
+    assert not any(issue.code == "verschachtelte-automation" for issue in report.issues)
+
+
+def test_diagnose_clean_automations_no_warning(tmp_path: Path) -> None:
+    config = make_config(tmp_path)
+    write_automation(tmp_path, ("job-a",), "job-a")
+    write_automation(tmp_path, ("job-b",), "job-b")
+
+    report = diagnose(config, lambda: [])
+
+    assert not any(issue.code == "verschachtelte-automation" for issue in report.issues)
+    assert not any(issue.code == "automation-id-duplikat" for issue in report.issues)
+    assert report.nested_automations == []
+    assert report.duplicate_automation_ids == []
 
 
 def test_repair_clears_stale_lockfile_on_execute(tmp_path: Path) -> None:

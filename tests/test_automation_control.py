@@ -9,6 +9,8 @@ from codex_logdatenbank_wartung.automation_control import (
     activate_all_automations,
     activate_carecenter_paused_automations,
     control_state_path,
+    find_automation_anomalies,
+    load_automations,
     load_carecenter_paused_ids,
     pause_active_automations,
     run_automation_action,
@@ -32,6 +34,22 @@ def write_automation(codex_home: Path, automation_id: str, status: str) -> Path:
     doc["rrule"] = "FREQ=HOURLY;INTERVAL=1"
     doc["status"] = status
     doc["updated_at"] = 1
+    path.write_text(tomlkit.dumps(doc), encoding="utf-8")
+    return path
+
+
+def write_automation_at(
+    codex_home: Path, rel_parts: tuple[str, ...], automation_id: str, status: str = "ACTIVE"
+) -> Path:
+    """Schreibt eine automation.toml an einem beliebigen relativen Pfad unter automations/."""
+    folder = codex_home.joinpath("automations", *rel_parts)
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / "automation.toml"
+    doc = tomlkit.document()
+    doc["id"] = automation_id
+    doc["name"] = f"Automation {automation_id}"
+    doc["kind"] = "cron"
+    doc["status"] = status
     path.write_text(tomlkit.dumps(doc), encoding="utf-8")
     return path
 
@@ -131,3 +149,48 @@ def test_run_automation_action_dispatches_staggered_all(tmp_path: Path) -> None:
 
     assert result.changed_ids == ["first", "second"]
     assert sleeps == [60.0]
+
+
+def test_find_anomalies_detects_nested_automation(tmp_path: Path) -> None:
+    # (a) Nest-Fall: verwaister Duplikat-Ordner mit identischer id im Eltern-Ordner.
+    config = make_config(tmp_path)
+    write_automation_at(config.codex_home, ("sync-check",), "sync-check")
+    nested = write_automation_at(config.codex_home, ("sync-check", "sync-check"), "sync-check")
+
+    report = find_automation_anomalies(config)
+
+    assert [item.path for item in report.nested] == [nested]
+    assert report.nested[0].id == "sync-check"
+    assert report.nested[0].depth == 2
+    assert report.has_anomalies is True
+    # Tiefe-1-Scan bleibt unberührt (sieht nur den Eltern-Ordner).
+    assert [record.id for record in load_automations(config)] == ["sync-check"]
+
+
+def test_find_anomalies_detects_duplicate_id_without_nesting(tmp_path: Path) -> None:
+    # (b) Doppel-id-Fall, unabhängig von Verschachtelung: zwei Tiefe-1-Ordner mit
+    # verschiedenen Ordnernamen, aber identischem id-Feld.
+    config = make_config(tmp_path)
+    first = write_automation_at(config.codex_home, ("folder-a",), "dupe")
+    second = write_automation_at(config.codex_home, ("folder-b",), "dupe")
+
+    report = find_automation_anomalies(config)
+
+    assert report.nested == []
+    assert len(report.duplicate_ids) == 1
+    assert report.duplicate_ids[0].id == "dupe"
+    assert report.duplicate_ids[0].paths == sorted([first, second])
+    assert report.has_anomalies is True
+
+
+def test_find_anomalies_clean_when_flat_and_unique(tmp_path: Path) -> None:
+    # (c) Sauberer Fall: nur Tiefe-1-Ordner mit eindeutigen ids.
+    config = make_config(tmp_path)
+    write_automation_at(config.codex_home, ("job-a",), "job-a")
+    write_automation_at(config.codex_home, ("job-b",), "job-b")
+
+    report = find_automation_anomalies(config)
+
+    assert report.nested == []
+    assert report.duplicate_ids == []
+    assert report.has_anomalies is False

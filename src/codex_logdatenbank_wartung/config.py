@@ -142,6 +142,20 @@ class MaintenanceConfig:
     # Abstand fuer CareCenter-eigene gestaffelte Automations-Freigaben.
     # Safe Start selbst nutzt seine eigene config.json (Default dort: 3 sofort, dann 5 Minuten).
     automation_stagger_delay_seconds: int = 60
+    # Loop-Modus: periodisch einen Fast-Wartungszyklus ausfuehren, aktive Automationen
+    # kurz pausieren, Codex neu starten und die zuvor aktiven Automationen gestaffelt
+    # wieder freigeben. Die Tray-UI erlaubt nur die Werte 2/3/5/7/10/12/24 Stunden.
+    fast_loop_enabled: bool = False
+    fast_loop_interval_hours: int = 3
+    # Wenn Codex im Fast-Loop nicht vollstaendig beendet werden kann, wird der reine
+    # Close-/Wartungs-Versuch wiederholt, bevor Safe als Fallback uebernimmt.
+    fast_loop_close_retry_attempts: int = 3
+    fast_loop_close_retry_delay_seconds: int = 15
+    # Nach erschoepften Fast-Close-Retries soll der faellige Wartungstermin nicht
+    # ausfallen: Safe wartet auf einen geeigneten Leerlaufzeitpunkt. Beim Wechsel zu
+    # Safe beginnt der normale Loop-Zaehler neu; nach Wartungserfolg plus verifiziertem
+    # Codex-Neustart beginnt er nochmals ab diesem Erfolgspunkt neu.
+    fast_loop_safe_fallback_enabled: bool = True
     # Config-Audit: erkennt Duplikate und ungenutzte MCP-Server/Plugins in config.toml.
     # Modus: "notify" = nur melden, "auto" = automatisch bereinigen/deaktivieren.
     audit_duplicate_mcp: str = "notify"  # "off", "notify", "auto"
