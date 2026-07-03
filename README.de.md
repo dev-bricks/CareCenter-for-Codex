@@ -73,6 +73,16 @@ Standalone-EXE bauen:
 build_exe.bat
 ```
 
+Standardmäßig nutzt der Build die veröffentlichte Abhängigkeit
+`safe-start-for-codex` aus `pyproject.toml`, damit die EXE nicht unbemerkt einen
+dirty lokalen Schwester-Checkout einbettet. Eine lokale Safe-Start-Quelle nur
+bewusst per Override verwenden:
+
+```powershell
+$env:CARECENTER_SAFE_START_SOURCE = "C:\Pfad\zu\REL-PUB_safe-start-for-codex"
+build_exe.bat
+```
+
 ## CLI
 
 ```powershell

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Hardened `build_exe.bat` for reproducible EXE packaging: it now uses the
+  published `safe-start-for-codex` dependency from `pyproject.toml` by default
+  and only installs a local Safe Start checkout when
+  `CARECENTER_SAFE_START_SOURCE` is set explicitly.
 - Added a GitHub Pages pipeline for the planned Windows Store privacy/support URLs:
   `scripts/build_store_pages.py` builds static `/privacy/` and `/support/` pages from
   the existing Store documents, `.github/workflows/pages.yml` deploys them with the

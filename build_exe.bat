@@ -18,7 +18,6 @@ set "WORK_DIR=C:\_Local_DEV\codex_build\codex-logwartung"
 set "SPEC_DIR=C:\_Local_DEV\codex_build\codex-logwartung-spec"
 set "BUILD_VENV=C:\_Local_DEV\codex_build\codex-logwartung-venv"
 set "BUILD_PY=%BUILD_VENV%\Scripts\python.exe"
-set "SAFE_START_SOURCE=%PROJECT_ROOT%\..\REL-PUB_safe-start-for-codex"
 
 if not exist "%BUILD_PY%" (
     echo [build] Erstelle Build-venv: %BUILD_VENV%
@@ -29,10 +28,19 @@ if not exist "%BUILD_PY%" (
 set "PATH=%BUILD_VENV%\Scripts;%PATH%"
 python -m pip install --upgrade pip
 if errorlevel 1 pause & exit /b 1
-if exist "%SAFE_START_SOURCE%\pyproject.toml" (
-    echo [build] Installiere lokale Safe-Start-Quelle: %SAFE_START_SOURCE%
-    python -m pip install --upgrade "%SAFE_START_SOURCE%"
-    if errorlevel 1 pause & exit /b 1
+if defined CARECENTER_SAFE_START_SOURCE (
+    if exist "%CARECENTER_SAFE_START_SOURCE%\pyproject.toml" (
+        echo [build] Installiere Safe Start aus Override-Quelle: %CARECENTER_SAFE_START_SOURCE%
+        python -m pip install --upgrade "%CARECENTER_SAFE_START_SOURCE%"
+        if errorlevel 1 pause & exit /b 1
+    ) else (
+        echo [build] WARNUNG: CARECENTER_SAFE_START_SOURCE zeigt nicht auf eine lokale Quelle mit pyproject.toml.
+        pause
+        exit /b 1
+    )
+)
+if not defined CARECENTER_SAFE_START_SOURCE (
+    echo [build] Nutze die veroeffentlichte Safe-Start-Abhaengigkeit aus pyproject.toml.
 )
 python -m pip install --upgrade -e ".[build]"
 if errorlevel 1 pause & exit /b 1
