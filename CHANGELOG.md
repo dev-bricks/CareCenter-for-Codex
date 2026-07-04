@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Added translated accessible names and descriptions to the loop interval, language,
+  MCP duplicate, and unused-plugin combo boxes in the tray status window. The loop
+  interval picker now also exposes a tooltip instead of relying only on the adjacent label.
 - Hardened `build_exe.bat` for reproducible EXE packaging: it now uses the
   published `safe-start-for-codex` dependency from `pyproject.toml` by default
   and only installs a local Safe Start checkout when

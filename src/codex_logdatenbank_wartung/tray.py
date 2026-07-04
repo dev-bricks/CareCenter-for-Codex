@@ -663,6 +663,14 @@ class StatusWindow(QWidget):
         if language is not None:
             self.language_changed.emit(language)
 
+    @staticmethod
+    def _accessible_label_text(label: QLabel) -> str:
+        return label.text().rstrip(":：").strip()
+
+    def _set_accessible_context(self, widget: QComboBox, label: QLabel, description: str) -> None:
+        widget.setAccessibleName(self._accessible_label_text(label))
+        widget.setAccessibleDescription(description)
+
     def retranslate(self) -> None:
         """Aktualisiert alle statischen UI-Texte nach einem Sprachwechsel."""
         self.repair_button.setText(t("repair_codex"))
@@ -693,6 +701,7 @@ class StatusWindow(QWidget):
                 t("fast_loop_interval_hours", hours=hours),
             )
         self.loop_interval_combo.blockSignals(False)
+        self.loop_interval_combo.setToolTip(t("fast_loop_interval_tooltip"))
         self.loop_start_button.setText(t("fast_loop_start"))
         self.loop_start_button.setToolTip(t("fast_loop_start_tooltip"))
         self.loop_stop_button.setText(t("fast_loop_stop"))
@@ -709,6 +718,26 @@ class StatusWindow(QWidget):
         self.plugin_label.setText(t("settings_unused_plugins"))
         self.mcp_combo.setToolTip(t("settings_audit_mode_tooltip"))
         self.plugin_combo.setToolTip(t("settings_plugin_mode_tooltip"))
+        self._set_accessible_context(
+            self.loop_interval_combo,
+            self.loop_interval_label,
+            t("fast_loop_interval_tooltip"),
+        )
+        self._set_accessible_context(
+            self.language_combo,
+            self.language_label_widget,
+            t("settings_language_tooltip"),
+        )
+        self._set_accessible_context(
+            self.mcp_combo,
+            self.mcp_label,
+            t("settings_audit_mode_tooltip"),
+        )
+        self._set_accessible_context(
+            self.plugin_combo,
+            self.plugin_label,
+            t("settings_plugin_mode_tooltip"),
+        )
         self.audit_button.setText(t("settings_audit_now"))
         self.audit_button.setToolTip(t("settings_audit_now_tooltip"))
         self.close_button.setText(t("window_close"))

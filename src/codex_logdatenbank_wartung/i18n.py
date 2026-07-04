@@ -143,6 +143,10 @@ _CATALOG: dict[str, dict[Language, str]] = {
     "fast_loop_group": {"de": "Loop-Modus", "en": "Loop mode"},
     "fast_loop_interval": {"de": "Intervall:", "en": "Interval:"},
     "fast_loop_interval_hours": {"de": "{hours} Stunden", "en": "{hours} hours"},
+    "fast_loop_interval_tooltip": {
+        "de": "Wählt, wie oft der periodische Fast-Wartungsloop automatisch startet.",
+        "en": "Choose how often the periodic fast maintenance loop starts automatically.",
+    },
     "fast_loop_start": {"de": "Loop starten", "en": "Start loop"},
     "fast_loop_stop": {"de": "Loop stoppen", "en": "Stop loop"},
     "fast_loop_start_tooltip": {
