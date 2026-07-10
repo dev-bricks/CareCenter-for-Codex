@@ -449,3 +449,49 @@ enabled = true
         config = _make_config(Path(tmp), toml)
         fixed = fix_unused_plugins(config)
         assert fixed == 0
+
+
+def test_manual_audit_rechecks_after_auto_fix():
+    from codex_logdatenbank_wartung.config_audit import run_manual_audit
+
+    duplicate_toml = """
+[mcp_servers.cc1]
+command = "npx"
+args = ["-y", "ellmos-codecommander-mcp"]
+
+[mcp_servers.cc2]
+command = "node"
+args = ["C:/node_modules/ellmos-codecommander-mcp/dist/index.js"]
+"""
+    with tempfile.TemporaryDirectory() as tmp:
+        config = _make_config(Path(tmp), duplicate_toml)
+        config.audit_duplicate_mcp = "auto"
+        config.audit_unused_plugins = "off"
+        report, cycle = run_manual_audit(config, renderer_present=False)
+        assert cycle.mcp_fixed == 1
+        assert cycle.fixes_deferred == 0
+        assert not any(f.category == "MCP-Duplikat" for f in report.findings)
+
+
+def test_manual_audit_reports_deferred_auto_fix_while_codex_runs():
+    from codex_logdatenbank_wartung.config_audit import run_manual_audit
+
+    duplicate_toml = """
+[mcp_servers.cc1]
+command = "npx"
+args = ["-y", "ellmos-codecommander-mcp"]
+
+[mcp_servers.cc2]
+command = "node"
+args = ["C:/node_modules/ellmos-codecommander-mcp/dist/index.js"]
+"""
+    with tempfile.TemporaryDirectory() as tmp:
+        config = _make_config(Path(tmp), duplicate_toml)
+        config.audit_duplicate_mcp = "auto"
+        config.audit_unused_plugins = "off"
+        original = config.config_toml_path.read_bytes()
+        report, cycle = run_manual_audit(config, renderer_present=True)
+        assert cycle.mcp_fixed == 0
+        assert cycle.fixes_deferred == 1
+        assert any(f.category == "MCP-Duplikat" for f in report.findings)
+        assert config.config_toml_path.read_bytes() == original

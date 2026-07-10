@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Restored compatibility with Codex Store builds that use `ChatGPT.exe` for the
+  Electron process tree and an embedded `codex.exe app-server`. CareCenter now
+  detects the real renderer, never classifies the app-server as a zombie main
+  process, and no longer reports its own `codex-maintenance` path as Codex.
+- Fixed manual config-audit feedback: auto-fixes are followed by a fresh audit,
+  while fixes deferred because Codex is still running are clearly reported and
+  remain queued for the next closed-state watchdog cycle.
 - Added Fast maintenance loop mode with 2/3/5/7/10/12/24-hour intervals: each cycle runs
   Fast maintenance, pauses currently active Codex automations, restarts Codex even if it
   was not running at cycle start, then restores only those paused automations in 60-second

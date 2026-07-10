@@ -39,6 +39,15 @@ def healthy_tree() -> list[ProcessInfo]:
     ]
 
 
+def current_store_tree() -> list[ProcessInfo]:
+    root = r"C:\Program Files\WindowsApps\OpenAI.Codex_26.707.3563.0_x64__2p2nqsd0c76g0\app"
+    return [
+        ProcessInfo(300, "ChatGPT.exe", root + r"\ChatGPT.exe", '"' + root + r'\ChatGPT.exe"', parent_pid=10, created_at="2026-07-09T22:10:00"),
+        ProcessInfo(301, "ChatGPT.exe", root + r"\ChatGPT.exe", '"' + root + r'\ChatGPT.exe" --type=renderer', parent_pid=300, created_at="2026-07-09T22:10:00"),
+        ProcessInfo(302, "codex.exe", root + r"\resources\codex.exe", '"' + root + r'\resources\codex.exe" app-server --analytics-default-enabled', parent_pid=300, created_at="2026-07-09T22:10:00"),
+    ]
+
+
 def zombie_tree() -> list[ProcessInfo]:
     # Hauptprozess + Helfer, ABER kein Renderer -> Fenster tot = Zombie
     return [
@@ -70,6 +79,14 @@ def test_diagnose_detects_zombie_without_renderer(tmp_path: Path) -> None:
     assert report.zombie_main_pids == [200]
     assert report.renderer_present is False
     assert report.status in {"warn", "critical"}
+
+
+def test_diagnose_current_store_tree_is_healthy(tmp_path: Path) -> None:
+    config = make_config(tmp_path)
+    report = diagnose(config, lambda: current_store_tree())
+    assert report.renderer_present is True
+    assert report.main_pids == [300]
+    assert report.zombie_main_pids == []
 
 
 def test_diagnose_detects_stale_lockfile(tmp_path: Path) -> None:

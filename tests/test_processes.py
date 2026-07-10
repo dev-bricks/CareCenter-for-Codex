@@ -7,6 +7,7 @@ from codex_logdatenbank_wartung.config import MaintenanceConfig
 from codex_logdatenbank_wartung.processes import (
     ProcessInfo,
     descendant_pids,
+    find_codex_processes,
     find_codex_processes_by_executable,
     find_companion_orphans,
     is_companion_orphan,
@@ -34,6 +35,16 @@ def test_process_type_parses_electron_helper_types() -> None:
     assert process_type(gpu) == "gpu-process"
 
 
+def test_process_type_recognises_embedded_app_server() -> None:
+    app_server = ProcessInfo(
+        103,
+        "codex.exe",
+        r"C:\Program Files\WindowsApps\OpenAI.Codex_26.707.3563.0_x64__2p2nqsd0c76g0\app\resources\codex.exe",
+        '"...\\app\\resources\\codex.exe" -c features.code_mode_host=true app-server --analytics-default-enabled',
+    )
+    assert process_type(app_server) == "app-server"
+
+
 def test_find_by_executable_uses_exact_path_not_substring() -> None:
     config = make_config()
     processes = [
@@ -47,6 +58,26 @@ def test_find_by_executable_uses_exact_path_not_substring() -> None:
     assert [p.pid for p in matches] == [1]
 
 
+def test_general_finder_excludes_carecenter_codex_maintenance_path() -> None:
+    config = make_config()
+    processes = [
+        ProcessInfo(
+            1,
+            "CareCenterForCodex.exe",
+            r"C:\_Local_DEV\codex-maintenance\bin\CareCenterForCodex.exe",
+            r'"C:\_Local_DEV\codex-maintenance\bin\CareCenterForCodex.exe"',
+        ),
+        ProcessInfo(
+            2,
+            "codex.exe",
+            r"C:\Users\dev\AppData\Roaming\npm\node_modules\@openai\codex\vendor\codex.exe",
+            "codex.exe",
+        ),
+    ]
+    matches = find_codex_processes(config, lambda: processes)
+    assert [p.pid for p in matches] == [2]
+
+
 def test_find_by_executable_also_matches_store_version() -> None:
     config = make_config()
     store_exe = r"C:\Program Files\WindowsApps\OpenAI.Codex_26.513.4821.0_x64__2p2nqsd0c76g0\app\Codex.exe"
@@ -57,6 +88,19 @@ def test_find_by_executable_also_matches_store_version() -> None:
     ]
     matches = find_codex_processes_by_executable(config, lambda: processes)
     assert [p.pid for p in matches] == [1, 3]
+
+
+def test_find_by_executable_matches_current_chatgpt_named_store_tree() -> None:
+    config = make_config()
+    root = r"C:\Program Files\WindowsApps\OpenAI.Codex_26.707.3563.0_x64__2p2nqsd0c76g0\app"
+    processes = [
+        ProcessInfo(10, "ChatGPT.exe", root + r"\ChatGPT.exe", '"' + root + r'\ChatGPT.exe"'),
+        ProcessInfo(11, "ChatGPT.exe", root + r"\ChatGPT.exe", '"' + root + r'\ChatGPT.exe" --type=renderer', parent_pid=10),
+        ProcessInfo(12, "codex.exe", root + r"\resources\codex.exe", '"' + root + r'\resources\codex.exe" app-server --analytics-default-enabled', parent_pid=10),
+    ]
+    matches = find_codex_processes_by_executable(config, lambda: processes)
+    assert [p.pid for p in matches] == [10, 11, 12]
+    assert [process_type(p) for p in matches] == ["main", "renderer", "app-server"]
 
 
 def test_is_companion_orphan_npm_global() -> None:

@@ -687,6 +687,10 @@ _CATALOG: dict[str, dict[Language, str]] = {
         "de": "Auto-Fix: {count} Plugin(s) deaktiviert.",
         "en": "Auto-fix: disabled {count} plugin(s).",
     },
+    "audit_fixes_deferred": {
+        "de": "Auto-Fix vorgemerkt: {count} Befund(e) werden automatisch behoben, sobald Codex geschlossen ist.",
+        "en": "Auto-fix queued: {count} finding(s) will be fixed automatically after Codex closes.",
+    },
     "audit_findings": {
         "de": "{count} Befund(e)",
         "en": "{count} finding(s)",
