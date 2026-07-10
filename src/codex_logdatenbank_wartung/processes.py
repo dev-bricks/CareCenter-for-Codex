@@ -141,7 +141,14 @@ def find_codex_processes(
             [process.name, process.executable, process.command_line]
         ).lower()
         name_match = process.name.lower().removesuffix(".exe") in configured_names
-        path_match = "\\codex\\" in haystack or "codex.exe" in haystack
+        path_match = any(
+            marker in haystack
+            for marker in (
+                r"\windowsapps\openai.codex_",
+                r"\npm\node_modules\@openai\codex",
+                r"\appdata\local\openai\codex",
+            )
+        )
         if name_match or path_match:
             matches.append(process)
 
@@ -159,7 +166,14 @@ def describe_processes(processes: Iterable[ProcessInfo]) -> str:
 def process_type(process: ProcessInfo) -> str:
     """Electron-Prozesstyp: 'main' fuer den Browserprozess, sonst der --type-Wert."""
     match = _TYPE_PATTERN.search(process.command_line)
-    return match.group(1) if match else "main"
+    if match:
+        return match.group(1)
+    # Neuere Store-Builds (ab 26.707) starten den Rust-App-Server als
+    # app/resources/codex.exe. Ohne Sonderfall wuerde er als Electron-Main und
+    # damit als rendererloser Zombie klassifiziert.
+    if "app-server" in process.command_line.lower():
+        return "app-server"
+    return "main"
 
 
 def _normalise_path(path: str) -> str:
@@ -176,17 +190,22 @@ def matches_codex_executable(process: ProcessInfo, config: MaintenanceConfig) ->
     exe = _normalise_path(process.executable)
     if target and exe == target:
         return True
-    # Store-Version: versionsabhaengiger WindowsApps-Pfad -> ueber stabilen Marker erkennen,
-    # aber nur bei Basisname Codex.exe (kein Over-Matching fremder Prozesse).
+    # Store-Version: versionsabhaengiger WindowsApps-Pfad -> ueber stabilen Marker erkennen.
+    # Aktuelle Builds verwenden ChatGPT.exe fuer Electron und codex.exe fuer den
+    # eingebetteten App-Server; beide gehoeren zum selben signierten Store-Paket.
     marker = _normalise_path(getattr(config, "codex_store_marker", "") or "")
-    if marker and marker in exe and exe.endswith("\\codex.exe"):
+    if marker and marker in exe and exe.rsplit("\\", 1)[-1] in {"codex.exe", "chatgpt.exe"}:
         return True
     # Fallback: Hauptprozess kennt manchmal keinen ExecutablePath, aber die
     # Kommandozeile beginnt mit dem (ggf. zitierten) Exe-Pfad.
     cmd = _normalise_path(process.command_line)
     if target and (cmd == target or cmd.startswith(target + " ")):
         return True
-    return bool(marker and marker in cmd and "codex.exe" in cmd)
+    return bool(
+        marker
+        and marker in cmd
+        and ("codex.exe" in cmd or "chatgpt.exe" in cmd)
+    )
 
 
 def find_codex_processes_by_executable(

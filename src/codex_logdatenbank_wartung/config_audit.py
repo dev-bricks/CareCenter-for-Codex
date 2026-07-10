@@ -579,6 +579,7 @@ class AuditCycleResult:
     notification: str | None = None
     mcp_fixed: int = 0
     plugins_fixed: int = 0
+    fixes_deferred: int = 0
 
 
 def run_audit_cycle(
@@ -629,6 +630,40 @@ def run_audit_cycle(
         )
 
     return result
+
+
+def run_manual_audit(
+    config: MaintenanceConfig,
+    *,
+    renderer_present: bool,
+) -> tuple[AuditReport, AuditCycleResult]:
+    """Fuehrt einen manuellen Audit samt sicherem Auto-Fix aus.
+
+    Das Ergebnis wird nach einer Mutation neu erhoben, damit bereits behobene
+    Befunde nicht weiter als offen angezeigt werden. Bei laufendem Codex bleibt
+    die config.toml unangetastet; reparierbare Auto-Befunde werden als
+    aufgeschoben ausgewiesen und vom periodischen Audit nach dem Schliessen
+    behoben.
+    """
+    before = run_full_audit(config)
+    cycle = run_audit_cycle(config, last_hash="", renderer_present=renderer_present)
+
+    auto_categories = set()
+    if config.audit_duplicate_mcp == "auto":
+        auto_categories.add("MCP-Duplikat")
+    if config.audit_unused_plugins == "auto":
+        auto_categories.add("Ungenutztes Plugin")
+
+    if renderer_present:
+        cycle.fixes_deferred = sum(
+            1
+            for finding in before.findings
+            if finding.auto_fixable and finding.category in auto_categories
+        )
+
+    if cycle.mcp_fixed or cycle.plugins_fixed:
+        return run_full_audit(config), cycle
+    return before, cycle
 
 
 def run_full_audit(config: MaintenanceConfig) -> AuditReport:

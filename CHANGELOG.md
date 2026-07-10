@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Restored compatibility with Codex Store builds that use `ChatGPT.exe` for the
+  Electron process tree and an embedded `codex.exe app-server`. CareCenter now
+  detects the real renderer, never classifies the app-server as a zombie main
+  process, and no longer reports its own `codex-maintenance` path as Codex.
+- Fixed manual config-audit feedback: auto-fixes are followed by a fresh audit,
+  while fixes deferred because Codex is still running are clearly reported and
+  remain queued for the next closed-state watchdog cycle.
 - Added translated accessible names and descriptions to the loop interval, language,
   MCP duplicate, and unused-plugin combo boxes in the tray status window. The loop
   interval picker now also exposes a tooltip instead of relying only on the adjacent label.

@@ -1943,24 +1943,22 @@ class TrayController(QObject):
 
     def run_config_audit(self) -> None:
         """Fuehrt einen sofortigen Config-Audit aus und zeigt die Ergebnisse."""
-        from .config_audit import fix_duplicate_mcp, fix_unused_plugins, run_full_audit
+        from .config_audit import run_manual_audit
+        from .health import diagnose
 
         config = MaintenanceConfig.load(self.config_path)
-        report = run_full_audit(config)
-
-        # Auto-Fix ausfuehren wenn entsprechend konfiguriert
-        fixed_mcp = 0
-        fixed_plugins = 0
-        if config.audit_duplicate_mcp == "auto":
-            fixed_mcp = fix_duplicate_mcp(config)
-        if config.audit_unused_plugins == "auto":
-            fixed_plugins = fix_unused_plugins(config)
+        renderer_present = diagnose(config).renderer_present
+        report, cycle = run_manual_audit(config, renderer_present=renderer_present)
+        fixed_mcp = cycle.mcp_fixed
+        fixed_plugins = cycle.plugins_fixed
 
         lines = [report.summary()]
         if fixed_mcp:
             lines.append("\n" + t("audit_fixed_mcp", count=fixed_mcp))
         if fixed_plugins:
             lines.append("\n" + t("audit_fixed_plugins", count=fixed_plugins))
+        if cycle.fixes_deferred:
+            lines.append("\n" + t("audit_fixes_deferred", count=cycle.fixes_deferred))
         result_text = "\n".join(lines)
 
         self.window.set_state(t("audit_done"))

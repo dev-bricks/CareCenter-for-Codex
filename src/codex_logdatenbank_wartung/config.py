@@ -92,7 +92,7 @@ class MaintenanceConfig:
     codex_store_product_id: str = "9PLM9XGG6VKS"
     codex_user_data_dir: str = field(default_factory=lambda: str(default_codex_user_data_dir()))
     codex_process_names: list[str] = field(
-        default_factory=lambda: ["Codex", "codex", "node_repl"]
+        default_factory=lambda: ["Codex", "codex", "ChatGPT", "node_repl"]
     )
     allow_stop_codex: bool = False
     allow_force_stop_codex: bool = False
