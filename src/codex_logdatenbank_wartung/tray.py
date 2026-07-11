@@ -32,6 +32,7 @@ from PySide6.QtWidgets import (
     QMenu,
     QProgressBar,
     QPushButton,
+    QSpinBox,
     QStyle,
     QSystemTrayIcon,
     QVBoxLayout,
@@ -296,7 +297,19 @@ class WatchdogWorker(QObject):
         self._audit(config, result)
         if result.action == "reaped":
             self.reaped.emit(result.to_dict())
+        self._run_thread_hygiene(config)
         self._run_config_audit(config)
+
+    def _run_thread_hygiene(self, config: MaintenanceConfig) -> None:
+        """Wendet konfigurierte Altersregeln an, sobald Codex geschlossen ist."""
+        try:
+            if config.auto_archive_threads_days <= 0 and config.auto_mark_threads_read_days <= 0:
+                return
+            from .thread_hygiene import run_configured_thread_hygiene
+
+            run_configured_thread_hygiene(config)
+        except Exception:  # noqa: BLE001 -- Hintergrundpflege darf den Watchdog nie kippen
+            return
 
     def _audit(self, config: MaintenanceConfig, result: object) -> None:
         """Lueckenloser Nachweis JEDES Ticks (auch 'nichts getan') in logs/watchdog.log.
@@ -460,6 +473,8 @@ class StatusWindow(QWidget):
     plugin_mode_changed = Signal(str)
     loop_interval_changed = Signal(int)
     language_changed = Signal(str)
+    auto_archive_days_changed = Signal(int)
+    auto_mark_read_days_changed = Signal(int)
 
     def __init__(self) -> None:
         super().__init__()
@@ -588,6 +603,28 @@ class StatusWindow(QWidget):
         self.mcp_combo.currentTextChanged.connect(self.mcp_mode_changed.emit)
         self.plugin_combo.currentTextChanged.connect(self.plugin_mode_changed.emit)
 
+        thread_archive_row = QHBoxLayout()
+        self.thread_archive_label = QLabel("Threads automatisch archivieren nach")
+        self.thread_archive_days = QSpinBox()
+        self.thread_archive_days.setRange(0, 3650)
+        self.thread_archive_days.setSuffix(" Tagen")
+        self.thread_archive_days.setSpecialValueText("Aus")
+        self.thread_archive_days.valueChanged.connect(self.auto_archive_days_changed.emit)
+        thread_archive_row.addWidget(self.thread_archive_label)
+        thread_archive_row.addWidget(self.thread_archive_days)
+        settings_layout.addLayout(thread_archive_row)
+
+        thread_read_row = QHBoxLayout()
+        self.thread_read_label = QLabel("Threads automatisch als gelesen markieren nach")
+        self.thread_read_days = QSpinBox()
+        self.thread_read_days.setRange(0, 3650)
+        self.thread_read_days.setSuffix(" Tagen")
+        self.thread_read_days.setSpecialValueText("Aus")
+        self.thread_read_days.valueChanged.connect(self.auto_mark_read_days_changed.emit)
+        thread_read_row.addWidget(self.thread_read_label)
+        thread_read_row.addWidget(self.thread_read_days)
+        settings_layout.addLayout(thread_read_row)
+
         self.audit_button = QPushButton()
         self.audit_button.clicked.connect(self.request_audit)
         settings_layout.addWidget(self.audit_button)
@@ -647,6 +684,15 @@ class StatusWindow(QWidget):
             self.plugin_combo.setCurrentIndex(idx_plugin)
         self.mcp_combo.blockSignals(False)
         self.plugin_combo.blockSignals(False)
+
+    def set_thread_hygiene_settings(self, archive_days: int, read_days: int) -> None:
+        for widget, value in (
+            (self.thread_archive_days, archive_days),
+            (self.thread_read_days, read_days),
+        ):
+            widget.blockSignals(True)
+            widget.setValue(max(0, min(3650, int(value))))
+            widget.blockSignals(False)
 
     def set_language_setting(self, language: str) -> None:
         """Setzt den sichtbaren Sprachwert ohne Signals auszulösen."""
@@ -830,9 +876,15 @@ class TrayController(QObject):
         self.window.mcp_mode_changed.connect(self.on_mcp_mode_changed)
         self.window.plugin_mode_changed.connect(self.on_plugin_mode_changed)
         self.window.language_changed.connect(self.on_language_changed)
+        self.window.auto_archive_days_changed.connect(self.on_auto_archive_days_changed)
+        self.window.auto_mark_read_days_changed.connect(self.on_auto_mark_read_days_changed)
         self.window.audit_requested.connect(self.run_config_audit)
         self.window.set_audit_settings(self.config.audit_duplicate_mcp, self.config.audit_unused_plugins)
         self.window.set_language_setting(self.config.language)
+        self.window.set_thread_hygiene_settings(
+            self.config.auto_archive_threads_days,
+            self.config.auto_mark_threads_read_days,
+        )
         self.window.set_loop_settings(
             bool(self.config.fast_loop_enabled),
             int(getattr(self.config, "fast_loop_interval_hours", 3)),
@@ -887,6 +939,8 @@ class TrayController(QObject):
         )
         self.mark_runs_read_action = QAction()
         self.mark_runs_read_action.triggered.connect(self.mark_runs_read)
+        self.mark_old_runs_read_action = QAction()
+        self.mark_old_runs_read_action.triggered.connect(self.mark_old_runs_read)
         self.watchdog_action = QAction()
         self.watchdog_action.setCheckable(True)
         self.watchdog_action.setChecked(bool(self.config.watcher_enabled))
@@ -914,6 +968,7 @@ class TrayController(QObject):
         self.automations_menu.addAction(self.automations_activate_all_staggered_action)
         self.automations_menu.addSeparator()
         self.automations_menu.addAction(self.mark_runs_read_action)
+        self.automations_menu.addAction(self.mark_old_runs_read_action)
         self.menu.addMenu(self.automations_menu)
         self.menu.addSeparator()
         self.menu.addAction(self.watchdog_action)
@@ -998,6 +1053,11 @@ class TrayController(QObject):
         self.mark_runs_read_action.setToolTip(
             "Leert den Ungelesen-Zähler der Codex-Automations-Läufe "
             "(setzt alle als gelesen). Nur bei geschlossenem Codex."
+        )
+        self.mark_old_runs_read_action.setText("Ältere Threads als gelesen markieren")
+        self.mark_old_runs_read_action.setToolTip(
+            "Markiert ungelesene Threads, die älter als der eingestellte Tageswert sind. "
+            "Nur bei geschlossenem Codex."
         )
         self.watchdog_action.setText(t("watchdog_menu"))
         self.watchdog_action.setToolTip(t("watchdog_tooltip"))
@@ -1636,12 +1696,14 @@ class TrayController(QObject):
         lesen/parsen, Backup, atomar schreiben. Bricht ab, wenn Codex läuft. Bewusst roh-deutsch
         (kein i18n) -- konsistent mit dem Automations-Anomalie-Detektor.
         """
-        from .mark_runs_read import mark_all_automation_runs_read
+        from .thread_hygiene import maintain_threads
 
         if self._manual_action_busy():
             self._show_manual_action_busy("CareCenter - Automatisierungen")
             return
-        result = mark_all_automation_runs_read(MaintenanceConfig.load(self.config_path))
+        result = maintain_threads(
+            MaintenanceConfig.load(self.config_path), mark_all_read=True
+        )
         self.window.set_state(result.message or result.status)
         self.window.set_result(result.to_text())
         self.show_window()
@@ -1656,6 +1718,21 @@ class TrayController(QObject):
             icon,
             7000,
         )
+
+    def mark_old_runs_read(self) -> None:
+        from .thread_hygiene import maintain_threads
+
+        if self._manual_action_busy():
+            self._show_manual_action_busy("CareCenter - Automatisierungen")
+            return
+        config = MaintenanceConfig.load(self.config_path)
+        days = max(0, int(config.auto_mark_threads_read_days))
+        result = maintain_threads(config, mark_read_days=days)
+        self.window.set_state(result.message or result.status)
+        self.window.set_result(result.to_text())
+        self.show_window()
+        icon = QSystemTrayIcon.MessageIcon.Information if result.status in {"ok", "nothing"} else QSystemTrayIcon.MessageIcon.Warning
+        self.tray.showMessage(t("automations_toast_title"), result.message, icon, 7000)
 
     def show_diagnosis(self) -> None:
         report = diagnose(MaintenanceConfig.load(self.config_path))
@@ -1940,6 +2017,16 @@ class TrayController(QObject):
             t("settings_language_saved", language=language_label(normalized)),
             QSystemTrayIcon.MessageIcon.Information, 3000,
         )
+
+    def on_auto_archive_days_changed(self, days: int) -> None:
+        self.config.auto_archive_threads_days = max(0, min(3650, int(days)))
+        with contextlib.suppress(OSError):
+            self.config.save(self.config_path)
+
+    def on_auto_mark_read_days_changed(self, days: int) -> None:
+        self.config.auto_mark_threads_read_days = max(0, min(3650, int(days)))
+        with contextlib.suppress(OSError):
+            self.config.save(self.config_path)
 
     def run_config_audit(self) -> None:
         """Fuehrt einen sofortigen Config-Audit aus und zeigt die Ergebnisse."""

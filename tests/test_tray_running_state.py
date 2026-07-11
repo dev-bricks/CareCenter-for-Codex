@@ -51,6 +51,7 @@ def _mock_pyside6():
     qt_widgets.QMenu = MagicMock
     qt_widgets.QProgressBar = MagicMock
     qt_widgets.QPushButton = MagicMock
+    qt_widgets.QSpinBox = MagicMock
     qt_widgets.QStyle = MagicMock()
     fake_tray_icon = MagicMock()
     fake_tray_icon.MessageIcon = MagicMock()
@@ -390,7 +391,8 @@ def test_retranslate_menu_updates_automation_submenu_labels():
             "automations_restore_ccc_staggered_action",
             "automations_activate_all_action",
             "automations_activate_all_staggered_action",
-            "mark_runs_read_action",
+                "mark_runs_read_action",
+                "mark_old_runs_read_action",
             "watchdog_action",
             "quit_action",
         ):

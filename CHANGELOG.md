@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Added configurable thread inbox hygiene: mark all unread threads, mark unread threads older than X days, and automatically archive threads older than a separately configured X days.
+- Updated thread care for the current Codex storage model (`state_5.sqlite` plus `.codex-global-state.json`) with backups, atomic state writes, transactional archive flags, rollout moves to `archived_sessions`, and rollback on failure.
+
+## Unreleased
+
 - Restored compatibility with Codex Store builds that use `ChatGPT.exe` for the
   Electron process tree and an embedded `codex.exe app-server`. CareCenter now
   detects the real renderer, never classifies the app-server as a zombie main

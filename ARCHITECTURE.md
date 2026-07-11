@@ -21,6 +21,7 @@ kann die Logik getestet werden, ohne die Tray-App zu starten (der interne Python
 | `repair_live.py` | Echte Windows-/AppX-Implementierungen der Reparatur-Bausteine (P11 absent-Erkennung, Reinstall-Prävention) |
 | `store_repair.py` | Microsoft-Store-Reparatur (wsreset/register/reset) + Store-Produktseite öffnen |
 | `scheduler.py` | Optionaler Windows-Task-Scheduler-Helfer für periodische Aufrufe von `maintain --execute` |
+| `thread_hygiene.py` | Altersbasierte Thread-Pflege: Ungelesen-State, transactionales Archivieren und Backups bei geschlossenem Codex |
 | `single_instance.py` | Windows-Mutex für die Tray-App |
 | `tray.py` | PySide6-Systemtray-App: Status-Fenster mit Fortschrittsbalken, Wächter, „Codex reparieren", Wartung, Store |
 | `cli.py` | maschinenlesbare Bedienung für LLMs und Shell |
@@ -101,5 +102,6 @@ nicht in bereits laufende Datenbankoperationen ein.
 - Backups entstehen vor jeder echten SQLite-Operation; Backup-Anzahl ist begrenzt (`backup_keep`).
 - Die Integrität wird auf dem Backup geprüft, nicht nur behauptet.
 - Ohne explizite Archivkonfiguration werden keine Logdaten gelöscht.
+- Thread-Archivierung ist separat konfiguriert (`auto_archive_threads_days=0` bedeutet aus), läuft nur bei geschlossenem Codex und sichert `state_5.sqlite` vor Änderungen.
 - Startup-Reparatur beendet ausschließlich Zombie-Hauptprozesse (kein Renderer); aktive Sitzungen nie.
 - Kill-Targeting nur über den exakten konfigurierten Exe-Pfad plus Prozessbaum — keine Substring-Treffer.

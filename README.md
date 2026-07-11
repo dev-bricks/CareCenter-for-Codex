@@ -23,7 +23,7 @@ On Windows, closing the Codex desktop window can leave a hung main process behin
 - Background start-prevention watcher: checks every 60 seconds whether Codex is closed and old start blockers remain. It never touches an active Codex session, the node-based Codex CLI, or a process tree that is still doing CPU work.
 - Tray settings with language switching: choose English or German in the Settings area. The choice is saved in `config.json` and the visible tray UI is relabeled immediately.
 - Tray automation controls: pause all currently active Codex automations, restore only automations disabled by CCC, or turn automations back on immediately or gradually. The spacing is configurable via `automation_stagger_delay_seconds` (default: 60 seconds).
-- Mark automation results as read: clears matching unread thread/chat/conversation state entries from `.codex-global-state.json` while Codex is closed, with a backup and atomic write.
+- Thread inbox hygiene: mark every result as read, mark only unread threads older than a configurable number of days, and automatically archive threads older than a separate configurable age. Current Codex thread ages and archive flags come from `state_5.sqlite`; unread IDs come from `.codex-global-state.json`. Changes run only while Codex is closed, with database/state backups, atomic JSON writes, and transactional archive updates.
 - Loop mode: choose 2, 3, 5, 7, 10, 12, or 24 hours. Each regular due cycle starts with Fast maintenance and retries Codex close failures up to three times by default. If closing still fails, Safe becomes an extended catch-up attempt and the normal loop timer starts over; if Safe finishes before that timer expires, the timer starts again from the successful maintenance plus verified Codex restart. If the timer expires while Safe is still waiting, Safe is cancelled and the next regular Fast cycle starts. Automations are paused only after maintenance has succeeded, and only those paused automations are restored in 60-second windows.
 - Direct tray starts: "Codex safe starten" launches Safe Start for Codex in its own tray and reuses its `config.json`; if that config is missing, CareCenter uses a 1-minute interval for that launch. If Safe Start is already gating, the second safe-start click is a no-op. "Codex starten" starts Codex normally without the Safe Start gate; while Safe Start is active, CareCenter only restores the automations paused by Safe Start and does not open another Codex window.
 - One-click Repair Codex action: runs a bounded escalation that stops as soon as Codex starts again. It begins with no-admin cleanup and only suggests admin restart, Store reinstall, or reboot when needed.
@@ -94,6 +94,8 @@ python -m codex_logdatenbank_wartung.cli maintain --execute
 python -m codex_logdatenbank_wartung.cli auto-maintain --mode safe --execute
 python -m codex_logdatenbank_wartung.cli fast-loop-cycle --execute
 python -m codex_logdatenbank_wartung.cli mark-runs-read --dry-run
+python -m codex_logdatenbank_wartung.cli mark-runs-read --older-than-days 2
+python -m codex_logdatenbank_wartung.cli mark-runs-read --older-than-days 2 --archive-older-than-days 10
 python -m codex_logdatenbank_wartung.cli store-repair --level repair --execute
 python -m codex_logdatenbank_wartung.cli store-materials
 python -m codex_logdatenbank_wartung.cli safe-start-report
@@ -102,6 +104,10 @@ python -m codex_logdatenbank_wartung.cli schedule install --interval-minutes 180
 ```
 
 The CLI reads `language` from `config.json` for runtime reports. The tray settings are the intended way to switch the persisted language.
+
+In the tray settings, `0` disables an age rule. Set `auto_mark_threads_read_days` and
+`auto_archive_threads_days` to independent values such as `2` and `10`. CareCenter applies
+the rules during background watcher ticks as soon as Codex is fully closed.
 
 ## Configuration
 
