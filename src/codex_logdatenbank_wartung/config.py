@@ -105,6 +105,7 @@ class MaintenanceConfig:
     archive_dir: str = field(default_factory=lambda: str(local_root() / "archive"))
     auto_archive_threads_days: int = 0
     auto_mark_threads_read_days: int = 0
+    audit_empty_threads: str = "auto"
     language: str = "de"
     # Hintergrund-Waechter (Start-Praevention): tickt periodisch read-only und raeumt bei
     # GESCHLOSSENEM Codex haengende Reste (Ghost-Hauptprozesse ohne Renderer + verwaistes

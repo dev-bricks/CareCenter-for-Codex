@@ -83,7 +83,7 @@ def render_store_screenshot(output_path: Path = DEFAULT_SCREENSHOT_PATH) -> Path
     window.set_state("Bereit.")
     window.set_progress(0, "", False)
     window.set_result("")
-    window.set_audit_settings("auto", "auto")
+    window.set_audit_settings("auto", "auto", "auto")
     window.resize(window.minimumWidth(), window.sizeHint().height())
     window.show()
     window.raise_()

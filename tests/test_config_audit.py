@@ -495,3 +495,41 @@ args = ["C:/node_modules/ellmos-codecommander-mcp/dist/index.js"]
         assert cycle.fixes_deferred == 1
         assert any(f.category == "MCP-Duplikat" for f in report.findings)
         assert config.config_toml_path.read_bytes() == original
+
+
+def test_auto_audit_archives_empty_threads_when_codex_is_closed(tmp_path: Path) -> None:
+    from codex_logdatenbank_wartung.config_audit import run_manual_audit
+
+    home = tmp_path / ".codex"
+    home.mkdir()
+    config = MaintenanceConfig(
+        database_path=str(home / "logs_2.sqlite"),
+        backup_dir=str(tmp_path / "backups"),
+        audit_duplicate_mcp="off",
+        audit_unused_plugins="off",
+        audit_empty_threads="auto",
+    )
+    rollout = home / "sessions" / "empty.jsonl"
+    rollout.parent.mkdir()
+    rollout.write_text("{}\n", encoding="utf-8")
+    with sqlite3.connect(config.state_db_path) as conn:
+        conn.execute(
+            "CREATE TABLE threads (id TEXT PRIMARY KEY, rollout_path TEXT NOT NULL, "
+            "created_at INTEGER, updated_at INTEGER NOT NULL, total_tokens INTEGER, "
+            "first_user_message TEXT, archived INTEGER NOT NULL DEFAULT 0, archived_at INTEGER)"
+        )
+        conn.execute(
+            "INSERT INTO threads VALUES (?, ?, ?, ?, ?, ?, 0, NULL)",
+            ("empty", str(rollout), 1, 1, 0, ""),
+        )
+
+    report, cycle = run_manual_audit(
+        config, renderer_present=False, process_provider=lambda: []
+    )
+
+    assert cycle.empty_threads_fixed == 1
+    assert not any(
+        finding.category == "Leere Threads" and finding.severity == "warning"
+        for finding in report.findings
+    )
+    assert (home / "archived_sessions" / rollout.name).exists()

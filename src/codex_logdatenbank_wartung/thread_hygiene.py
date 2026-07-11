@@ -49,6 +49,7 @@ def maintain_threads(
     *,
     mark_read_days: int = 0,
     archive_days: int = 0,
+    archive_thread_ids: set[str] | None = None,
     mark_all_read: bool = False,
     process_provider: ProcessProvider | None = None,
     now: int | None = None,
@@ -60,7 +61,8 @@ def maintain_threads(
     """
     if find_codex_processes_by_executable(config, provider=process_provider):
         return ThreadHygieneResult("blocked", message="Codex läuft; Ausführung vorgemerkt/übersprungen.")
-    if not mark_all_read and mark_read_days <= 0 and archive_days <= 0:
+    explicit_archive_ids = set(archive_thread_ids or ())
+    if not mark_all_read and mark_read_days <= 0 and archive_days <= 0 and not explicit_archive_ids:
         return ThreadHygieneResult("nothing", message="Keine Thread-Regel aktiviert.")
 
     db_path = config.state_db_path
@@ -109,12 +111,13 @@ def maintain_threads(
         if isinstance(atom, dict):
             atom[UNREAD_KEY] = unread_by_host
 
-        candidates = []
-        if archive_days > 0:
-            candidates = [
-                row for row in rows.values()
-                if not int(row["archived"]) and int(row["updated_at"]) < archive_cutoff
-            ]
+        candidates = [
+            row for row in rows.values()
+            if not int(row["archived"]) and (
+                row["id"] in explicit_archive_ids
+                or (archive_days > 0 and int(row["updated_at"]) < archive_cutoff)
+            )
+        ]
 
         if not marked and not candidates:
             return ThreadHygieneResult("nothing", message="Keine passenden Threads gefunden.")

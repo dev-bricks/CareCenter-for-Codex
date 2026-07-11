@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Literal
 
 from .config import MaintenanceConfig
+from .processes import ProcessProvider
 
 AuditSeverity = Literal["info", "warning", "critical"]
 
@@ -308,7 +309,7 @@ def _content_columns(columns: set[str]) -> list[str]:
 def _token_empty(row: sqlite3.Row, columns: set[str]) -> bool:
     token_columns = [
         column for column in (
-            "total_tokens", "token_count", "tokens", "input_tokens", "output_tokens",
+            "tokens_used", "total_tokens", "token_count", "tokens", "input_tokens", "output_tokens",
         )
         if column in columns
     ]
@@ -360,11 +361,13 @@ def find_empty_threads(config: MaintenanceConfig) -> list[EmptyThread]:
             token_columns_present = any(
                 column in columns
                 for column in (
-                    "total_tokens", "token_count", "tokens", "input_tokens", "output_tokens",
+                    "tokens_used", "total_tokens", "token_count", "tokens", "input_tokens", "output_tokens",
                 )
             )
             if id_column is not None:
                 for row in _select_rows(conn, "threads", columns, limit=500):
+                    if "archived" in columns and bool(row["archived"]):
+                        continue
                     if not token_columns_present and not content_columns:
                         break
                     if not _token_empty(row, columns):
@@ -431,6 +434,7 @@ def audit_threads(config: MaintenanceConfig) -> AuditReport:
             "warning",
             f"{len(empty)} Thread(s) ohne Inhalt gefunden (0 Tokens, kein User-Prompt).",
             detail="Diese belegen MCP-Stacks beim Desktop-Start. Archivierung empfohlen.",
+            auto_fixable=True,
         )
     else:
         report.add("Leere Threads", "info", "Keine leeren Threads gefunden.")
@@ -579,6 +583,7 @@ class AuditCycleResult:
     notification: str | None = None
     mcp_fixed: int = 0
     plugins_fixed: int = 0
+    empty_threads_fixed: int = 0
     fixes_deferred: int = 0
 
 
@@ -586,6 +591,8 @@ def run_audit_cycle(
     config: MaintenanceConfig,
     last_hash: str,
     renderer_present: bool,
+    *,
+    process_provider: ProcessProvider | None = None,
 ) -> AuditCycleResult:
     """Reine Orchestrierungsfunktion fuer den periodischen Config-Audit.
 
@@ -595,7 +602,11 @@ def run_audit_cycle(
     """
     result = AuditCycleResult()
 
-    if config.audit_duplicate_mcp == "off" and config.audit_unused_plugins == "off":
+    if (
+        config.audit_duplicate_mcp == "off"
+        and config.audit_unused_plugins == "off"
+        and config.audit_empty_threads == "off"
+    ):
         return result
 
     # Auto-Fix: nur wenn Codex geschlossen
@@ -604,17 +615,31 @@ def run_audit_cycle(
             result.mcp_fixed = fix_duplicate_mcp(config)
         if config.audit_unused_plugins == "auto":
             result.plugins_fixed = fix_unused_plugins(config)
+        if config.audit_empty_threads == "auto":
+            empty_ids = {item.thread_id for item in find_empty_threads(config)}
+            if empty_ids:
+                from .thread_hygiene import maintain_threads
+
+                hygiene = maintain_threads(
+                    config,
+                    archive_thread_ids=empty_ids,
+                    process_provider=process_provider,
+                )
+                if hygiene.status == "ok":
+                    result.empty_threads_fixed = hygiene.archived
 
     # Notify: entprellt, per-Kategorie gefiltert
     notify_mcp = config.audit_duplicate_mcp == "notify"
     notify_plugins = config.audit_unused_plugins == "notify"
-    if notify_mcp or notify_plugins:
-        report = audit_config_toml(config)
+    notify_empty = config.audit_empty_threads == "notify"
+    if notify_mcp or notify_plugins or notify_empty:
+        report = run_full_audit(config)
         relevant = [
             f for f in report.findings
             if f.auto_fixable and (
                 (notify_mcp and f.category == "MCP-Duplikat")
                 or (notify_plugins and f.category == "Ungenutztes Plugin")
+                or (notify_empty and f.category == "Leere Threads" and f.severity == "warning")
             )
         ]
         if not relevant:
@@ -636,6 +661,7 @@ def run_manual_audit(
     config: MaintenanceConfig,
     *,
     renderer_present: bool,
+    process_provider: ProcessProvider | None = None,
 ) -> tuple[AuditReport, AuditCycleResult]:
     """Fuehrt einen manuellen Audit samt sicherem Auto-Fix aus.
 
@@ -646,13 +672,20 @@ def run_manual_audit(
     behoben.
     """
     before = run_full_audit(config)
-    cycle = run_audit_cycle(config, last_hash="", renderer_present=renderer_present)
+    cycle = run_audit_cycle(
+        config,
+        last_hash="",
+        renderer_present=renderer_present,
+        process_provider=process_provider,
+    )
 
     auto_categories = set()
     if config.audit_duplicate_mcp == "auto":
         auto_categories.add("MCP-Duplikat")
     if config.audit_unused_plugins == "auto":
         auto_categories.add("Ungenutztes Plugin")
+    if config.audit_empty_threads == "auto":
+        auto_categories.add("Leere Threads")
 
     if renderer_present:
         cycle.fixes_deferred = sum(
@@ -661,7 +694,7 @@ def run_manual_audit(
             if finding.auto_fixable and finding.category in auto_categories
         )
 
-    if cycle.mcp_fixed or cycle.plugins_fixed:
+    if cycle.mcp_fixed or cycle.plugins_fixed or cycle.empty_threads_fixed:
         return run_full_audit(config), cycle
     return before, cycle
 

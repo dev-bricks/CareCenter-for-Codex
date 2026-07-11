@@ -22,6 +22,7 @@ kann die Logik getestet werden, ohne die Tray-App zu starten (der interne Python
 | `store_repair.py` | Microsoft-Store-Reparatur (wsreset/register/reset) + Store-Produktseite öffnen |
 | `scheduler.py` | Optionaler Windows-Task-Scheduler-Helfer für periodische Aufrufe von `maintain --execute` |
 | `thread_hygiene.py` | Altersbasierte Thread-Pflege: Ungelesen-State, transactionales Archivieren und Backups bei geschlossenem Codex |
+| `config_audit.py` | Audit plus getrennte off/notify/auto-Fixes für MCP-Duplikate, Plattform-Plugins und leere Threads |
 | `single_instance.py` | Windows-Mutex für die Tray-App |
 | `tray.py` | PySide6-Systemtray-App: Status-Fenster mit Fortschrittsbalken, Wächter, „Codex reparieren", Wartung, Store |
 | `cli.py` | maschinenlesbare Bedienung für LLMs und Shell |

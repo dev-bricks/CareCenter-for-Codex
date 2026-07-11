@@ -4,6 +4,7 @@
 
 - Added configurable thread inbox hygiene: mark all unread threads, mark unread threads older than X days, and automatically archive threads older than a separately configured X days.
 - Updated thread care for the current Codex storage model (`state_5.sqlite` plus `.codex-global-state.json`) with backups, atomic state writes, transactional archive flags, rollout moves to `archived_sessions`, and rollback on failure.
+- Fixed config audit auto-cleanup: empty-thread findings are now genuinely auto-fixable through a third `off` / `notify` / `auto` setting instead of merely saying “archiving recommended”.
 
 ## Unreleased
 

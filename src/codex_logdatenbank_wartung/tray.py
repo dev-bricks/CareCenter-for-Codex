@@ -343,11 +343,19 @@ class WatchdogWorker(QObject):
         from .health import diagnose
 
         try:
-            if config.audit_duplicate_mcp == "off" and config.audit_unused_plugins == "off":
+            if (
+                config.audit_duplicate_mcp == "off"
+                and config.audit_unused_plugins == "off"
+                and config.audit_empty_threads == "off"
+            ):
                 return
 
             renderer_present = True
-            if config.audit_duplicate_mcp == "auto" or config.audit_unused_plugins == "auto":
+            if (
+                config.audit_duplicate_mcp == "auto"
+                or config.audit_unused_plugins == "auto"
+                or config.audit_empty_threads == "auto"
+            ):
                 report = diagnose(config)
                 renderer_present = report.renderer_present
 
@@ -471,6 +479,7 @@ class StatusWindow(QWidget):
     audit_requested = Signal()
     mcp_mode_changed = Signal(str)
     plugin_mode_changed = Signal(str)
+    empty_threads_mode_changed = Signal(str)
     loop_interval_changed = Signal(int)
     language_changed = Signal(str)
     auto_archive_days_changed = Signal(int)
@@ -600,8 +609,17 @@ class StatusWindow(QWidget):
         plugin_row.addWidget(self.plugin_combo)
         settings_layout.addLayout(plugin_row)
 
+        empty_threads_row = QHBoxLayout()
+        self.empty_threads_label = QLabel("Leere Threads")
+        empty_threads_row.addWidget(self.empty_threads_label)
+        self.empty_threads_combo = QComboBox()
+        self.empty_threads_combo.addItems(["off", "notify", "auto"])
+        empty_threads_row.addWidget(self.empty_threads_combo)
+        settings_layout.addLayout(empty_threads_row)
+
         self.mcp_combo.currentTextChanged.connect(self.mcp_mode_changed.emit)
         self.plugin_combo.currentTextChanged.connect(self.plugin_mode_changed.emit)
+        self.empty_threads_combo.currentTextChanged.connect(self.empty_threads_mode_changed.emit)
 
         thread_archive_row = QHBoxLayout()
         self.thread_archive_label = QLabel("Threads automatisch archivieren nach")
@@ -672,18 +690,23 @@ class StatusWindow(QWidget):
         self.loop_start_button.setEnabled(not enabled)
         self.loop_stop_button.setEnabled(enabled)
 
-    def set_audit_settings(self, mcp_mode: str, plugin_mode: str) -> None:
+    def set_audit_settings(self, mcp_mode: str, plugin_mode: str, empty_threads_mode: str) -> None:
         """Setzt die Combo-Werte ohne Signals auszuloesen."""
         self.mcp_combo.blockSignals(True)
         self.plugin_combo.blockSignals(True)
+        self.empty_threads_combo.blockSignals(True)
         idx_mcp = self.mcp_combo.findText(mcp_mode)
         if idx_mcp >= 0:
             self.mcp_combo.setCurrentIndex(idx_mcp)
         idx_plugin = self.plugin_combo.findText(plugin_mode)
         if idx_plugin >= 0:
             self.plugin_combo.setCurrentIndex(idx_plugin)
+        idx_empty = self.empty_threads_combo.findText(empty_threads_mode)
+        if idx_empty >= 0:
+            self.empty_threads_combo.setCurrentIndex(idx_empty)
         self.mcp_combo.blockSignals(False)
         self.plugin_combo.blockSignals(False)
+        self.empty_threads_combo.blockSignals(False)
 
     def set_thread_hygiene_settings(self, archive_days: int, read_days: int) -> None:
         for widget, value in (
@@ -875,11 +898,16 @@ class TrayController(QObject):
         self.window.request_safe_start_install.connect(self.install_safe_start)
         self.window.mcp_mode_changed.connect(self.on_mcp_mode_changed)
         self.window.plugin_mode_changed.connect(self.on_plugin_mode_changed)
+        self.window.empty_threads_mode_changed.connect(self.on_empty_threads_mode_changed)
         self.window.language_changed.connect(self.on_language_changed)
         self.window.auto_archive_days_changed.connect(self.on_auto_archive_days_changed)
         self.window.auto_mark_read_days_changed.connect(self.on_auto_mark_read_days_changed)
         self.window.audit_requested.connect(self.run_config_audit)
-        self.window.set_audit_settings(self.config.audit_duplicate_mcp, self.config.audit_unused_plugins)
+        self.window.set_audit_settings(
+            self.config.audit_duplicate_mcp,
+            self.config.audit_unused_plugins,
+            self.config.audit_empty_threads,
+        )
         self.window.set_language_setting(self.config.language)
         self.window.set_thread_hygiene_settings(
             self.config.auto_archive_threads_days,
@@ -2023,6 +2051,13 @@ class TrayController(QObject):
         with contextlib.suppress(OSError):
             self.config.save(self.config_path)
 
+    def on_empty_threads_mode_changed(self, mode: str) -> None:
+        if mode not in ("off", "notify", "auto"):
+            return
+        self.config.audit_empty_threads = mode
+        with contextlib.suppress(OSError):
+            self.config.save(self.config_path)
+
     def on_auto_mark_read_days_changed(self, days: int) -> None:
         self.config.auto_mark_threads_read_days = max(0, min(3650, int(days)))
         with contextlib.suppress(OSError):
@@ -2038,12 +2073,15 @@ class TrayController(QObject):
         report, cycle = run_manual_audit(config, renderer_present=renderer_present)
         fixed_mcp = cycle.mcp_fixed
         fixed_plugins = cycle.plugins_fixed
+        fixed_empty_threads = cycle.empty_threads_fixed
 
         lines = [report.summary()]
         if fixed_mcp:
             lines.append("\n" + t("audit_fixed_mcp", count=fixed_mcp))
         if fixed_plugins:
             lines.append("\n" + t("audit_fixed_plugins", count=fixed_plugins))
+        if fixed_empty_threads:
+            lines.append(f"\n{fixed_empty_threads} leere Thread(s) archiviert.")
         if cycle.fixes_deferred:
             lines.append("\n" + t("audit_fixes_deferred", count=cycle.fixes_deferred))
         result_text = "\n".join(lines)
@@ -2052,8 +2090,8 @@ class TrayController(QObject):
         self.window.set_result(result_text)
         self.show_window()
 
-        if report.has_warnings or fixed_mcp or fixed_plugins:
-            fixed_count = fixed_mcp + fixed_plugins
+        if report.has_warnings or fixed_mcp or fixed_plugins or fixed_empty_threads:
+            fixed_count = fixed_mcp + fixed_plugins + fixed_empty_threads
             self.tray.showMessage(
                 t("audit_title"),
                 t("audit_findings", count=len(report.findings))
