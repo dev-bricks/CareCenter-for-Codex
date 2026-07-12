@@ -5,8 +5,11 @@ from __future__ import annotations
 import json
 import os
 import re
+import tempfile
 from dataclasses import dataclass
+from importlib import util as importlib_util
 from pathlib import Path
+from types import ModuleType
 from urllib.parse import urlparse
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -223,6 +226,68 @@ def _check_published_store_docs(project_root: Path, payload: dict[str, object]) 
     )
 
 
+def _load_pages_builder(build_script: Path) -> ModuleType:
+    spec = importlib_util.spec_from_file_location("carecenter_store_pages_build_check", build_script)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Pages-Builder kann nicht geladen werden: {build_script}")
+    module = importlib_util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _check_store_pages_build(project_root: Path) -> StoreCheck:
+    build_script = project_root / PAGES_BUILD_SCRIPT_PATH
+    if not build_script.exists():
+        return StoreCheck(
+            "Store-Webseiten-Build",
+            "warning",
+            f"Pages-Builder fehlt: {PAGES_BUILD_SCRIPT_PATH.as_posix()}",
+        )
+
+    try:
+        module = _load_pages_builder(build_script)
+        build_pages = module.build_pages  # type: ignore[attr-defined]
+    except (AttributeError, RuntimeError, OSError, SyntaxError) as exc:
+        return StoreCheck("Store-Webseiten-Build", "warning", f"Pages-Builder unbrauchbar: {exc}")
+
+    try:
+        with tempfile.TemporaryDirectory(prefix="carecenter-store-pages-") as tmp_dir:
+            output_dir = Path(tmp_dir) / "_site"
+            written = [Path(path) for path in build_pages(project_root, output_dir)]
+            expected = {
+                output_dir / ".carecenter-pages-build",
+                output_dir / "index.html",
+                output_dir / "privacy" / "index.html",
+                output_dir / "support" / "index.html",
+            }
+            missing = sorted(str(path.relative_to(output_dir)) for path in expected if not path.exists())
+            if missing:
+                return StoreCheck(
+                    "Store-Webseiten-Build",
+                    "warning",
+                    "Gebautes Pages-Artefakt unvollstaendig: " + ", ".join(missing),
+                )
+            invalid = [
+                str(path.relative_to(output_dir))
+                for path in expected
+                if path.suffix == ".html" and "<!doctype html>" not in path.read_text(encoding="utf-8").lower()
+            ]
+            if invalid:
+                return StoreCheck(
+                    "Store-Webseiten-Build",
+                    "warning",
+                    "Gebautes HTML ohne Doctype: " + ", ".join(sorted(invalid)),
+                )
+    except Exception as exc:  # noqa: BLE001 - Store gate should report builder failures, not crash.
+        return StoreCheck("Store-Webseiten-Build", "warning", f"Pages-Build fehlgeschlagen: {exc}")
+
+    return StoreCheck(
+        "Store-Webseiten-Build",
+        "ok",
+        f"Temporärer Build ok ({len(written)} Dateien, privacy/support/index).",
+    )
+
+
 def _discover_build_dist_dir(project_root: Path) -> Path | None:
     build_script = project_root / BUILD_SCRIPT_PATH.name
     if not build_script.exists():
@@ -325,6 +390,7 @@ def validate_store_materials(
     checks.append(_check_urls(payload))
     checks.append(_check_docs(project_root))
     checks.append(_check_published_store_docs(project_root, payload))
+    checks.append(_check_store_pages_build(project_root))
     checks.append(_check_screenshot(project_root))
     checks.append(_check_executable(project_root, payload, exe_path))
     return StoreMaterialsReport(checks)

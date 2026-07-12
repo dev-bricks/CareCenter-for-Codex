@@ -19,7 +19,29 @@ def _write_store_files(project_root: Path, payload: dict[str, object]) -> None:
         (docs_dir / name).write_text(f"# {name}\n", encoding="utf-8")
     scripts_dir = project_root / "scripts"
     scripts_dir.mkdir(parents=True, exist_ok=True)
-    (scripts_dir / "build_store_pages.py").write_text("print('build pages')\n", encoding="utf-8")
+    (scripts_dir / "build_store_pages.py").write_text(
+        "\n".join(
+            [
+                "from pathlib import Path",
+                "",
+                "def build_pages(project_root: Path, output_dir: Path) -> list[Path]:",
+                "    output_dir.mkdir(parents=True, exist_ok=True)",
+                "    (output_dir / '.carecenter-pages-build').write_text('test marker\\n', encoding='utf-8')",
+                "    written = []",
+                "    for slug in ('privacy', 'support'):",
+                "        target = output_dir / slug / 'index.html'",
+                "        target.parent.mkdir(parents=True, exist_ok=True)",
+                "        target.write_text('<!doctype html><title>' + slug + '</title>', encoding='utf-8')",
+                "        written.append(target)",
+                "    index = output_dir / 'index.html'",
+                "    index.write_text('<!doctype html><title>index</title>', encoding='utf-8')",
+                "    written.append(index)",
+                "    return written",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
     workflow_dir = project_root / ".github" / "workflows"
     workflow_dir.mkdir(parents=True, exist_ok=True)
     (workflow_dir / "pages.yml").write_text(
@@ -71,6 +93,8 @@ def test_validate_store_materials_reports_ok_for_complete_materials(tmp_path: Pa
     report = validate_store_materials(project_root=tmp_path, exe_path=exe_path)
 
     assert report.status == "ok"
+    pages_build_check = next(check for check in report.checks if check.name == "Store-Webseiten-Build")
+    assert pages_build_check.status == "ok"
 
 
 def test_validate_store_materials_auto_detects_built_exe_from_build_script(tmp_path: Path) -> None:
@@ -240,5 +264,47 @@ def test_validate_store_materials_warns_without_pages_workflow(tmp_path: Path) -
     assert report.status == "warning"
     assert any(
         check.name == "Store-Webseiten" and "Pages-Workflow fehlt" in check.message
+        for check in report.checks
+    )
+
+
+def test_validate_store_materials_warns_when_pages_builder_fails(tmp_path: Path) -> None:
+    _write_store_files(
+        tmp_path,
+        {
+            "app_name": "CareCenter for Codex",
+            "publisher": "CN=01234567-89AB-CDEF-0123-456789ABCDEF",
+            "publisher_display": "Lukas Geiger",
+            "identity_name": "LukasGeiger.CareCenterForCodex",
+            "version": "0.6.2.0",
+            "description": "Offline Wartung und Reparatur fuer die Codex-Desktop-App.",
+            "executable": "CareCenterForCodex.exe",
+            "capabilities": "runFullTrust",
+            "category": "Developer Tools",
+            "age_rating": "3+",
+            "privacy_url": "https://dev-bricks.github.io/CareCenter-for-Codex/privacy",
+            "support_url": "https://dev-bricks.github.io/CareCenter-for-Codex/support",
+        },
+    )
+    (tmp_path / "scripts" / "build_store_pages.py").write_text(
+        "\n".join(
+            [
+                "from pathlib import Path",
+                "",
+                "def build_pages(project_root: Path, output_dir: Path) -> list[Path]:",
+                "    raise RuntimeError('cannot build store pages')",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    report = validate_store_materials(project_root=tmp_path)
+
+    assert report.status == "warning"
+    assert any(
+        check.name == "Store-Webseiten-Build"
+        and check.status == "warning"
+        and "cannot build store pages" in check.message
         for check in report.checks
     )
