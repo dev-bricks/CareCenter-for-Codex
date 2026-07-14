@@ -6,6 +6,12 @@ if errorlevel 1 (
     pause
     exit /b 1
 )
+where pythonw >nul 2>&1
+if errorlevel 1 (
+    echo [FEHLER] pythonw.exe nicht gefunden!
+    pause
+    exit /b 1
+)
 set "PYTHONPATH=%CD%\src;%PYTHONPATH%"
-python -m codex_logdatenbank_wartung.cli tray
-if errorlevel 1 pause
+start "" pythonw -m codex_logdatenbank_wartung.cli tray
+exit /b 0

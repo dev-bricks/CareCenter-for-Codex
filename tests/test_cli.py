@@ -122,3 +122,17 @@ def test_safe_start_install_command_uses_installer(tmp_path: Path, capsys) -> No
     assert rc == 0
     installer.assert_called_once_with(target="local-src")
     assert "Safe Start installiert" in capsys.readouterr().out
+
+
+def test_tray_command_starts_runtime_logging_before_launch(tmp_path: Path) -> None:
+    cfg = tmp_path / "config.json"
+    cfg.write_text("{}", encoding="utf-8")
+
+    with patch("codex_logdatenbank_wartung.runtime.app_logging.start") as start_logging, patch(
+        "codex_logdatenbank_wartung.tray.run_tray", return_value=0
+    ) as run_tray:
+        rc = main(["--config", str(cfg), "tray"])
+
+    assert rc == 0
+    start_logging.assert_called_once_with()
+    run_tray.assert_called_once_with(cfg)

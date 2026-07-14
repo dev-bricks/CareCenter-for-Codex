@@ -69,6 +69,11 @@ python -m codex_logdatenbank_wartung.cli status
 python -m codex_logdatenbank_wartung.cli tray
 ```
 
+For the normal tray start from a checkout, use `start.bat`. It launches the tray
+windowlessly through `pythonw.exe` and writes startup failures to
+`%LOCALAPPDATA%\CareCenterForCodex\logs\app.log`. Use `debug.bat` when you want
+the console to stay visible for troubleshooting.
+
 Build a standalone EXE:
 
 ```powershell

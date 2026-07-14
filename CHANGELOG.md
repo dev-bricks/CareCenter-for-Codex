@@ -2,12 +2,12 @@
 
 ## Unreleased
 
+- Added the standard runtime logger for windowless tray starts (`runtime/app_logging.py`) and wired the tray source path plus the PyInstaller tray entrypoint to it, so startup failures now land in `logs/app.log` instead of disappearing under `pythonw`.
+- Changed the source launch scripts to the intended split: `start.bat` now launches the tray windowlessly through `pythonw.exe`, while the new `debug.bat` keeps a visible console for troubleshooting.
 - Extended the Store material preflight so it performs a temporary GitHub Pages build and verifies the generated privacy/support/index routes before Store handoff.
 - Added configurable thread inbox hygiene: mark all unread threads, mark unread threads older than X days, and automatically archive threads older than a separately configured X days.
 - Updated thread care for the current Codex storage model (`state_5.sqlite` plus `.codex-global-state.json`) with backups, atomic state writes, transactional archive flags, rollout moves to `archived_sessions`, and rollback on failure.
 - Fixed config audit auto-cleanup: empty-thread findings are now genuinely auto-fixable through a third `off` / `notify` / `auto` setting instead of merely saying “archiving recommended”.
-
-## Unreleased
 
 - Restored compatibility with Codex Store builds that use `ChatGPT.exe` for the
   Electron process tree and an embedded `codex.exe app-server`. CareCenter now

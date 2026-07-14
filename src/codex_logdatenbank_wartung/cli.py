@@ -288,6 +288,9 @@ def cmd_mark_runs_read(args: argparse.Namespace) -> int:
 
 
 def cmd_tray(args: argparse.Namespace) -> int:
+    from .runtime.app_logging import start as start_app_logging
+
+    start_app_logging()
     from .tray import run_tray
 
     return run_tray(Path(args.config))

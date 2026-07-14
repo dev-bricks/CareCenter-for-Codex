@@ -10,14 +10,20 @@ from pathlib import Path
 def main() -> int:
     try:
         from codex_logdatenbank_wartung.config import default_config_path
+        from codex_logdatenbank_wartung.runtime.app_logging import start as start_app_logging
+
+        start_app_logging()
         from codex_logdatenbank_wartung.tray import run_tray
 
         return run_tray(default_config_path())
     except Exception:
         try:
+            import logging
+
             from codex_logdatenbank_wartung.config import local_root
 
             log_dir = local_root() / "logs"
+            logging.getLogger("CareCenterForCodex").exception("Tray-Start fehlgeschlagen.")
         except Exception:
             log_dir = Path.home() / "AppData" / "Local" / "CareCenterForCodex" / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)
