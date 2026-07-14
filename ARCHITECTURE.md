@@ -11,21 +11,30 @@ kann die Logik getestet werden, ohne die Tray-App zu starten (der interne Python
 | Modul | Aufgabe |
 |---|---|
 | `config.py` | lokale Konfiguration, Standardpfade (aus `%LOCALAPPDATA%`/`%APPDATA%`/`~/.codex`), Schwellwerte |
+| `i18n.py` | leichtgewichtige DE-/EN-Lokalisierung und persistierte Sprachauswahl |
 | `processes.py` | Codex-Prozessprüfung über PowerShell/CIM; Klassifikation (`--type`), exaktes Exe-Matching, Prozessbaum |
 | `maintenance.py` | Backup + Retention, Integritätscheck, WAL-Checkpoint, `PRAGMA optimize`, `VACUUM`, Protokolle |
 | `health.py` | Startup-Diagnose (`diagnose`) und gezielte Reparatur (`repair_start`) — getrennt vom Wartungsblocker |
 | `orchestrator.py` | Autonome Wartung (`auto_maintain`): Aktivitätsmessung (CPU+DB des ganzen Baums), zwei Modi (safe/fast) |
+| `automation_control.py` | aktive Codex-Automatisierungen pausieren, CareCenter-eigene Pausen nachhalten und gezielt reaktivieren |
 | `watchdog.py` | Hintergrund-Wächter (Start-Prävention): reapt bei geschlossenem Codex idle Ghosts; CPU-Aktivitäts-Gate |
 | `start_repair.py` | Klassifikation der Start-Lage für die zusammengefasste „Codex reparieren"-Eskalation |
 | `repair_workflow.py` | Hang-sichere S1–S7-Eskalationsengine (rein, injizierbare Bausteine) |
 | `repair_live.py` | Echte Windows-/AppX-Implementierungen der Reparatur-Bausteine (P11 absent-Erkennung, Reinstall-Prävention) |
 | `store_repair.py` | Microsoft-Store-Reparatur (wsreset/register/reset) + Store-Produktseite öffnen |
+| `store_release.py` | Store-Materialien, öffentliche URLs, Pages-Artefakt und EXE-Pfad validieren |
+| `store_screenshot.py` | reproduzierbaren README-/Store-Screenshot aus dem echten Statusfenster rendern |
 | `scheduler.py` | Optionaler Windows-Task-Scheduler-Helfer für periodische Aufrufe von `maintain --execute` |
 | `thread_hygiene.py` | Altersbasierte Thread-Pflege: Ungelesen-State, transactionales Archivieren und Backups bei geschlossenem Codex |
+| `mark_runs_read.py` | Codex-Ungelesen-State für Automations-/Thread-Ergebnisse gesichert als gelesen markieren |
 | `config_audit.py` | Audit plus getrennte off/notify/auto-Fixes für MCP-Duplikate, Plattform-Plugins und leere Threads |
+| `safe_start_integration.py` | Safe-Start-Status, Installation, Start-Gate, Wiederherstellung und Aufschublogik anbinden |
 | `single_instance.py` | Windows-Mutex für die Tray-App |
-| `tray.py` | PySide6-Systemtray-App: Status-Fenster mit Fortschrittsbalken, Wächter, „Codex reparieren", Wartung, Store |
+| `tray.py` | PySide6-Systemtray-App mit Statusfenster, QThread-Workern, Wächter, Reparatur, Wartung und Store-Aktionen |
+| `tray_app.py` | direkter EXE-/PyInstaller-Einstieg für die Systemtray-App |
+| `runtime/app_logging.py` | rotierendes Datei-Logging und Crash-Hooks für fensterlose `pythonw`-/EXE-Starts |
 | `cli.py` | maschinenlesbare Bedienung für LLMs und Shell |
+| `main.py` | kompatibler Moduleinstieg, der an die CLI weiterleitet |
 
 ## Zwei getrennte Pfade
 

@@ -151,7 +151,6 @@ When set, `config.json`, `logs\`, and `backups\` are placed under that path inst
 
 The project includes Windows Store groundwork:
 
-- `PORTIERUNGSPLAN.md`
 - `store_package.json`
 - `STORE_LISTING.md`
 - `PRIVACY_POLICY.md`

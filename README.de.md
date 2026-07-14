@@ -139,7 +139,6 @@ Codex-Pfade werden aus `%LOCALAPPDATA%`, `%APPDATA%` und `CODEX_HOME` erkannt. N
 
 Das Projekt enthält die Grundlage für den Windows Store:
 
-- `PORTIERUNGSPLAN.md`
 - `store_package.json`
 - `STORE_LISTING.md`
 - `PRIVACY_POLICY.md`
