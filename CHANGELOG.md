@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fixed the tray freezing for over ten seconds: the "Diagnose" and "Config audit" buttons called `diagnose()` (which shells out via `subprocess.run`, measured at 11.3 s) synchronously on the GUI thread, so Windows reported the app as not responding. Both now run in their own `QThread` (`DiagnosisWorker`, `ConfigAuditWorker`) and return their result via signal. Note the workers were never the problem — all nine were already moved to threads correctly; the two button handlers simply bypassed them. The config audit also repairs, so it now counts towards `_manual_action_busy`: while it ran synchronously it was necessarily exclusive, and that exclusivity has to be stated explicitly once it runs concurrently. Guarded by `tests/test_tray_threading.py`, which forbids blocking calls outside worker classes.
 - Added the standard runtime logger for windowless tray starts (`runtime/app_logging.py`) and wired the tray source path plus the PyInstaller tray entrypoint to it, so startup failures now land in `logs/app.log` instead of disappearing under `pythonw`.
 - Changed the source launch scripts to the intended split: `start.bat` now launches the tray windowlessly through `pythonw.exe`, while the new `debug.bat` keeps a visible console for troubleshooting.
 - Extended the Store material preflight so it performs a temporary GitHub Pages build and verifies the generated privacy/support/index routes before Store handoff.

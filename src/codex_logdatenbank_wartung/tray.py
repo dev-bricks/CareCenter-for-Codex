@@ -462,6 +462,50 @@ class StartRepairWorker(QObject):
         self.finished.emit({"outcome": "escalate", "reaped": 0, "message": t("repair_full_needed")})
 
 
+class DiagnosisWorker(QObject):
+    """Diagnose im eigenen Thread.
+
+    `diagnose()` ruft `subprocess.run` und braucht gemessen ueber 10 Sekunden —
+    im GUI-Thread stand die Oberflaeche so lange still. Die Diagnose aendert
+    nichts, sie liest nur; ein zweiter Lauf waehrend des ersten ist trotzdem
+    unnoetig und wird in `show_diagnosis` abgefangen.
+    """
+
+    finished = Signal(object)
+
+    def __init__(self, config: MaintenanceConfig) -> None:
+        super().__init__()
+        self.config = config
+
+    def run(self) -> None:
+        self.finished.emit(diagnose(self.config))
+
+
+class ConfigAuditWorker(QObject):
+    """Manueller Config-Audit im eigenen Thread.
+
+    `diagnose()` ruft `subprocess.run` (health.py) und braucht gemessen ueber
+    10 Sekunden; `run_manual_audit()` scannt danach die Konfigurationsdateien.
+    Im GUI-Thread bedeutete das eine ebenso lange Totalblockade der Oberflaeche
+    ("reagiert nicht"). Der Watchdog fuhr denselben Audit laengst im Worker
+    (`WatchdogWorker._run_config_audit`) — nur der Knopf tat es synchron.
+    """
+
+    finished = Signal(object)
+
+    def __init__(self, config: MaintenanceConfig) -> None:
+        super().__init__()
+        self.config = config
+
+    def run(self) -> None:
+        from .config_audit import run_manual_audit
+        from .health import diagnose
+
+        renderer_present = diagnose(self.config).renderer_present
+        report, cycle = run_manual_audit(self.config, renderer_present=renderer_present)
+        self.finished.emit((report, cycle))
+
+
 class StatusWindow(QWidget):
     """Kleines Statusfenster: aktueller Zustand, Fortschrittsbalken, letztes Ergebnis."""
 
@@ -879,6 +923,10 @@ class TrayController(QObject):
         self.watchdog_worker: WatchdogWorker | None = None
         self.start_repair_thread: QThread | None = None
         self.start_repair_worker: StartRepairWorker | None = None
+        self.config_audit_thread: QThread | None = None
+        self.config_audit_worker: ConfigAuditWorker | None = None
+        self.diagnosis_thread: QThread | None = None
+        self.diagnosis_worker: DiagnosisWorker | None = None
         self.zombie_kill_count = 0  # vom Hintergrund-Waechter + leichter Reparatur seit Start
 
         self.app_icon = _app_icon()  # konstantes Tray-Icon (kein Wechsel)
@@ -1116,6 +1164,10 @@ class TrayController(QObject):
             or getattr(self, "safe_start_install_thread", None) is not None
             or getattr(self, "automation_thread", None) is not None
             or getattr(self, "full_repair_thread", None) is not None
+            # Der Config-Audit repariert mit (MCP/Plugins/leere Threads) und ist damit
+            # ebenfalls mutierend. Solange er synchron lief, war er zwangslaeufig
+            # exklusiv — im eigenen Thread muss diese Exklusivitaet ausdruecklich gelten.
+            or getattr(self, "config_audit_thread", None) is not None
             or (not ignore_start_repair and getattr(self, "start_repair_thread", None) is not None)
         )
 
@@ -1763,13 +1815,42 @@ class TrayController(QObject):
         self.tray.showMessage(t("automations_toast_title"), result.message, icon, 7000)
 
     def show_diagnosis(self) -> None:
-        report = diagnose(MaintenanceConfig.load(self.config_path))
+        """Startet die Diagnose in einem eigenen Thread.
+
+        Frueher lief `diagnose()` hier synchron — gemessen ueber 10 Sekunden, in
+        denen die Oberflaeche stand. Das Ergebnis kommt per Signal zurueck.
+        """
+        if self.diagnosis_thread is not None:
+            return  # laeuft bereits
+
+        self.window.set_state(t("diagnose"))
+        self.window.set_progress(0, t("diagnose"), True)
+        self.show_window()
+
+        self.diagnosis_thread = QThread(self)
+        self.diagnosis_worker = DiagnosisWorker(MaintenanceConfig.load(self.config_path))
+        self.diagnosis_worker.moveToThread(self.diagnosis_thread)
+        self.diagnosis_thread.started.connect(self.diagnosis_worker.run)
+        self.diagnosis_worker.finished.connect(self.on_diagnosis_finished)
+        self.diagnosis_worker.finished.connect(self.diagnosis_thread.quit)
+        self.diagnosis_worker.finished.connect(self.diagnosis_worker.deleteLater)
+        self.diagnosis_thread.finished.connect(self.diagnosis_thread.deleteLater)
+        self.diagnosis_thread.finished.connect(self.clear_diagnosis_thread)
+        self.diagnosis_thread.start()
+
+    def clear_diagnosis_thread(self) -> None:
+        self.diagnosis_thread = None
+        self.diagnosis_worker = None
+
+    def on_diagnosis_finished(self, report: object) -> None:
+        """Zeigt den Befund — wieder im GUI-Thread (Signal)."""
         if report.zombie_main_pids or report.stale_lockfile or not report.codex_exe_present:
             text = t("diagnosis_start_blocker", status=report.status)
         elif report.status != "ok":
             text = t("diagnosis_findings", count=len(report.issues), status=report.status)
         else:
             text = t("diagnosis_ok")
+        self.window.set_progress(100, t("diagnose"), False)
         self.window.set_state(t("diagnose"))
         self.window.set_result(text)
         self.show_window()
@@ -2064,13 +2145,40 @@ class TrayController(QObject):
             self.config.save(self.config_path)
 
     def run_config_audit(self) -> None:
-        """Fuehrt einen sofortigen Config-Audit aus und zeigt die Ergebnisse."""
-        from .config_audit import run_manual_audit
-        from .health import diagnose
+        """Startet den Config-Audit in einem eigenen Thread.
+
+        Frueher lief er hier synchron — `diagnose()` allein braucht gemessen ueber
+        10 Sekunden, die Oberflaeche stand so lange still. Ergebnis kommt jetzt per
+        Signal in `on_config_audit_finished` zurueck (kein Widget-Zugriff im Worker).
+        """
+        if self._manual_action_busy():
+            self._show_manual_action_busy(t("audit_title"))
+            return
 
         config = MaintenanceConfig.load(self.config_path)
-        renderer_present = diagnose(config).renderer_present
-        report, cycle = run_manual_audit(config, renderer_present=renderer_present)
+        self.window.set_state(t("audit_running"))
+        self.window.set_progress(0, t("audit_running"), True)
+        self.show_window()
+
+        self.config_audit_thread = QThread(self)
+        self.config_audit_worker = ConfigAuditWorker(config)
+        self.config_audit_worker.moveToThread(self.config_audit_thread)
+        self.config_audit_thread.started.connect(self.config_audit_worker.run)
+        self.config_audit_worker.finished.connect(self.on_config_audit_finished)
+        self.config_audit_worker.finished.connect(self.config_audit_thread.quit)
+        self.config_audit_worker.finished.connect(self.config_audit_worker.deleteLater)
+        self.config_audit_thread.finished.connect(self.config_audit_thread.deleteLater)
+        self.config_audit_thread.finished.connect(self.clear_config_audit_thread)
+        self.config_audit_thread.start()
+
+    def clear_config_audit_thread(self) -> None:
+        self.config_audit_thread = None
+        self.config_audit_worker = None
+
+    def on_config_audit_finished(self, payload: object) -> None:
+        """Zeigt das Audit-Ergebnis — laeuft wieder im GUI-Thread (Signal)."""
+        report, cycle = payload  # type: ignore[misc]
+        self.window.set_progress(100, t("audit_done"), False)
         fixed_mcp = cycle.mcp_fixed
         fixed_plugins = cycle.plugins_fixed
         fixed_empty_threads = cycle.empty_threads_fixed

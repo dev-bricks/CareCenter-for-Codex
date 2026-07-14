@@ -683,6 +683,7 @@ _CATALOG: dict[str, dict[Language, str]] = {
     # -- Config audit / CLI --
     "audit_title": {"de": "CareCenter – Config-Audit", "en": "CareCenter - config audit"},
     "audit_done": {"de": "Config-Audit abgeschlossen", "en": "Config audit completed"},
+    "audit_running": {"de": "Config-Audit läuft …", "en": "Config audit running …"},
     "audit_fixed_mcp": {
         "de": "Auto-Fix: {count} MCP-Duplikat(e) entfernt.",
         "en": "Auto-fix: removed {count} MCP duplicate(s).",
