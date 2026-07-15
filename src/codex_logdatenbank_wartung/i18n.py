@@ -341,8 +341,8 @@ _CATALOG: dict[str, dict[Language, str]] = {
         "en": "Install Safe Start",
     },
     "safe_start_install_tooltip": {
-        "de": "Installiert oder aktualisiert Safe Start for Codex über pip. Bevorzugt die lokale Schwesterquelle, sonst das Paket safe-start-for-codex.",
-        "en": "Installs or updates Safe Start for Codex via pip. Prefers the local sibling source, otherwise the safe-start-for-codex package.",
+        "de": "Installiert oder aktualisiert Safe Start for Codex über pip. Bevorzugt die lokale Schwesterquelle, sonst die commit-gepinnte GitHub-Quelle.",
+        "en": "Installs or updates Safe Start for Codex via pip. Prefers the local sibling source, otherwise the commit-pinned GitHub source.",
     },
     "safe_start_install_running": {
         "de": "Safe Start wird installiert oder aktualisiert …",

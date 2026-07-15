@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Replaced the unresolvable `safe-start-for-codex>=1.1.2` index dependency with
+  the verified public GitHub source pinned to commit
+  `dcb369a64f403f6551bcb3bac16565c56ec79474`. The base runtime no longer requires
+  Safe Start; the reproducible EXE build extra and the explicit in-app installer
+  use the same pinned source.
 - Fixed the tray freezing for over ten seconds: the "Diagnose" and "Config audit" buttons called `diagnose()` (which shells out via `subprocess.run`, measured at 11.3 s) synchronously on the GUI thread, so Windows reported the app as not responding. Both now run in their own `QThread` (`DiagnosisWorker`, `ConfigAuditWorker`) and return their result via signal. Note the workers were never the problem — all nine were already moved to threads correctly; the two button handlers simply bypassed them. The config audit also repairs, so it now counts towards `_manual_action_busy`: while it ran synchronously it was necessarily exclusive, and that exclusivity has to be stated explicitly once it runs concurrently. Guarded by `tests/test_tray_threading.py`, which forbids blocking calls outside worker classes.
 - Added the standard runtime logger for windowless tray starts (`runtime/app_logging.py`) and wired the tray source path plus the PyInstaller tray entrypoint to it, so startup failures now land in `logs/app.log` instead of disappearing under `pythonw`.
 - Changed the source launch scripts to the intended split: `start.bat` now launches the tray windowlessly through `pythonw.exe`, while the new `debug.bat` keeps a visible console for troubleshooting.
@@ -21,7 +26,7 @@
   MCP duplicate, and unused-plugin combo boxes in the tray status window. The loop
   interval picker now also exposes a tooltip instead of relying only on the adjacent label.
 - Hardened `build_exe.bat` for reproducible EXE packaging: it now uses the
-  published `safe-start-for-codex` dependency from `pyproject.toml` by default
+  commit-pinned `safe-start-for-codex` GitHub source from `pyproject.toml` by default
   and only installs a local Safe Start checkout when
   `CARECENTER_SAFE_START_SOURCE` is set explicitly.
 - Added a GitHub Pages pipeline for the planned Windows Store privacy/support URLs:

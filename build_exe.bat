@@ -40,7 +40,7 @@ if defined CARECENTER_SAFE_START_SOURCE (
     )
 )
 if not defined CARECENTER_SAFE_START_SOURCE (
-    echo [build] Nutze die veroeffentlichte Safe-Start-Abhaengigkeit aus pyproject.toml.
+    echo [build] Nutze die commit-gepinnte Safe-Start-GitHub-Quelle aus pyproject.toml.
 )
 python -m pip install --upgrade -e ".[build]"
 if errorlevel 1 pause & exit /b 1

@@ -19,7 +19,11 @@ import tomlkit
 
 from .config import MaintenanceConfig
 
-SAFE_START_PACKAGE_SPEC = "safe-start-for-codex>=1.1.2"
+SAFE_START_PACKAGE_SPEC = (
+    "safe-start-for-codex @ "
+    "git+https://github.com/dev-bricks/safe-start-for-codex.git"
+    "@dcb369a64f403f6551bcb3bac16565c56ec79474"
+)
 SAFE_START_SOURCE_ENV = "CARECENTER_SAFE_START_SOURCE"
 CREATE_NO_WINDOW = 0x08000000
 CARECENTER_SAFE_START_DEFAULT_INTERVAL_MINUTES = 1
@@ -196,7 +200,7 @@ def _local_safe_start_source() -> Path | None:
 
 
 def safe_start_install_target() -> str:
-    """Bevorzuge die lokale Schwesterquelle, sonst das veröffentlichte Paket."""
+    """Bevorzuge die lokale Schwesterquelle, sonst die commit-gepinnte GitHub-Quelle."""
     local_source = _local_safe_start_source()
     if local_source is not None:
         return str(local_source)

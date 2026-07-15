@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
+import tomllib
 from datetime import datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -11,6 +13,7 @@ import tomlkit
 from codex_logdatenbank_wartung.config import MaintenanceConfig
 from codex_logdatenbank_wartung.safe_start_integration import (
     CARECENTER_SAFE_START_DEFAULT_INTERVAL_MINUTES,
+    SAFE_START_PACKAGE_SPEC,
     build_safe_start_status,
     detect_safe_start_storm,
     install_safe_start_package,
@@ -153,6 +156,29 @@ def test_safe_start_install_target_prefers_local_source(tmp_path: Path, monkeypa
     monkeypatch.setenv("CARECENTER_SAFE_START_SOURCE", str(source))
 
     assert safe_start_install_target() == str(source)
+
+
+def test_safe_start_fallback_is_commit_pinned_and_matches_build_extra(monkeypatch) -> None:
+    from codex_logdatenbank_wartung import safe_start_integration
+
+    monkeypatch.setattr(safe_start_integration, "_local_safe_start_source", lambda: None)
+
+    target = safe_start_install_target()
+    assert target == SAFE_START_PACKAGE_SPEC
+    assert re.fullmatch(
+        r"safe-start-for-codex @ git\+https://github\.com/dev-bricks/"
+        r"safe-start-for-codex\.git@[0-9a-f]{40}",
+        target,
+    )
+
+    project_root = Path(__file__).resolve().parents[1]
+    metadata = tomllib.loads((project_root / "pyproject.toml").read_text(encoding="utf-8"))
+    assert target in metadata["project"]["optional-dependencies"]["build"]
+    assert metadata["tool"]["hatch"]["metadata"]["allow-direct-references"] is True
+    assert not any(
+        dependency.startswith("safe-start-for-codex")
+        for dependency in metadata["project"]["dependencies"]
+    )
 
 
 def test_install_safe_start_package_runs_pip_upgrade(tmp_path: Path, monkeypatch) -> None:

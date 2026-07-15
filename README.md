@@ -80,9 +80,10 @@ Build a standalone EXE:
 build_exe.bat
 ```
 
-By default, the build uses the published `safe-start-for-codex` dependency from
-`pyproject.toml`, so the EXE does not silently bundle a dirty local sibling
-checkout. Only use a local Safe Start source on purpose:
+By default, the build uses the public Safe Start GitHub source pinned to an exact
+commit in `pyproject.toml`. This keeps the build reproducible without silently
+bundling a dirty local sibling checkout. Only use a local Safe Start source on
+purpose:
 
 ```powershell
 $env:CARECENTER_SAFE_START_SOURCE = "C:\path\to\REL-PUB_safe-start-for-codex"

@@ -1,34 +1,51 @@
-THIRD-PARTY LICENSES
-====================
+# Third-Party Licenses
 
-This project ("CareCenter for Codex") is licensed under the MIT License (see LICENSE).
-It uses the following third-party components:
+Last checked: 2026-07-15 against the declared project metadata, PyPI metadata,
+and the pinned Safe Start GitHub revision.
 
---------------------------------------------------------------------------------
-PySide6  (runtime dependency, GUI)
---------------------------------------------------------------------------------
-License: GNU Lesser General Public License v3 (LGPL-3.0)
-Project: https://pypi.org/project/PySide6/  (The Qt Company)
-Notes:   Used as an unmodified, dynamically linked library. The LGPL permits use
-         from an MIT-licensed application as long as PySide6/Qt itself remains
-         replaceable and is not modified. No Qt/PySide6 source is included or
-         modified in this repository.
+Scope: direct dependencies declared in `pyproject.toml`. This is a direct
+dependency inventory, not a frozen transitive SBOM and not a replacement for
+license files shipped inside bundled wheels or executables.
 
---------------------------------------------------------------------------------
-PyInstaller  (build-time only, optional)
---------------------------------------------------------------------------------
-License: GNU General Public License v2.0 with a special bootloader exception
-Project: https://pyinstaller.org/
-Notes:   Used only to produce a standalone .exe. The bootloader exception
-         explicitly allows distributing the resulting executable under the
-         application's own (here: MIT) license.
+## Project License
 
---------------------------------------------------------------------------------
-Standard library only otherwise
---------------------------------------------------------------------------------
-All other functionality relies on the Python standard library. No other
-third-party runtime dependencies are bundled.
+CareCenter for Codex is licensed under the MIT License. See `LICENSE`.
+
+## Direct Runtime Dependencies
+
+| Package | Constraint / revision | Version checked | License metadata | Source |
+|---|---:|---:|---|---|
+| PySide6 | `>=6.7` | 6.11.1 | LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only | https://pypi.org/project/PySide6/ |
+| tomlkit | `>=0.13` | 0.15.0 | MIT | https://pypi.org/project/tomlkit/ |
+
+## Safe Start Integration and Build Dependencies
+
+| Package | Declared use | Constraint / revision | Version checked | License metadata | Source |
+|---|---|---:|---:|---|---|
+| safe-start-for-codex | Optional integration and EXE build | commit `dcb369a64f403f6551bcb3bac16565c56ec79474` | 1.1.3 | MIT | https://github.com/dev-bricks/safe-start-for-codex |
+| PyInstaller | Optional Windows EXE build | `>=6.0` | 6.21.0 | GPLv2-or-later with PyInstaller's special exception | https://pypi.org/project/pyinstaller/ |
+| hatchling | Build backend / EXE build | `>=1.25` | 1.31.0 | MIT | https://pypi.org/project/hatchling/ |
+
+## Direct Development Dependencies
+
+| Package | Constraint | Version checked | License metadata | Source |
+|---|---:|---:|---|---|
+| pytest | `>=8.0` | 9.1.1 | MIT | https://pypi.org/project/pytest/ |
+| Ruff | `>=0.5` | 0.15.21 | MIT | https://pypi.org/project/ruff/ |
+| mypy | `>=1.10` | 2.3.0 | MIT | https://pypi.org/project/mypy/ |
+
+## Distribution Notes
+
+- PySide6 is used as an unmodified dynamically linked library. No Qt/PySide6
+  source is included or modified in this repository.
+- Safe Start is not available from PyPI as of this check. The explicit installer
+  and build extra therefore use the verified public repository revision above;
+  a local checkout is used only through `CARECENTER_SAFE_START_SOURCE`.
+- PyInstaller's special exception allows distributing the generated executable
+  under the application's own MIT license.
+- Binary release preparation must inspect the actual bundled distributions and
+  retain their shipped license files.
 
 Trademark note: "OpenAI" and "Codex" are trademarks of OpenAI. They are used in
-this project solely to identify the software this tool is compatible with
-(nominative use). This project is not affiliated with or endorsed by OpenAI.
+this project solely to identify compatibility. This project is not affiliated
+with or endorsed by OpenAI.

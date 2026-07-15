@@ -494,7 +494,7 @@ def build_parser() -> argparse.ArgumentParser:
     safe_start_install_parser.add_argument(
         "--target",
         default=None,
-        help="Optionales pip-Ziel. Ohne Angabe: lokale Schwesterquelle, sonst safe-start-for-codex>=1.1.2.",
+        help="Optionales pip-Ziel. Ohne Angabe: lokale Schwesterquelle, sonst commit-gepinnte GitHub-Quelle.",
     )
     safe_start_install_parser.add_argument(
         "--json", action="store_true", help="Ergebnis als JSON ausgeben."
