@@ -12,12 +12,12 @@ kann die Logik getestet werden, ohne die Tray-App zu starten (der interne Python
 |---|---|
 | `config.py` | lokale Konfiguration, Standardpfade (aus `%LOCALAPPDATA%`/`%APPDATA%`/`~/.codex`), Schwellwerte |
 | `i18n.py` | leichtgewichtige DE-/EN-Lokalisierung und persistierte Sprachauswahl |
-| `processes.py` | Codex-Prozessprüfung über PowerShell/CIM; Klassifikation (`--type`), exaktes Exe-Matching, Prozessbaum |
+| `processes.py` | Codex-Prozessprüfung über PowerShell/CIM; Klassifikation (`--type`), exaktes Exe-Matching, Prozessbaum und fail-closed Erkennung wiederholter Runtime-MCP-Launcher |
 | `maintenance.py` | Backup + Retention, Integritätscheck, WAL-Checkpoint, `PRAGMA optimize`, `VACUUM`, Protokolle |
 | `health.py` | Startup-Diagnose (`diagnose`) und gezielte Reparatur (`repair_start`) — getrennt vom Wartungsblocker |
 | `orchestrator.py` | Autonome Wartung (`auto_maintain`): Aktivitätsmessung (CPU+DB des ganzen Baums), zwei Modi (safe/fast) |
 | `automation_control.py` | aktive Codex-Automatisierungen pausieren, CareCenter-eigene Pausen nachhalten und gezielt reaktivieren |
-| `watchdog.py` | Hintergrund-Wächter (Start-Prävention): reapt bei geschlossenem Codex idle Ghosts; CPU-Aktivitäts-Gate |
+| `watchdog.py` | Hintergrund-Wächter: reapt bei geschlossenem Codex idle Ghosts und bei aktivem Desktop sicher wiederholte, CPU-inaktive Runtime-MCP-Prozessbäume |
 | `start_repair.py` | Klassifikation der Start-Lage für die zusammengefasste „Codex reparieren"-Eskalation |
 | `repair_workflow.py` | Hang-sichere S1–S7-Eskalationsengine (rein, injizierbare Bausteine) |
 | `repair_live.py` | Echte Windows-/AppX-Implementierungen der Reparatur-Bausteine (P11 absent-Erkennung, Reinstall-Prävention) |
@@ -27,7 +27,7 @@ kann die Logik getestet werden, ohne die Tray-App zu starten (der interne Python
 | `scheduler.py` | Optionaler Windows-Task-Scheduler-Helfer für periodische Aufrufe von `maintain --execute` |
 | `thread_hygiene.py` | Altersbasierte Thread-Pflege: Ungelesen-State, transactionales Archivieren und Backups bei geschlossenem Codex |
 | `mark_runs_read.py` | Codex-Ungelesen-State für Automations-/Thread-Ergebnisse gesichert als gelesen markieren |
-| `config_audit.py` | Audit plus getrennte off/notify/auto-Fixes für MCP-Duplikate, Plattform-Plugins und leere Threads |
+| `config_audit.py` | Audit plus getrennte off/notify/auto-Fixes für MCP-Konfigurationsduplikate, Plattform-Plugins und leere Threads; manueller Audit startet zusätzlich den Runtime-MCP-Reaper |
 | `safe_start_integration.py` | Safe-Start-Status, Installation, Start-Gate, Wiederherstellung und Aufschublogik anbinden |
 | `single_instance.py` | Windows-Mutex für die Tray-App |
 | `tray.py` | PySide6-Systemtray-App mit Statusfenster, QThread-Workern, Wächter, Reparatur, Wartung und Store-Aktionen |
@@ -114,4 +114,6 @@ nicht in bereits laufende Datenbankoperationen ein.
 - Ohne explizite Archivkonfiguration werden keine Logdaten gelöscht.
 - Thread-Archivierung ist separat konfiguriert (`auto_archive_threads_days=0` bedeutet aus), läuft nur bei geschlossenem Codex und sichert `state_5.sqlite` vor Änderungen.
 - Startup-Reparatur beendet ausschließlich Zombie-Hauptprozesse (kein Renderer); aktive Sitzungen nie.
+- Runtime-MCP-Bereinigung gilt nur für direkte Launcher unter dem Store-Desktop-App-Server: der neueste Start-Cohort bleibt immer bestehen, mindestens zwei verschiedene Signaturen müssen exakt wiederholt sein, die Karenzzeit muss abgelaufen sein und der vollständige Kandidatenbaum darf im CPU-Sample nicht arbeiten.
+- npm-/CLI-app-server, der Desktop-App-Server selbst, fremde Kindprozesse und Kandidaten mit unvollständigen Zeitdaten werden fail-closed ausgeschlossen.
 - Kill-Targeting nur über den exakten konfigurierten Exe-Pfad plus Prozessbaum — keine Substring-Treffer.

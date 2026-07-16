@@ -42,7 +42,10 @@ def _make_config(tmp: Path, toml_content: str = "", state_db: bool = False) -> M
         """)
         conn.commit()
         conn.close()
-    return MaintenanceConfig(database_path=str(codex_home / "logs_2.sqlite"))
+    return MaintenanceConfig(
+        database_path=str(codex_home / "logs_2.sqlite"),
+        reap_runtime_mcp_duplicates=False,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -495,6 +498,34 @@ args = ["C:/node_modules/ellmos-codecommander-mcp/dist/index.js"]
         assert cycle.fixes_deferred == 1
         assert any(f.category == "MCP-Duplikat" for f in report.findings)
         assert config.config_toml_path.read_bytes() == original
+
+
+def test_manual_audit_reaps_runtime_mcp_duplicates_while_codex_runs():
+    from codex_logdatenbank_wartung.config_audit import run_manual_audit
+
+    with tempfile.TemporaryDirectory() as tmp:
+        config = _make_config(Path(tmp))
+        config.reap_runtime_mcp_duplicates = True
+
+        def provider():
+            return []
+
+        with patch(
+            "codex_logdatenbank_wartung.watchdog.reap_runtime_mcp_duplicates",
+            return_value=7,
+        ) as reap:
+            _report, cycle = run_manual_audit(
+                config,
+                renderer_present=True,
+                process_provider=provider,
+            )
+
+    assert cycle.runtime_mcp_roots_reaped == 7
+    reap.assert_called_once_with(
+        config,
+        execute=True,
+        provider=provider,
+    )
 
 
 def test_auto_audit_archives_empty_threads_when_codex_is_closed(tmp_path: Path) -> None:

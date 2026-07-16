@@ -8,7 +8,7 @@ oder System-Locale gesetzt und kann im Tray über die Einstellungen gewechselt w
 from __future__ import annotations
 
 import locale
-from typing import Literal, cast
+from typing import Literal
 
 Language = Literal["de", "en"]
 LANGUAGES: tuple[Language, ...] = ("de", "en")
@@ -36,8 +36,8 @@ _CATALOG: dict[str, dict[Language, str]] = {
     },
     "settings_audit_now": {"de": "Audit jetzt ausführen", "en": "Run audit now"},
     "settings_audit_now_tooltip": {
-        "de": "Config-Audit sofort starten (prüft MCP, Plugins und CLI).",
-        "en": "Run the config audit now (checks MCP, plugins and CLI).",
+        "de": "Audit sofort starten: prüft Konfiguration, Plugins, CLI und bereinigt sicher erkannte alte Runtime-MCP-Prozessbäume.",
+        "en": "Run the audit now: checks configuration, plugins and CLI, and removes safely identified old runtime MCP process trees.",
     },
     "settings_language_saved": {
         "de": "Sprache gespeichert: {language}.",
@@ -238,12 +238,12 @@ _CATALOG: dict[str, dict[Language, str]] = {
     "process_check_step": {"de": "Codex-Prozessprüfung", "en": "Codex process check"},
     # -- Watchdog --
     "watchdog_menu": {
-        "de": "Auto-Wächter: Start-Reste entfernen",
-        "en": "Auto watchdog: remove start remnants",
+        "de": "Auto-Wächter: Start- und MCP-Reste entfernen",
+        "en": "Auto watchdog: remove start and MCP remnants",
     },
     "watchdog_tooltip": {
-        "de": "Überwacht im Hintergrund: ist Codex zu und hängen alte Reste (Ghost-Prozess ohne Fenster / verwaistes Lockfile), werden sie entfernt, damit der nächste Start sauber ist. Beendet nie eine aktive Sitzung und nie die Codex-CLI. Benachrichtigt beim Aufräumen.",
-        "en": "Watches in the background: when Codex is closed and old remnants remain (ghost process without window / stale lockfile), removes them so the next start is clean. Never ends an active session or the Codex CLI. Notifies when cleanup happened.",
+        "de": "Überwacht im Hintergrund: entfernt bei geschlossenem Codex alte Start-Reste und bereinigt sicher wiederholte Runtime-MCP-Prozessbäume auch bei aktiver Desktop-App. Die neueste MCP-Generation, aktive Sitzungen und die Codex-CLI bleiben geschützt. Benachrichtigt beim Aufräumen.",
+        "en": "Watches in the background: removes old start remnants when Codex is closed and safely repeated runtime MCP process trees even while the desktop app is active. The newest MCP generation, active sessions and the Codex CLI remain protected. Notifies when cleanup happened.",
     },
     "watchdog_codex_active": {
         "de": "Codex aktiv (Renderer vorhanden) — Wächter hält sich raus.",
@@ -692,6 +692,10 @@ _CATALOG: dict[str, dict[Language, str]] = {
         "de": "Auto-Fix: {count} Plugin(s) deaktiviert.",
         "en": "Auto-fix: disabled {count} plugin(s).",
     },
+    "audit_reaped_runtime_mcp": {
+        "de": "Runtime-Bereinigung: {count} alte MCP-Prozessbäume entfernt.",
+        "en": "Runtime cleanup: removed {count} old MCP process tree(s).",
+    },
     "audit_fixes_deferred": {
         "de": "Auto-Fix vorgemerkt: {count} Befund(e) werden automatisch behoben, sobald Codex geschlossen ist.",
         "en": "Auto-fix queued: {count} finding(s) will be fixed automatically after Codex closes.",
@@ -1003,7 +1007,7 @@ def normalize_language(lang: object) -> Language | None:
     if isinstance(lang, str):
         value = lang.strip().lower()
         if value in LANGUAGES:
-            return cast(Language, value)
+            return value
     return None
 
 

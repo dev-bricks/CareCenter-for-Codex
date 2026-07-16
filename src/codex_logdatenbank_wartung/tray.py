@@ -295,7 +295,11 @@ class WatchdogWorker(QObject):
         except Exception:  # noqa: BLE001 -- ein Tick darf den Waechter nie crashen
             return
         self._audit(config, result)
-        if result.action == "reaped":
+        if (
+            result.action == "reaped"
+            or result.companion_orphans_reaped
+            or result.runtime_mcp_roots_reaped
+        ):
             self.reaped.emit(result.to_dict())
         self._run_thread_hygiene(config)
         self._run_config_audit(config)
@@ -328,9 +332,12 @@ class WatchdogWorker(QObject):
             zombies = getattr(result, "zombie_pids", [])
             stale = getattr(result, "stale_lockfile", False)
             status = getattr(result, "repair_status", None)
+            companion = getattr(result, "companion_orphans_reaped", 0)
+            runtime_mcp = getattr(result, "runtime_mcp_roots_reaped", 0)
             line = (
                 f"{stamp}  action={action}  zombies={zombies}  "
-                f"lockfile={stale}  reap_status={status}\n"
+                f"lockfile={stale}  reap_status={status}  companion_reaped={companion}  "
+                f"runtime_mcp_reaped={runtime_mcp}\n"
             )
             with (logs / "watchdog.log").open("a", encoding="utf-8") as handle:
                 handle.write(line)
@@ -2182,6 +2189,7 @@ class TrayController(QObject):
         fixed_mcp = cycle.mcp_fixed
         fixed_plugins = cycle.plugins_fixed
         fixed_empty_threads = cycle.empty_threads_fixed
+        runtime_mcp_reaped = cycle.runtime_mcp_roots_reaped
 
         lines = [report.summary()]
         if fixed_mcp:
@@ -2190,6 +2198,8 @@ class TrayController(QObject):
             lines.append("\n" + t("audit_fixed_plugins", count=fixed_plugins))
         if fixed_empty_threads:
             lines.append(f"\n{fixed_empty_threads} leere Thread(s) archiviert.")
+        if runtime_mcp_reaped:
+            lines.append("\n" + t("audit_reaped_runtime_mcp", count=runtime_mcp_reaped))
         if cycle.fixes_deferred:
             lines.append("\n" + t("audit_fixes_deferred", count=cycle.fixes_deferred))
         result_text = "\n".join(lines)
@@ -2198,8 +2208,19 @@ class TrayController(QObject):
         self.window.set_result(result_text)
         self.show_window()
 
-        if report.has_warnings or fixed_mcp or fixed_plugins or fixed_empty_threads:
-            fixed_count = fixed_mcp + fixed_plugins + fixed_empty_threads
+        if (
+            report.has_warnings
+            or fixed_mcp
+            or fixed_plugins
+            or fixed_empty_threads
+            or runtime_mcp_reaped
+        ):
+            fixed_count = (
+                fixed_mcp
+                + fixed_plugins
+                + fixed_empty_threads
+                + runtime_mcp_reaped
+            )
             self.tray.showMessage(
                 t("audit_title"),
                 t("audit_findings", count=len(report.findings))

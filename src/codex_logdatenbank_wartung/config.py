@@ -132,6 +132,15 @@ class MaintenanceConfig:
     # Laeuft unabhaengig vom Desktop-Zustand bei jedem Watchdog-Tick.
     reap_companion_orphans: bool = True
     companion_orphan_min_age_seconds: int = 300  # 5 Minuten Karenzzeit nach Task-Ende
+    # Runtime-MCP-Reaper: Codex Desktop kann bei wiederholter Runtime-Initialisierung
+    # vollstaendige MCP-Prozessgruppen unter demselben App-Server ansammeln. Nur alte,
+    # exakt im neuesten Start-Cohort wiederholte Launcher werden als Baum entfernt.
+    reap_runtime_mcp_duplicates: bool = True
+    runtime_mcp_duplicate_min_age_seconds: int = 300
+    runtime_mcp_generation_gap_seconds: int = 90
+    runtime_mcp_batch_window_seconds: int = 30
+    runtime_mcp_min_matching_roots: int = 2
+    runtime_mcp_activity_sample_seconds: float = 1.0
     # Safe Start for Codex bleibt ein eigenständiges Werkzeug. CareCenter liest dessen
     # Config/Snapshots optional aus und zeigt Start-Storm- sowie Catch-up-Hinweise an.
     safe_start_config_path: str = field(

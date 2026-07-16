@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Added a conservative runtime MCP reaper for duplicate process generations left
+  under the Codex Store desktop app-server. It groups launches by Codex's direct
+  `node_repl.exe` runtime anchors, always protects the newest launch cohort, requires
+  at least two distinct MCP launcher signatures repeated in that cohort, waits five
+  minutes, samples complete candidate trees for CPU activity, and then terminates
+  only idle old launcher trees with `taskkill /T`. npm/CLI app-servers, unrelated
+  children, active trees, and the desktop app-server itself are fail-closed exclusions.
+  The 60-second watchdog and the manual tray audit both run the reaper and record the
+  number of removed runtime MCP roots in `watchdog.log` and the UI.
 - Replaced the unresolvable `safe-start-for-codex>=1.1.2` index dependency with
   the verified public GitHub source pinned to commit
   `dcb369a64f403f6551bcb3bac16565c56ec79474`. The base runtime no longer requires

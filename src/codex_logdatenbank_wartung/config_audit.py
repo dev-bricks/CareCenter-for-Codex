@@ -584,6 +584,7 @@ class AuditCycleResult:
     mcp_fixed: int = 0
     plugins_fixed: int = 0
     empty_threads_fixed: int = 0
+    runtime_mcp_roots_reaped: int = 0
     fixes_deferred: int = 0
 
 
@@ -677,6 +678,16 @@ def run_manual_audit(
         last_hash="",
         renderer_present=renderer_present,
         process_provider=process_provider,
+    )
+    # Runtime-MCP-Duplikate sind Prozessreste, keine config.toml-Mutation.
+    # Der konservative Reaper darf deshalb auch bei aktivem Renderer laufen:
+    # seine eigene Erkennung schuetzt den neuesten Cohort und alle CLI-Baeume.
+    from .watchdog import reap_runtime_mcp_duplicates
+
+    cycle.runtime_mcp_roots_reaped = reap_runtime_mcp_duplicates(
+        config,
+        execute=True,
+        provider=process_provider,
     )
 
     auto_categories = set()

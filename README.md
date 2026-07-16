@@ -20,11 +20,11 @@ On Windows, closing the Codex desktop window can leave a hung main process behin
 
 ## Features
 
-- Background start-prevention watcher: checks every 60 seconds whether Codex is closed and old start blockers remain. It never touches an active Codex session, the node-based Codex CLI, or a process tree that is still doing CPU work.
+- Background watcher: checks every 60 seconds for old start blockers and duplicate runtime MCP process generations. Runtime cleanup is fail-closed: it only targets idle launcher trees repeated under the same Store desktop app-server, always keeps the newest launch cohort, and never touches the app-server itself or the node-based Codex CLI.
 - Tray settings with language switching: choose English or German in the Settings area. The choice is saved in `config.json` and the visible tray UI is relabeled immediately.
 - Tray automation controls: pause all currently active Codex automations, restore only automations disabled by CCC, or turn automations back on immediately or gradually. The spacing is configurable via `automation_stagger_delay_seconds` (default: 60 seconds).
 - Thread inbox hygiene: mark every result as read, mark only unread threads older than a configurable number of days, and automatically archive threads older than a separate configurable age. Current Codex thread ages and archive flags come from `state_5.sqlite`; unread IDs come from `.codex-global-state.json`. Changes run only while Codex is closed, with database/state backups, atomic JSON writes, and transactional archive updates.
-- Config audit cleanup now has three independent `off` / `notify` / `auto` controls: duplicate MCP entries, Windows-incompatible plugins, and empty threads. Empty-thread auto-fix uses the same backed-up transactional archive path and is deferred until Codex is closed.
+- Config audit cleanup has three independent `off` / `notify` / `auto` controls for duplicate MCP configuration entries, Windows-incompatible plugins, and empty threads. The manual audit additionally runs the conservative runtime MCP reaper even while the desktop renderer is present; configuration and thread mutations remain deferred until Codex is closed.
 - Loop mode: choose 2, 3, 5, 7, 10, 12, or 24 hours. Each regular due cycle starts with Fast maintenance and retries Codex close failures up to three times by default. If closing still fails, Safe becomes an extended catch-up attempt and the normal loop timer starts over; if Safe finishes before that timer expires, the timer starts again from the successful maintenance plus verified Codex restart. If the timer expires while Safe is still waiting, Safe is cancelled and the next regular Fast cycle starts. Automations are paused only after maintenance has succeeded, and only those paused automations are restored in 60-second windows.
 - Direct tray starts: "Codex safe starten" launches Safe Start for Codex in its own tray and reuses its `config.json`; if that config is missing, CareCenter uses a 1-minute interval for that launch. If Safe Start is already gating, the second safe-start click is a no-op. "Codex starten" starts Codex normally without the Safe Start gate; while Safe Start is active, CareCenter only restores the automations paused by Safe Start and does not open another Codex window.
 - One-click Repair Codex action: runs a bounded escalation that stops as soon as Codex starts again. It begins with no-admin cleanup and only suggests admin restart, Store reinstall, or reboot when needed.
@@ -129,6 +129,11 @@ database: %USERPROFILE%\.codex\logs_2.sqlite
 
 Codex paths are detected from `%LOCALAPPDATA%`, `%APPDATA%`, and `CODEX_HOME`. New installs also place CareCenter data under `%LOCALAPPDATA%\CareCenterForCodex` by default. Existing local setups under `C:\_Local_DEV\codex-maintenance\` are reused automatically as a legacy fallback. You can override every path in `config.json`.
 
+Runtime MCP cleanup is enabled by default through `reap_runtime_mcp_duplicates`.
+Its conservative defaults are a 300-second minimum age, a 90-second launch-cohort
+gap, a 30-second launcher window, at least two distinct repeated MCP signatures,
+and a 1-second CPU activity sample. Each threshold can be overridden in `config.json`.
+
 To use a different data root (useful in tests or alternative installations), set `CCC_DATA_ROOT` before launching:
 
 ```powershell
@@ -144,8 +149,9 @@ When set, `config.json`, `logs\`, and `backups\` are placed under that path inst
 - Scheduled maintenance never closes Codex.
 - Safe auto-maintain only closes Codex after the full process tree is idle.
 - Safe cancellation stops only the waiting phase before Codex is closed; active database operations are not force-interrupted.
-- The watcher kills only inactive ghosts without a renderer and only after the configured age threshold.
-- The Codex CLI and active desktop sessions are explicitly excluded.
+- The watcher kills inactive ghosts without a renderer only after the configured age threshold.
+- Duplicate runtime MCP cleanup always keeps the newest launch cohort and skips candidate trees whose CPU counters still advance.
+- The Codex desktop app-server, unrelated child processes, the Codex CLI, and active desktop work are explicitly excluded.
 - Destructive paths such as Store reset, admin repair, reinstall, and reboot are suggestions or explicit user actions, not automatic surprises.
 
 ## Windows Store Materials

@@ -8,6 +8,7 @@ import re
 import subprocess
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from typing import Any
 
 from .config import MaintenanceConfig
@@ -280,6 +281,177 @@ def find_companion_orphans(
         for p in provider()
         if is_companion_orphan(p, min_age_seconds=min_age_seconds)
     ]
+
+
+def _created_datetime(process: ProcessInfo) -> datetime | None:
+    """Parse den CIM-Zeitstempel; unbekannte Zeiten bleiben fail-closed."""
+    if not process.created_at:
+        return None
+    try:
+        value = datetime.fromisoformat(process.created_at)
+    except ValueError:
+        return None
+    if value.tzinfo is not None:
+        value = value.astimezone().replace(tzinfo=None)
+    return value
+
+
+def _is_desktop_app_server(process: ProcessInfo) -> bool:
+    """Nur der eingebettete Store-App-Server, niemals npm-/CLI-app-server."""
+    executable = _normalise_path(process.executable)
+    command = process.command_line.lower()
+    return bool(
+        process.name.lower() == "codex.exe"
+        and r"\windowsapps\openai.codex_" in executable
+        and "app-server" in command
+        and "--analytics-default-enabled" in command
+    )
+
+
+def _is_runtime_generation_anchor(process: ProcessInfo, app_server_pid: int) -> bool:
+    if process.parent_pid != app_server_pid or process.name.lower() != "node_repl.exe":
+        return False
+    haystack = _normalise_path(f"{process.executable} {process.command_line}")
+    return r"\openai\codex\runtimes\cua_node" in haystack
+
+
+def _is_runtime_mcp_launcher(process: ProcessInfo, app_server_pid: int) -> bool:
+    """Enger Root-Matcher: direkter node/cmd-Kindprozess mit MCP-Signatur."""
+    if process.parent_pid != app_server_pid:
+        return False
+    if process.name.lower() not in {"cmd.exe", "node.exe"}:
+        return False
+    haystack = f"{process.executable} {process.command_line}".lower()
+    return "mcp" in haystack
+
+
+def _runtime_root_signature(process: ProcessInfo) -> str:
+    command = re.sub(r"\s+", " ", process.command_line.strip()).lower()
+    executable = _normalise_path(process.executable)
+    return f"{process.name.lower()}|{executable}|{command}"
+
+
+def find_runtime_mcp_duplicate_roots(
+    provider: ProcessProvider | None = None,
+    *,
+    min_age_seconds: int = 300,
+    generation_gap_seconds: int = 90,
+    batch_window_seconds: int = 30,
+    minimum_matching_mcp_roots: int = 2,
+    now: datetime | None = None,
+) -> list[ProcessInfo]:
+    """Finde nur sicher wiederholte, alte MCP-Launcher des Desktop-App-Servers.
+
+    Codex startet jede Runtime-Generation mit einem direkten ``node_repl.exe``-
+    Kind. MCP-Launcher derselben Generation entstehen im engen Zeitfenster um
+    diesen Anker. Mehrere Anker innerhalb kurzer Zeit werden als ein Start-Cohort
+    behandelt und gemeinsam geschuetzt. Entfernt werden nur Roots, deren exakte
+    Prozesssignatur auch im neuesten Cohort vorkommt. Der neueste Cohort, fremde
+    Kindprozesse, der Desktop-App-Server selbst und CLI-app-server sind tabu.
+
+    Die Rueckgabe enthaelt nur direkte Launcher-Roots. Der Aufrufer beendet deren
+    Baum mit ``taskkill /T``; Nachfahren werden deshalb nicht separat geliefert.
+    """
+    provider = provider or windows_processes
+    processes = provider()
+    current = now or datetime.now()
+    if current.tzinfo is not None:
+        current = current.astimezone().replace(tzinfo=None)
+
+    gap = timedelta(seconds=max(0, generation_gap_seconds))
+    window = timedelta(seconds=max(0, batch_window_seconds))
+    min_age = max(0, min_age_seconds)
+    minimum_roots = max(1, minimum_matching_mcp_roots)
+    duplicates: list[ProcessInfo] = []
+
+    for app_server in (
+        process for process in processes if _is_desktop_app_server(process)
+    ):
+        direct_children = [
+            process for process in processes if process.parent_pid == app_server.pid
+        ]
+        anchor_processes = [
+            process
+            for process in direct_children
+            if _is_runtime_generation_anchor(process, app_server.pid)
+        ]
+        parsed_anchors = [
+            (_created_datetime(process), process) for process in anchor_processes
+        ]
+        # Ein unbekannter Anker-Zeitstempel koennte die neueste Generation sein:
+        # dann darf keine aeltere Generation irrtuemlich als "neueste" gelten.
+        if any(started is None for started, _process in parsed_anchors):
+            continue
+        anchors = sorted(
+            (
+                (started, process)
+                for started, process in parsed_anchors
+                if started is not None
+            ),
+            key=lambda item: (item[0], item[1].pid),
+        )
+        if len(anchors) < 2:
+            continue
+
+        cohorts: list[list[tuple[datetime, ProcessInfo]]] = []
+        for started, process in anchors:
+            if not cohorts or started - cohorts[-1][-1][0] > gap:
+                cohorts.append([])
+            cohorts[-1].append((started, process))
+        if len(cohorts) < 2:
+            continue
+
+        timed_roots: list[tuple[datetime, ProcessInfo]] = []
+        for process in direct_children:
+            if not (
+                _is_runtime_generation_anchor(process, app_server.pid)
+                or _is_runtime_mcp_launcher(process, app_server.pid)
+            ):
+                continue
+            if root_started := _created_datetime(process):
+                timed_roots.append((root_started, process))
+
+        cohort_roots: list[list[ProcessInfo]] = []
+        for cohort in cohorts:
+            start = cohort[0][0] - window
+            end = cohort[-1][0] + window
+            cohort_roots.append(
+                [process for started, process in timed_roots if start <= started <= end]
+            )
+
+        newest_signatures = {
+            _runtime_root_signature(process) for process in cohort_roots[-1]
+        }
+        if not newest_signatures:
+            continue
+
+        for cohort, roots in zip(cohorts[:-1], cohort_roots[:-1], strict=True):
+            cohort_age = (current - cohort[-1][0]).total_seconds()
+            if cohort_age < min_age:
+                continue
+            matching = [
+                process
+                for process in roots
+                if _runtime_root_signature(process) in newest_signatures
+            ]
+            matching_mcp_signatures = {
+                _runtime_root_signature(process)
+                for process in matching
+                if _is_runtime_mcp_launcher(process, app_server.pid)
+            }
+            matching_anchor = any(
+                _is_runtime_generation_anchor(process, app_server.pid)
+                for process in matching
+            )
+            if not matching_anchor or len(matching_mcp_signatures) < minimum_roots:
+                continue
+            duplicates.extend(matching)
+
+    unique = {process.pid: process for process in duplicates}
+    return sorted(
+        unique.values(),
+        key=lambda process: (_created_datetime(process) or datetime.max, process.pid),
+    )
 
 
 def build_children_map(processes: Iterable[ProcessInfo]) -> dict[int, list[int]]:

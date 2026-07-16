@@ -20,13 +20,23 @@ einem Worker-Thread + Benachrichtigung) liegt in `tray.py`.
 
 from __future__ import annotations
 
+import subprocess
+import time
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field
 from typing import Literal
 
 from .config import MaintenanceConfig
 from .health import RepairResult, diagnose, repair_start
-from .processes import ProcessProvider, find_companion_orphans
+from .processes import (
+    ProcessInfo,
+    ProcessProvider,
+    find_companion_orphans,
+    find_runtime_mcp_duplicate_roots,
+    tree_pids,
+    windows_processes,
+)
 
 WatchdogAction = Literal["codex_active", "idle", "disabled", "busy", "failed", "reaped"]
 
@@ -42,6 +52,7 @@ class WatchdogTickResult:
     repair_status: str | None = None  # Status der repair_start-RepairResult, falls gereapt
     relaunched: bool = False
     companion_orphans_reaped: int = 0
+    runtime_mcp_roots_reaped: int = 0
 
     def to_dict(self) -> dict[str, object]:
         return asdict(self)
@@ -70,8 +81,6 @@ def _reap_companion_orphans(
     if not execute:
         return len(orphans)
 
-    import subprocess
-
     from .processes import no_window_kwargs
 
     reaped = 0
@@ -92,6 +101,151 @@ def _reap_companion_orphans(
             except (subprocess.CalledProcessError, OSError):
                 pass
     return reaped
+
+
+def reap_runtime_mcp_duplicates(
+    config: MaintenanceConfig,
+    *,
+    execute: bool = True,
+    provider: ProcessProvider | None = None,
+    activity_provider: ProcessProvider | None = None,
+    killer: Callable[[int], tuple[bool, str]] | None = None,
+) -> int:
+    """Entferne alte, sicher wiederholte MCP-Launcher samt Prozessbaum.
+
+    Die Erkennung in ``processes`` schuetzt den neuesten Runtime-Cohort, den
+    Desktop-App-Server selbst, fremde Kindprozesse und alle CLI-app-server.
+    Default-seitig wird jeder gefundene direkte Launcher mit ``taskkill /T``
+    beendet, damit npx-/cmd-Nachfahren nicht als neue Orphans zurueckbleiben.
+    """
+    if not getattr(config, "reap_runtime_mcp_duplicates", True):
+        return 0
+
+    resolved_provider = provider or windows_processes
+    initial_processes = resolved_provider()
+    roots = find_runtime_mcp_duplicate_roots(
+        provider=lambda: initial_processes,
+        min_age_seconds=getattr(
+            config, "runtime_mcp_duplicate_min_age_seconds", 300
+        ),
+        generation_gap_seconds=getattr(
+            config, "runtime_mcp_generation_gap_seconds", 90
+        ),
+        batch_window_seconds=getattr(
+            config, "runtime_mcp_batch_window_seconds", 30
+        ),
+        minimum_matching_mcp_roots=getattr(
+            config, "runtime_mcp_min_matching_roots", 2
+        ),
+    )
+    if not roots or not execute:
+        return len(roots)
+
+    # Noch arbeitende alte Baeume bleiben unangetastet. Das zweite Snapshot-
+    # Fenster laeuft nur, wenn es ueberhaupt sichere Duplikat-Kandidaten gibt.
+    # Ein fehlgeschlagener zweiter Snapshot ist fail-closed: dann wird nichts beendet.
+    sample_seconds = max(
+        0.0,
+        float(getattr(config, "runtime_mcp_activity_sample_seconds", 1.0)),
+    )
+    if killer is None and sample_seconds > 0:
+        time.sleep(sample_seconds)
+        later_processes = (activity_provider or resolved_provider)()
+        if not later_processes:
+            return 0
+        before_ticks = {process.pid: process.cpu_ticks for process in initial_processes}
+        later_ticks = {process.pid: process.cpu_ticks for process in later_processes}
+        idle_roots = []
+        for root in roots:
+            if root.pid not in later_ticks:
+                continue
+            members = tree_pids(root.pid, initial_processes) | tree_pids(
+                root.pid, later_processes
+            )
+            before_total = sum(before_ticks.get(pid, 0) for pid in members)
+            later_total = sum(later_ticks.get(pid, 0) for pid in members)
+            if later_total <= before_total:
+                idle_roots.append(root)
+        roots = idle_roots
+        if not roots:
+            return 0
+
+    from .processes import no_window_kwargs
+
+    if killer:
+        reaped = 0
+        for root in roots:
+            ok, _ = killer(root.pid)
+            if ok:
+                reaped += 1
+        return reaped
+
+    def kill_tree(root: ProcessInfo) -> int:
+        try:
+            completed = subprocess.run(
+                ["taskkill", "/T", "/F", "/PID", str(root.pid)],
+                check=False,
+                capture_output=True,
+                timeout=15,
+                **no_window_kwargs(),
+            )
+            return int(completed.returncode == 0)
+        except (OSError, subprocess.TimeoutExpired):
+            return 0
+
+    # Alle Roots sind direkte, voneinander unabhaengige Kinder des App-Servers.
+    # Eine kleine Worker-Grenze verhindert, dass ein grosser Erstfund den Tray
+    # minutenlang blockiert, ohne Windows mit hunderten taskkill-Prozessen zu fluten.
+    workers = min(8, len(roots))
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        return sum(pool.map(kill_tree, roots))
+
+
+def _reap_runtime_residue(
+    config: MaintenanceConfig,
+    *,
+    execute: bool,
+    provider: ProcessProvider | None,
+    killer: Callable[[int], tuple[bool, str]] | None,
+) -> tuple[int, int]:
+    """Teile eine Prozessaufnahme zwischen beiden Runtime-Reapern."""
+    if not (
+        getattr(config, "reap_companion_orphans", True)
+        or getattr(config, "reap_runtime_mcp_duplicates", True)
+    ):
+        return 0, 0
+
+    cache: list[ProcessInfo] | None = None
+
+    def cached_provider():
+        nonlocal cache
+        if cache is None:
+            cache = (provider or windows_processes)()
+        return cache
+
+    companion = _reap_companion_orphans(
+        config,
+        execute=execute,
+        provider=cached_provider,
+        killer=killer,
+    )
+    runtime_mcp = reap_runtime_mcp_duplicates(
+        config,
+        execute=execute,
+        provider=cached_provider,
+        activity_provider=provider or windows_processes,
+        killer=killer,
+    )
+    return companion, runtime_mcp
+
+
+def _reap_message(companion: int, runtime_mcp: int) -> str:
+    parts: list[str] = []
+    if companion:
+        parts.append(f"{companion} Companion-Orphan(s) bereinigt")
+    if runtime_mcp:
+        parts.append(f"{runtime_mcp} alte Runtime-MCP-Prozessbäume bereinigt")
+    return (" " + "; ".join(parts) + ".") if parts else ""
 
 
 def run_watchdog_tick(
@@ -128,31 +282,36 @@ def run_watchdog_tick(
     report = diagnose_fn(config, provider)
 
     if getattr(report, "renderer_present", False):
-        companion_reaped = _reap_companion_orphans(config, execute=execute, provider=provider, killer=killer)
+        companion_reaped, runtime_mcp_reaped = _reap_runtime_residue(
+            config, execute=execute, provider=provider, killer=killer
+        )
         msg = "Codex aktiv (Renderer vorhanden) -- Waechter haelt sich raus."
-        if companion_reaped:
-            msg += f" {companion_reaped} Companion-Orphan(s) bereinigt."
+        msg += _reap_message(companion_reaped, runtime_mcp_reaped)
         result = WatchdogTickResult("codex_active", msg)
         result.companion_orphans_reaped = companion_reaped
+        result.runtime_mcp_roots_reaped = runtime_mcp_reaped
         return result
 
     zombie_pids = list(getattr(report, "zombie_main_pids", []) or [])
     stale_lockfile = bool(getattr(report, "stale_lockfile", False))
 
     if not zombie_pids and not stale_lockfile:
-        companion_reaped = _reap_companion_orphans(config, execute=execute, provider=provider, killer=killer)
+        companion_reaped, runtime_mcp_reaped = _reap_runtime_residue(
+            config, execute=execute, provider=provider, killer=killer
+        )
         msg = "Codex zu, keine haengenden Reste."
-        if companion_reaped:
-            msg += f" {companion_reaped} Companion-Orphan(s) bereinigt."
+        msg += _reap_message(companion_reaped, runtime_mcp_reaped)
         result = WatchdogTickResult("idle", msg)
         result.companion_orphans_reaped = companion_reaped
+        result.runtime_mcp_roots_reaped = runtime_mcp_reaped
         return result
 
     if not config.watcher_enabled:
-        companion_reaped = _reap_companion_orphans(config, execute=execute, provider=provider, killer=killer)
+        companion_reaped, runtime_mcp_reaped = _reap_runtime_residue(
+            config, execute=execute, provider=provider, killer=killer
+        )
         msg = "Haengende Reste erkannt, aber der Waechter ist deaktiviert (watcher_enabled=False)."
-        if companion_reaped:
-            msg += f" {companion_reaped} Companion-Orphan(s) bereinigt."
+        msg += _reap_message(companion_reaped, runtime_mcp_reaped)
         result = WatchdogTickResult(
             "disabled",
             msg,
@@ -160,6 +319,7 @@ def run_watchdog_tick(
             stale_lockfile=stale_lockfile,
         )
         result.companion_orphans_reaped = companion_reaped
+        result.runtime_mcp_roots_reaped = runtime_mcp_reaped
         return result
 
     # Aktivitaets-Gate: nur fuer den Ghost-Kill relevant (ein reines verwaistes Lockfile hat
@@ -179,13 +339,14 @@ def run_watchdog_tick(
         except Exception:  # noqa: BLE001 -- im Zweifel NICHT killen (konservativ)
             busy = True
         if busy:
-            companion_reaped = _reap_companion_orphans(config, execute=execute, provider=provider, killer=killer)
+            companion_reaped, runtime_mcp_reaped = _reap_runtime_residue(
+                config, execute=execute, provider=provider, killer=killer
+            )
             msg = (
                 "Haengende Reste erkannt, aber der Codex-Baum arbeitet aktiv (CPU) -- kein "
                 "Eingriff, um keinen Hintergrundlauf abzubrechen ('kein Renderer' != idle)."
             )
-            if companion_reaped:
-                msg += f" {companion_reaped} Companion-Orphan(s) bereinigt."
+            msg += _reap_message(companion_reaped, runtime_mcp_reaped)
             result = WatchdogTickResult(
                 "busy",
                 msg,
@@ -193,6 +354,7 @@ def run_watchdog_tick(
                 stale_lockfile=stale_lockfile,
             )
             result.companion_orphans_reaped = companion_reaped
+            result.runtime_mcp_roots_reaped = runtime_mcp_reaped
             return result
 
     # Reap: genau der getestete, sichere S1-Schritt (nur Ghosts ohne Renderer + verwaistes Lockfile).
@@ -233,7 +395,9 @@ def run_watchdog_tick(
     suffix = " Codex neu gestartet." if relaunched else " Du kannst Codex jetzt sauber starten."
     message = f"{detail}.{suffix}"
 
-    companion_reaped = _reap_companion_orphans(config, execute=execute, provider=provider, killer=killer)
+    companion_reaped, runtime_mcp_reaped = _reap_runtime_residue(
+        config, execute=execute, provider=provider, killer=killer
+    )
 
     return WatchdogTickResult(
         "reaped",
@@ -243,4 +407,5 @@ def run_watchdog_tick(
         repair_status=repair_result.status,
         relaunched=relaunched,
         companion_orphans_reaped=companion_reaped,
+        runtime_mcp_roots_reaped=runtime_mcp_reaped,
     )

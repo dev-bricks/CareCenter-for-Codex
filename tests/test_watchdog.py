@@ -10,7 +10,10 @@ import types
 
 from codex_logdatenbank_wartung.config import MaintenanceConfig
 from codex_logdatenbank_wartung.health import RepairResult
-from codex_logdatenbank_wartung.watchdog import run_watchdog_tick
+from codex_logdatenbank_wartung.watchdog import (
+    reap_runtime_mcp_duplicates,
+    run_watchdog_tick,
+)
 
 
 def activity(active: bool):
@@ -60,6 +63,7 @@ def repair_recorder(status: str = "repaired"):
 
 
 def make_config(**kw) -> MaintenanceConfig:
+    kw.setdefault("reap_runtime_mcp_duplicates", False)
     return MaintenanceConfig(**kw)
 
 
@@ -447,3 +451,94 @@ def test_companion_orphans_reaped_in_disabled_path() -> None:
     assert result.companion_orphans_reaped == 1
     assert 66666 in killed_pids
     assert _calls == []  # Zombie-Kill bleibt aus, Companion-Reap passiert
+
+
+# ---------------------------------------------------------------------------
+# Runtime-MCP-Reaper (doppelte Desktop-Generationen)
+# ---------------------------------------------------------------------------
+
+
+def test_runtime_mcp_duplicates_reaped_while_desktop_is_active() -> None:
+    from unittest.mock import patch
+
+    from codex_logdatenbank_wartung.processes import ProcessInfo
+
+    roots = [
+        ProcessInfo(701, "node_repl.exe"),
+        ProcessInfo(702, "cmd.exe", command_line="npx -y filecommander-mcp"),
+        ProcessInfo(703, "node.exe", command_line="node ./mcp/server.mjs"),
+    ]
+    killed_pids: list[int] = []
+
+    def killer(pid: int) -> tuple[bool, str]:
+        killed_pids.append(pid)
+        return True, "ok"
+
+    with patch(
+        "codex_logdatenbank_wartung.watchdog.find_runtime_mcp_duplicate_roots",
+        return_value=roots,
+    ):
+        result = run_watchdog_tick(
+            make_config(
+                reap_runtime_mcp_duplicates=True,
+                reap_companion_orphans=False,
+            ),
+            diagnose_fn=diagnose_returning(_Report(renderer_present=True)),
+            killer=killer,
+        )
+
+    assert result.action == "codex_active"
+    assert result.runtime_mcp_roots_reaped == 3
+    assert killed_pids == [701, 702, 703]
+
+
+def test_runtime_mcp_default_kill_uses_complete_process_tree() -> None:
+    from unittest.mock import patch
+
+    from codex_logdatenbank_wartung.processes import ProcessInfo
+
+    root = ProcessInfo(704, "cmd.exe", command_line="npx -y filecommander-mcp")
+    with patch(
+        "codex_logdatenbank_wartung.watchdog.find_runtime_mcp_duplicate_roots",
+        return_value=[root],
+    ), patch("codex_logdatenbank_wartung.watchdog.subprocess.run") as run:
+        run.return_value.returncode = 0
+        reaped = reap_runtime_mcp_duplicates(
+            make_config(
+                reap_runtime_mcp_duplicates=True,
+                runtime_mcp_activity_sample_seconds=0.0,
+            ),
+            execute=True,
+            provider=lambda: [root],
+        )
+
+    assert reaped == 1
+    command = run.call_args.args[0]
+    assert command == ["taskkill", "/T", "/F", "/PID", "704"]
+
+
+def test_runtime_mcp_reaper_skips_tree_with_cpu_activity() -> None:
+    from unittest.mock import patch
+
+    from codex_logdatenbank_wartung.processes import ProcessInfo
+
+    before = [ProcessInfo(705, "node.exe", cpu_ticks=10)]
+    after = [ProcessInfo(705, "node.exe", cpu_ticks=20)]
+    with patch(
+        "codex_logdatenbank_wartung.watchdog.find_runtime_mcp_duplicate_roots",
+        return_value=before,
+    ), patch("codex_logdatenbank_wartung.watchdog.subprocess.run") as run, patch(
+        "codex_logdatenbank_wartung.watchdog.time.sleep"
+    ):
+        reaped = reap_runtime_mcp_duplicates(
+            make_config(
+                reap_runtime_mcp_duplicates=True,
+                runtime_mcp_activity_sample_seconds=1.0,
+            ),
+            execute=True,
+            provider=lambda: before,
+            activity_provider=lambda: after,
+        )
+
+    assert reaped == 0
+    run.assert_not_called()

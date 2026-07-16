@@ -20,11 +20,11 @@ Unter Windows kann nach dem Schließen des Codex-Desktopfensters ein hängender 
 
 ## Funktionen
 
-- Hintergrund-Wächter für Start-Prävention: prüft alle 60 Sekunden, ob Codex geschlossen ist und alte Startblocker übrig sind. Er berührt nie eine aktive Codex-Sitzung, nie die node-basierte Codex-CLI und nie einen Prozessbaum, der noch CPU-Arbeit leistet.
+- Hintergrund-Wächter: prüft alle 60 Sekunden auf alte Startblocker und doppelte Runtime-MCP-Prozessgenerationen. Die Runtime-Bereinigung arbeitet fail-closed: Sie erfasst nur inaktive Launcher-Bäume, die unter demselben Store-Desktop-App-Server wiederholt wurden, behält immer den neuesten Start-Cohort und berührt weder den App-Server selbst noch die node-basierte Codex-CLI.
 - Spracheinstellung im Tray: Im Bereich Einstellungen kann zwischen Deutsch und Englisch gewechselt werden. Die Auswahl wird in `config.json` gespeichert und die sichtbare Tray-Oberfläche wird sofort neu beschriftet.
 - Automatisierungssteuerung im Tray: alle aktuell aktiven Codex-Automatisierungen ausschalten, nur von CCC ausgeschaltete Automatisierungen wieder aktivieren oder Automatisierungen sofort beziehungsweise gestaffelt nacheinander einschalten. Der Abstand ist über `automation_stagger_delay_seconds` konfigurierbar (Standard: 60 Sekunden).
 - Thread-Postfachpflege: alle als gelesen markieren, ungelesene Threads älter als X Tage markieren und Threads nach einem getrennt einstellbaren Alter automatisch archivieren. Die aktuelle Codex-Datenhaltung (`state_5.sqlite` plus `.codex-global-state.json`) wird nur bei geschlossenem Codex mit Backups, atomarem State-Schreiben und transaktionaler Archivierung geändert.
-- Die Audit-Bereinigung besitzt jetzt drei getrennte Modi `off` / `notify` / `auto`: doppelte MCP-Einträge, unter Windows unbrauchbare Plugins und leere Threads. Leere Threads werden im Auto-Modus über denselben gesicherten Archivpfad bereinigt, sobald Codex geschlossen ist.
+- Die Audit-Bereinigung besitzt drei getrennte Modi `off` / `notify` / `auto` für doppelte MCP-Konfigurationseinträge, unter Windows unbrauchbare Plugins und leere Threads. Der manuelle Audit startet zusätzlich den konservativen Runtime-MCP-Reaper, auch wenn der Desktop-Renderer läuft; Änderungen an Konfiguration und Threads bleiben bis zum Schließen von Codex aufgeschoben.
 - Loop-Modus: 2, 3, 5, 7, 10, 12 oder 24 Stunden wählen. Jeder regulär fällige Zyklus startet mit Fast-Wartung und wiederholt fehlgeschlagene Codex-Beenden-Versuche standardmäßig bis zu dreimal. Wenn das Beenden weiter scheitert, wird Safe zum verlängerten Nachholversuch und der normale Loop-Zähler beginnt neu; wenn Safe vor Ablauf dieses Zählers erfolgreich fertig wird, beginnt der Zähler erneut ab Wartungserfolg plus verifiziertem Codex-Neustart. Läuft der Zähler ab, während Safe noch wartet, wird Safe beendet und der nächste reguläre Fast-Zyklus startet. Automatisierungen werden erst nach erfolgreicher Wartung pausiert und nur diese pausierten Automatisierungen in 60-Sekunden-Fenstern zurückgegeben.
 - Direkte Tray-Starts: „Codex safe starten“ startet Safe Start for Codex im eigenen Tray und übernimmt dessen `config.json`; fehlt diese Config, nutzt CareCenter für diesen Start 1 Minute Abstand. Läuft Safe Start bereits, passiert kein zweiter Start. „Codex starten“ startet Codex normal ohne Safe-Start-Gate; ist Safe Start gerade aktiv, gibt CareCenter nur die von Safe Start pausierten Automatisierungen zurück und öffnet kein weiteres Codex-Fenster.
 - Ein-Klick-Aktion „Codex reparieren“: startet eine begrenzte Eskalation, die stoppt, sobald Codex wieder startet. Zuerst läuft eine Reparatur ohne Adminrechte; Admin-Neustart, Store-Neuinstallation oder Reboot werden nur bei Bedarf vorgeschlagen.
@@ -125,14 +125,21 @@ database: %USERPROFILE%\.codex\logs_2.sqlite
 
 Codex-Pfade werden aus `%LOCALAPPDATA%`, `%APPDATA%` und `CODEX_HOME` erkannt. Neue Installationen legen auch die CareCenter-Daten standardmäßig unter `%LOCALAPPDATA%\CareCenterForCodex` ab. Bestehende lokale Setups unter `C:\_Local_DEV\codex-maintenance\` werden als Legacy-Fallback automatisch weiterverwendet. Alle Pfade lassen sich in `config.json` überschreiben.
 
+Die Runtime-MCP-Bereinigung ist über `reap_runtime_mcp_duplicates` standardmäßig
+aktiv. Ihre konservativen Vorgaben sind 300 Sekunden Mindestalter, 90 Sekunden
+Start-Cohort-Abstand, ein 30-Sekunden-Launcherfenster, mindestens zwei verschiedene
+wiederholte MCP-Signaturen und eine Sekunde CPU-Aktivitätsmessung. Alle Schwellen
+lassen sich in `config.json` anpassen.
+
 ## Sicherheitsmodell
 
 - Konservative Wartung blockiert, solange Codex läuft.
 - Geplante Wartung schließt Codex nie.
 - Safe Auto-Maintain schließt Codex erst, wenn der gesamte Prozessbaum im Leerlauf ist.
 - Der Safe-Abbruch stoppt nur das Warten vor dem Schließen von Codex; laufende Datenbankoperationen werden nicht hart unterbrochen.
-- Der Wächter beendet nur inaktive Ghosts ohne Renderer und nur nach der konfigurierten Altersschwelle.
-- Die Codex-CLI und aktive Desktop-Sitzungen sind ausdrücklich ausgeschlossen.
+- Der Wächter beendet inaktive Ghosts ohne Renderer nur nach der konfigurierten Altersschwelle.
+- Die Runtime-MCP-Bereinigung behält immer den neuesten Start-Cohort und überspringt Kandidaten, deren CPU-Zähler noch steigen.
+- Der Codex-Desktop-App-Server, fremde Kindprozesse, die Codex-CLI und aktive Desktop-Arbeit sind ausdrücklich ausgeschlossen.
 - Destruktive Pfade wie Store-Reset, Admin-Reparatur, Neuinstallation und Reboot sind Vorschläge oder ausdrückliche Nutzeraktionen, keine automatischen Überraschungen.
 
 ## Windows-Store-Materialien

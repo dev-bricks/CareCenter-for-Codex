@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 from codex_logdatenbank_wartung.config import MaintenanceConfig
@@ -10,6 +11,7 @@ from codex_logdatenbank_wartung.processes import (
     find_codex_processes,
     find_codex_processes_by_executable,
     find_companion_orphans,
+    find_runtime_mcp_duplicate_roots,
     is_companion_orphan,
     process_type,
     tree_pids,
@@ -159,6 +161,128 @@ def test_find_companion_orphans_filters_correctly() -> None:
     result = find_companion_orphans(provider=lambda: procs, min_age_seconds=0)
     assert len(result) == 1
     assert result[0].pid == 1
+
+
+def _desktop_runtime_generations() -> list[ProcessInfo]:
+    store_root = (
+        r"C:\Program Files\WindowsApps\OpenAI.Codex_26.707.3563.0_x64__2p2nqsd0c76g0"
+        r"\app\resources"
+    )
+    repl = r"C:\Users\Example\AppData\Local\OpenAI\Codex\runtimes\cua_node\abc\node_repl.exe"
+    return [
+        ProcessInfo(
+            100,
+            "codex.exe",
+            store_root + r"\codex.exe",
+            '"codex.exe" app-server --analytics-default-enabled',
+            parent_pid=10,
+            created_at="2026-07-16T09:00:00",
+        ),
+        # Alte, vollstaendig wiederholte Generation.
+        ProcessInfo(110, "node_repl.exe", repl, f'"{repl}"', 100, "2026-07-16T09:10:00"),
+        ProcessInfo(
+            111,
+            "cmd.exe",
+            r"C:\Windows\System32\cmd.exe",
+            'cmd.exe /c "npx.cmd -y ellmos-filecommander-mcp"',
+            100,
+            "2026-07-16T09:10:01",
+        ),
+        ProcessInfo(
+            112,
+            "node.exe",
+            r"C:\Program Files\nodejs\node.exe",
+            'node.exe ./mcp/server.mjs --stdio',
+            100,
+            "2026-07-16T09:10:02",
+        ),
+        # Nachfahre wird spaeter per taskkill /T erfasst, aber nicht als eigener Root geliefert.
+        ProcessInfo(113, "node.exe", command_line="node dist/index.js", parent_pid=111,
+                    created_at="2026-07-16T09:10:10"),
+        # Zeitlich passend, aber kein MCP-Launcher: muss unangetastet bleiben.
+        ProcessInfo(114, "pwsh.exe", command_line="pwsh -EncodedCommand AAA", parent_pid=100,
+                    created_at="2026-07-16T09:10:03"),
+        # Neueste Generation bleibt immer erhalten.
+        ProcessInfo(210, "node_repl.exe", repl, f'"{repl}"', 100, "2026-07-16T09:20:00"),
+        ProcessInfo(
+            211,
+            "cmd.exe",
+            r"C:\Windows\System32\cmd.exe",
+            'cmd.exe /c "npx.cmd -y ellmos-filecommander-mcp"',
+            100,
+            "2026-07-16T09:20:01",
+        ),
+        ProcessInfo(
+            212,
+            "node.exe",
+            r"C:\Program Files\nodejs\node.exe",
+            'node.exe ./mcp/server.mjs --stdio',
+            100,
+            "2026-07-16T09:20:02",
+        ),
+    ]
+
+
+def test_runtime_mcp_reaper_finds_only_old_repeated_desktop_roots() -> None:
+    processes = _desktop_runtime_generations()
+
+    result = find_runtime_mcp_duplicate_roots(
+        provider=lambda: processes,
+        now=datetime.fromisoformat("2026-07-16T09:20:30"),
+        min_age_seconds=300,
+        minimum_matching_mcp_roots=2,
+    )
+
+    assert [process.pid for process in result] == [110, 111, 112]
+
+
+def test_runtime_mcp_reaper_keeps_single_or_fresh_generation() -> None:
+    processes = _desktop_runtime_generations()
+
+    single = find_runtime_mcp_duplicate_roots(
+        provider=lambda: [process for process in processes if process.pid < 200],
+        now=datetime.fromisoformat("2026-07-16T09:20:30"),
+        min_age_seconds=300,
+    )
+    fresh = find_runtime_mcp_duplicate_roots(
+        provider=lambda: processes,
+        now=datetime.fromisoformat("2026-07-16T09:12:00"),
+        min_age_seconds=300,
+    )
+
+    assert single == []
+    assert fresh == []
+
+
+def test_runtime_mcp_reaper_rejects_cli_app_server_and_incomplete_repeat() -> None:
+    processes = _desktop_runtime_generations()
+    cli_processes = [
+        ProcessInfo(
+            process.pid,
+            process.name,
+            process.executable.replace(r"C:\Program Files\WindowsApps", r"C:\Users\Example\AppData\Roaming\npm"),
+            process.command_line.replace(" --analytics-default-enabled", ""),
+            process.parent_pid,
+            process.created_at,
+        )
+        for process in processes
+    ]
+    incomplete = [process for process in processes if process.pid not in {112, 212}]
+
+    cli = find_runtime_mcp_duplicate_roots(
+        provider=lambda: cli_processes,
+        now=datetime.fromisoformat("2026-07-16T09:20:30"),
+        min_age_seconds=300,
+    )
+    not_enough_evidence = find_runtime_mcp_duplicate_roots(
+        provider=lambda: incomplete,
+        now=datetime.fromisoformat("2026-07-16T09:20:30"),
+        min_age_seconds=300,
+        minimum_matching_mcp_roots=2,
+    )
+
+    assert cli == []
+    assert not_enough_evidence == []
 
 
 def test_tree_and_descendants() -> None:

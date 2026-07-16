@@ -98,6 +98,30 @@ def test_load_persists_fast_loop_fields(tmp_path: Path) -> None:
     assert config.fast_loop_safe_fallback_enabled is True
 
 
+def test_load_persists_runtime_mcp_reaper_fields(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        json.dumps({
+            "reap_runtime_mcp_duplicates": False,
+            "runtime_mcp_duplicate_min_age_seconds": 600,
+            "runtime_mcp_generation_gap_seconds": 120,
+            "runtime_mcp_batch_window_seconds": 45,
+            "runtime_mcp_min_matching_roots": 3,
+            "runtime_mcp_activity_sample_seconds": 2,
+        }),
+        encoding="utf-8",
+    )
+
+    config = MaintenanceConfig.load(config_path)
+
+    assert config.reap_runtime_mcp_duplicates is False
+    assert config.runtime_mcp_duplicate_min_age_seconds == 600
+    assert config.runtime_mcp_generation_gap_seconds == 120
+    assert config.runtime_mcp_batch_window_seconds == 45
+    assert config.runtime_mcp_min_matching_roots == 3
+    assert config.runtime_mcp_activity_sample_seconds == 2.0
+
+
 def test_load_rejects_bool_for_int_field(tmp_path: Path) -> None:
     """bool darf nicht als gueltiger int-Wert durchgehen (bool ist int-Unterklasse).
 

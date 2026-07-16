@@ -22,6 +22,9 @@ Important boundaries:
   legacy path C:\_Local_DEV\codex-maintenance when it already exists.
 - It should not manipulate the node-based Codex CLI except through explicit
   read-only/audit paths.
+- Runtime MCP cleanup only targets old, idle launcher trees repeated under the
+  Codex Store desktop app-server. It always preserves the newest launch cohort,
+  the app-server itself, unrelated children, and every CLI app-server.
 - Loop mode treats Fast as the regular maintenance point. Safe is only an
   extended catch-up attempt after Fast close retries fail; if the next interval
   becomes due before Safe succeeds, Safe is cancelled and Fast starts again.
@@ -48,7 +51,7 @@ Environment variables:
 Verification:
 - python -m compileall -q src tests
 - python -m pytest -q
-- Current local verification: 309 pytest tests pass on Python 3.12 (2026-07-14)
+- Current local verification: 318 pytest tests pass on Python 3.12 (2026-07-16)
 
 Public documentation:
 - README.md: overview, install, usage, safety boundaries
@@ -57,4 +60,4 @@ Public documentation:
 - STORE_LISTING.md, PRIVACY_POLICY.md, SUPPORT.md: Store release materials
 - SECURITY.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md: community health files
 
-Last-checked: 2026-07-14
+Last-checked: 2026-07-16
