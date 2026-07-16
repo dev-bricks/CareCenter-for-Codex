@@ -236,6 +236,22 @@ def test_runtime_mcp_reaper_finds_only_old_repeated_desktop_roots() -> None:
     assert [process.pid for process in result] == [110, 111, 112]
 
 
+def test_runtime_mcp_reaper_default_waits_until_every_root_is_one_hour_old() -> None:
+    processes = _desktop_runtime_generations()
+
+    one_root_still_too_young = find_runtime_mcp_duplicate_roots(
+        provider=lambda: processes,
+        now=datetime.fromisoformat("2026-07-16T10:10:01"),
+    )
+    all_roots_old_enough = find_runtime_mcp_duplicate_roots(
+        provider=lambda: processes,
+        now=datetime.fromisoformat("2026-07-16T10:10:02"),
+    )
+
+    assert one_root_still_too_young == []
+    assert [process.pid for process in all_roots_old_enough] == [110, 111, 112]
+
+
 def test_runtime_mcp_reaper_keeps_single_or_fresh_generation() -> None:
     processes = _desktop_runtime_generations()
 

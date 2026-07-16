@@ -27,7 +27,10 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field
 from typing import Literal
 
-from .config import MaintenanceConfig
+from .config import (
+    DEFAULT_RUNTIME_MCP_DUPLICATE_MIN_AGE_SECONDS,
+    MaintenanceConfig,
+)
 from .health import RepairResult, diagnose, repair_start
 from .processes import (
     ProcessInfo,
@@ -126,7 +129,9 @@ def reap_runtime_mcp_duplicates(
     roots = find_runtime_mcp_duplicate_roots(
         provider=lambda: initial_processes,
         min_age_seconds=getattr(
-            config, "runtime_mcp_duplicate_min_age_seconds", 300
+            config,
+            "runtime_mcp_duplicate_min_age_seconds",
+            DEFAULT_RUNTIME_MCP_DUPLICATE_MIN_AGE_SECONDS,
         ),
         generation_gap_seconds=getattr(
             config, "runtime_mcp_generation_gap_seconds", 90

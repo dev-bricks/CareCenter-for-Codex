@@ -10,6 +10,7 @@ from typing import Any
 
 DEFAULT_DATA_DIR_NAME = "CareCenterForCodex"
 LEGACY_LOCAL_ROOT = Path(r"C:\_Local_DEV\codex-maintenance")
+DEFAULT_RUNTIME_MCP_DUPLICATE_MIN_AGE_SECONDS = 60 * 60
 
 
 def _local_appdata() -> Path:
@@ -136,7 +137,7 @@ class MaintenanceConfig:
     # vollstaendige MCP-Prozessgruppen unter demselben App-Server ansammeln. Nur alte,
     # exakt im neuesten Start-Cohort wiederholte Launcher werden als Baum entfernt.
     reap_runtime_mcp_duplicates: bool = True
-    runtime_mcp_duplicate_min_age_seconds: int = 300
+    runtime_mcp_duplicate_min_age_seconds: int = DEFAULT_RUNTIME_MCP_DUPLICATE_MIN_AGE_SECONDS
     runtime_mcp_generation_gap_seconds: int = 90
     runtime_mcp_batch_window_seconds: int = 30
     runtime_mcp_min_matching_roots: int = 2

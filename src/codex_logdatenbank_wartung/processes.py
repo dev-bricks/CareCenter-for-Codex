@@ -11,7 +11,10 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
-from .config import MaintenanceConfig
+from .config import (
+    DEFAULT_RUNTIME_MCP_DUPLICATE_MIN_AGE_SECONDS,
+    MaintenanceConfig,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -334,7 +337,7 @@ def _runtime_root_signature(process: ProcessInfo) -> str:
 def find_runtime_mcp_duplicate_roots(
     provider: ProcessProvider | None = None,
     *,
-    min_age_seconds: int = 300,
+    min_age_seconds: int = DEFAULT_RUNTIME_MCP_DUPLICATE_MIN_AGE_SECONDS,
     generation_gap_seconds: int = 90,
     batch_window_seconds: int = 30,
     minimum_matching_mcp_roots: int = 2,
@@ -429,11 +432,16 @@ def find_runtime_mcp_duplicate_roots(
             cohort_age = (current - cohort[-1][0]).total_seconds()
             if cohort_age < min_age:
                 continue
-            matching = [
-                process
-                for process in roots
-                if _runtime_root_signature(process) in newest_signatures
-            ]
+            matching: list[ProcessInfo] = []
+            for process in roots:
+                process_started = _created_datetime(process)
+                if process_started is None:
+                    continue
+                process_age = (current - process_started).total_seconds()
+                if process_age < min_age:
+                    continue
+                if _runtime_root_signature(process) in newest_signatures:
+                    matching.append(process)
             matching_mcp_signatures = {
                 _runtime_root_signature(process)
                 for process in matching

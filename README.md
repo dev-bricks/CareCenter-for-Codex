@@ -130,7 +130,8 @@ database: %USERPROFILE%\.codex\logs_2.sqlite
 Codex paths are detected from `%LOCALAPPDATA%`, `%APPDATA%`, and `CODEX_HOME`. New installs also place CareCenter data under `%LOCALAPPDATA%\CareCenterForCodex` by default. Existing local setups under `C:\_Local_DEV\codex-maintenance\` are reused automatically as a legacy fallback. You can override every path in `config.json`.
 
 Runtime MCP cleanup is enabled by default through `reap_runtime_mcp_duplicates`.
-Its conservative defaults are a 300-second minimum age, a 90-second launch-cohort
+Its conservative defaults are a configurable 3600-second (one-hour) minimum age for
+every candidate root, a 90-second launch-cohort
 gap, a 30-second launcher window, at least two distinct repeated MCP signatures,
 and a 1-second CPU activity sample. Each threshold can be overridden in `config.json`.
 

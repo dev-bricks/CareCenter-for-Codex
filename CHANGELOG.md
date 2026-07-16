@@ -5,8 +5,9 @@
 - Added a conservative runtime MCP reaper for duplicate process generations left
   under the Codex Store desktop app-server. It groups launches by Codex's direct
   `node_repl.exe` runtime anchors, always protects the newest launch cohort, requires
-  at least two distinct MCP launcher signatures repeated in that cohort, waits five
-  minutes, samples complete candidate trees for CPU activity, and then terminates
+  at least two distinct MCP launcher signatures repeated in that cohort, waits until
+  every candidate root is at least the configurable one-hour default age, samples
+  complete candidate trees for CPU activity, and then terminates
   only idle old launcher trees with `taskkill /T`. npm/CLI app-servers, unrelated
   children, active trees, and the desktop app-server itself are fail-closed exclusions.
   The 60-second watchdog and the manual tray audit both run the reaper and record the

@@ -126,8 +126,9 @@ database: %USERPROFILE%\.codex\logs_2.sqlite
 Codex-Pfade werden aus `%LOCALAPPDATA%`, `%APPDATA%` und `CODEX_HOME` erkannt. Neue Installationen legen auch die CareCenter-Daten standardmäßig unter `%LOCALAPPDATA%\CareCenterForCodex` ab. Bestehende lokale Setups unter `C:\_Local_DEV\codex-maintenance\` werden als Legacy-Fallback automatisch weiterverwendet. Alle Pfade lassen sich in `config.json` überschreiben.
 
 Die Runtime-MCP-Bereinigung ist über `reap_runtime_mcp_duplicates` standardmäßig
-aktiv. Ihre konservativen Vorgaben sind 300 Sekunden Mindestalter, 90 Sekunden
-Start-Cohort-Abstand, ein 30-Sekunden-Launcherfenster, mindestens zwei verschiedene
+aktiv. Ihre konservativen Vorgaben sind ein konfigurierbares Mindestalter von 3600 Sekunden
+(einer Stunde) für jeden Kandidaten-Root, 90 Sekunden Start-Cohort-Abstand, ein
+30-Sekunden-Launcherfenster, mindestens zwei verschiedene
 wiederholte MCP-Signaturen und eine Sekunde CPU-Aktivitätsmessung. Alle Schwellen
 lassen sich in `config.json` anpassen.
 
