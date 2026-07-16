@@ -3,7 +3,7 @@
   "publisher": "CN=TODO-PUBLISHER-DN",
   "publisher_display": "Lukas Geiger",
   "identity_name": "LukasGeiger.CareCenterForCodex",
-  "version": "0.6.2.0",
+  "version": "0.8.0.0",
   "description": "Lokales Windows-Tray- und CLI-Werkzeug zur Offline-Reparatur und Wartung der Codex-Desktop-App.",
   "executable": "CareCenterForCodex.exe",
   "capabilities": "runFullTrust",
