@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from codex_logdatenbank_wartung import store_release
 from codex_logdatenbank_wartung.store_release import validate_store_materials
 
 
@@ -95,6 +96,112 @@ def test_validate_store_materials_reports_ok_for_complete_materials(tmp_path: Pa
     assert report.status == "ok"
     pages_build_check = next(check for check in report.checks if check.name == "Store-Webseiten-Build")
     assert pages_build_check.status == "ok"
+
+
+def test_validate_store_materials_checks_live_pages_on_request(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    class FakeResponse:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args) -> None:
+            return None
+
+    requested_urls: list[str] = []
+
+    def fake_urlopen(request, *, timeout: float):
+        requested_urls.append(request.full_url)
+        assert timeout == 10.0
+        return FakeResponse()
+
+    monkeypatch.setattr(store_release.urlrequest, "urlopen", fake_urlopen)
+    exe_path = tmp_path / "CareCenterForCodex.exe"
+    exe_path.write_bytes(b"exe")
+    _write_store_files(
+        tmp_path,
+        {
+            "app_name": "CareCenter for Codex",
+            "publisher": "CN=01234567-89AB-CDEF-0123-456789ABCDEF",
+            "publisher_display": "Lukas Geiger",
+            "identity_name": "LukasGeiger.CareCenterForCodex",
+            "version": "0.8.0.0",
+            "description": "Offline Wartung und Reparatur fuer die Codex-Desktop-App.",
+            "executable": "CareCenterForCodex.exe",
+            "capabilities": "runFullTrust",
+            "category": "Developer Tools",
+            "age_rating": "3+",
+            "privacy_url": "https://dev-bricks.github.io/CareCenter-for-Codex/privacy",
+            "support_url": "https://dev-bricks.github.io/CareCenter-for-Codex/support",
+        },
+    )
+
+    report = validate_store_materials(
+        project_root=tmp_path,
+        exe_path=exe_path,
+        check_live_pages=True,
+    )
+
+    live_check = next(check for check in report.checks if check.name == "Store-Webseiten-Live")
+    assert live_check.status == "ok"
+    assert requested_urls == [
+        "https://dev-bricks.github.io/CareCenter-for-Codex/privacy",
+        "https://dev-bricks.github.io/CareCenter-for-Codex/support",
+    ]
+
+
+def test_validate_store_materials_warns_when_live_page_is_missing(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    class FakeResponse:
+        def __init__(self, status: int) -> None:
+            self.status = status
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args) -> None:
+            return None
+
+    def fake_urlopen(request, *, timeout: float):
+        del timeout
+        status = 404 if request.full_url.endswith("/support") else 200
+        return FakeResponse(status)
+
+    monkeypatch.setattr(store_release.urlrequest, "urlopen", fake_urlopen)
+    exe_path = tmp_path / "CareCenterForCodex.exe"
+    exe_path.write_bytes(b"exe")
+    _write_store_files(
+        tmp_path,
+        {
+            "app_name": "CareCenter for Codex",
+            "publisher": "CN=01234567-89AB-CDEF-0123-456789ABCDEF",
+            "publisher_display": "Lukas Geiger",
+            "identity_name": "LukasGeiger.CareCenterForCodex",
+            "version": "0.8.0.0",
+            "description": "Offline Wartung und Reparatur fuer die Codex-Desktop-App.",
+            "executable": "CareCenterForCodex.exe",
+            "capabilities": "runFullTrust",
+            "category": "Developer Tools",
+            "age_rating": "3+",
+            "privacy_url": "https://dev-bricks.github.io/CareCenter-for-Codex/privacy",
+            "support_url": "https://dev-bricks.github.io/CareCenter-for-Codex/support",
+        },
+    )
+
+    report = validate_store_materials(
+        project_root=tmp_path,
+        exe_path=exe_path,
+        check_live_pages=True,
+    )
+
+    live_check = next(check for check in report.checks if check.name == "Store-Webseiten-Live")
+    assert live_check.status == "warning"
+    assert "support_url: HTTP 404" in live_check.message
 
 
 def test_validate_store_materials_auto_detects_built_exe_from_build_script(tmp_path: Path) -> None:

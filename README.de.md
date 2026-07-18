@@ -154,7 +154,7 @@ Das Projekt enthält die Grundlage für den Windows Store:
 - `docs/privacy.md`
 - `docs/support.md`
 
-Geplante öffentliche Store-Ziele:
+Öffentliche Store-Seiten:
 
 - Datenschutz: `https://dev-bricks.github.io/CareCenter-for-Codex/privacy`
 - Support: `https://dev-bricks.github.io/CareCenter-for-Codex/support`
@@ -163,10 +163,13 @@ Validieren mit:
 
 ```powershell
 python -m codex_logdatenbank_wartung.cli store-materials
+python -m codex_logdatenbank_wartung.cli store-materials --live-pages
 python -m codex_logdatenbank_wartung.cli store-materials --exe-path C:\_Local_DEV\codex-maintenance\bin
 ```
 
-Ohne `--exe-path` versucht der Check, die gebaute EXE automatisch aus `build_exe.bat` (`DIST_DIR`) zu finden. Mit `--exe-path` kann entweder die konkrete `.exe` oder nur der Build-Ordner übergeben werden.
+Mit `--live-pages` wird das externe Release-Gate geprüft: Der Befehl ruft beide konfigurierten Store-URLs über HTTPS ab und meldet nicht erreichbare Seiten als Warnung. Ohne `--exe-path` versucht der Check, die gebaute EXE automatisch aus `build_exe.bat` (`DIST_DIR`) zu finden. Mit `--exe-path` kann entweder die konkrete `.exe` oder nur der Build-Ordner übergeben werden.
+
+Der Check baut die statischen GitHub-Pages-Dateien außerdem temporär und prüft `privacy/index.html`, `support/index.html`, `index.html` sowie den Build-Marker. Der aktive Workflow `.github/workflows/pages.yml` veröffentlicht die Routen `/privacy/` und `/support/` über GitHub Pages.
 
 ## Entwicklung
 

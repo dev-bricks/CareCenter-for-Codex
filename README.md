@@ -166,7 +166,7 @@ The project includes Windows Store groundwork:
 - `docs/privacy.md`
 - `docs/support.md`
 
-Planned public Store targets:
+Public Store pages:
 
 - Privacy: `https://dev-bricks.github.io/CareCenter-for-Codex/privacy`
 - Support: `https://dev-bricks.github.io/CareCenter-for-Codex/support`
@@ -175,10 +175,11 @@ Validate them with:
 
 ```powershell
 python -m codex_logdatenbank_wartung.cli store-materials
+python -m codex_logdatenbank_wartung.cli store-materials --live-pages
 python -m codex_logdatenbank_wartung.cli store-materials --exe-path C:\_Local_DEV\codex-maintenance\bin
 ```
 
-Without `--exe-path`, the check tries to discover the built EXE automatically from `build_exe.bat` (`DIST_DIR`). With `--exe-path`, you can pass either the exact `.exe` file or just the build directory.
+Use `--live-pages` for the external release gate: it requests both configured Store URLs over HTTPS and reports unreachable pages as warnings. Without `--exe-path`, the check tries to discover the built EXE automatically from `build_exe.bat` (`DIST_DIR`). With `--exe-path`, you can pass either the exact `.exe` file or just the build directory.
 
 The Store privacy/support URLs are prepared for GitHub Pages. `store-materials` also runs a temporary static Pages build and verifies `privacy/index.html`, `support/index.html`, `index.html`, and the build marker. You can still build the artifact explicitly with:
 
@@ -186,7 +187,7 @@ The Store privacy/support URLs are prepared for GitHub Pages. `store-materials` 
 python scripts\build_store_pages.py --output _site
 ```
 
-The workflow `.github/workflows/pages.yml` publishes the generated `/privacy/` and `/support/` routes after GitHub Pages is configured to use GitHub Actions for this repository.
+The active workflow `.github/workflows/pages.yml` publishes the generated `/privacy/` and `/support/` routes through GitHub Pages.
 
 ## Development
 

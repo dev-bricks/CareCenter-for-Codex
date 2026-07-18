@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 
-from codex_logdatenbank_wartung.cli import main
+from codex_logdatenbank_wartung.cli import build_parser, main
 
 
 def test_init_config_writes_on_fresh_system(tmp_path: Path, capsys) -> None:
@@ -79,6 +79,12 @@ def test_store_materials_command_returns_warning_for_missing_files(tmp_path: Pat
     assert rc == 1
     out = capsys.readouterr().out
     assert "Store-Materialien" in out
+
+
+def test_store_materials_parser_accepts_live_pages_flag() -> None:
+    args = build_parser().parse_args(["store-materials", "--live-pages"])
+
+    assert args.live_pages is True
 
 
 def test_store_screenshot_command_writes_png(tmp_path: Path, capsys, monkeypatch) -> None:

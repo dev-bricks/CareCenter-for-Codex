@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Added an opt-in `store-materials --live-pages` gate that checks the configured
+  privacy and support URLs over HTTPS. GitHub Pages is now enabled for the
+  repository and both public Store routes are deployed.
 - Added a conservative runtime MCP reaper for duplicate process generations left
   under the Codex Store desktop app-server. It groups launches by Codex's direct
   `node_repl.exe` runtime anchors, always protects the newest launch cohort, requires

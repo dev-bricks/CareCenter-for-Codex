@@ -144,7 +144,11 @@ def cmd_store_materials(args: argparse.Namespace) -> int:
     from .store_release import validate_store_materials
 
     exe_path = Path(args.exe_path) if args.exe_path else None
-    report = validate_store_materials(project_root=Path(args.project_root), exe_path=exe_path)
+    report = validate_store_materials(
+        project_root=Path(args.project_root),
+        exe_path=exe_path,
+        check_live_pages=args.live_pages,
+    )
     print(report.to_text())
     return {"ok": 0, "warning": 2, "failed": 1}[report.status]
 
@@ -442,6 +446,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--exe-path",
         default=None,
         help="Optionaler Pfad zur gebauten EXE fuer einen konkreten Existenzcheck.",
+    )
+    store_materials_parser.add_argument(
+        "--live-pages",
+        action="store_true",
+        help="Oeffentliche Privacy-/Support-URLs per HTTPS pruefen.",
     )
     store_materials_parser.set_defaults(func=cmd_store_materials)
 

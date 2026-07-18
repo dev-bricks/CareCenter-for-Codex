@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from importlib import util as importlib_util
 from pathlib import Path
 from types import ModuleType
+from urllib import error as urlerror
+from urllib import request as urlrequest
 from urllib.parse import urlparse
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -149,6 +151,40 @@ def _check_urls(payload: dict[str, object]) -> StoreCheck:
     if problems:
         return StoreCheck("Store-URLs", "warning", "; ".join(problems))
     return StoreCheck("Store-URLs", "ok", " / ".join(ok_fields))
+
+
+def _check_live_store_pages(
+    payload: dict[str, object],
+    timeout_seconds: float = 10.0,
+) -> StoreCheck:
+    problems: list[str] = []
+    ok_fields: list[str] = []
+
+    for field in URL_FIELDS:
+        raw = str(payload.get(field, "")).strip()
+        if not raw:
+            problems.append(f"{field} fehlt")
+            continue
+
+        request = urlrequest.Request(
+            raw,
+            headers={"User-Agent": "CareCenter-for-Codex store-readiness"},
+        )
+        try:
+            with urlrequest.urlopen(request, timeout=timeout_seconds) as response:
+                status = int(response.status)
+        except (urlerror.HTTPError, urlerror.URLError, TimeoutError, OSError) as exc:
+            problems.append(f"{field}: {exc}")
+            continue
+
+        if status != 200:
+            problems.append(f"{field}: HTTP {status}")
+            continue
+        ok_fields.append(field)
+
+    if problems:
+        return StoreCheck("Store-Webseiten-Live", "warning", "; ".join(problems))
+    return StoreCheck("Store-Webseiten-Live", "ok", " / ".join(ok_fields))
 
 
 def _check_docs(project_root: Path) -> StoreCheck:
@@ -377,6 +413,7 @@ def _check_executable(project_root: Path, payload: dict[str, object], exe_path: 
 def validate_store_materials(
     project_root: Path = PROJECT_ROOT,
     exe_path: Path | None = None,
+    check_live_pages: bool = False,
 ) -> StoreMaterialsReport:
     checks: list[StoreCheck] = []
     payload, config_check = _load_store_package(project_root / STORE_PACKAGE_PATH.name)
@@ -391,6 +428,8 @@ def validate_store_materials(
     checks.append(_check_docs(project_root))
     checks.append(_check_published_store_docs(project_root, payload))
     checks.append(_check_store_pages_build(project_root))
+    if check_live_pages:
+        checks.append(_check_live_store_pages(payload))
     checks.append(_check_screenshot(project_root))
     checks.append(_check_executable(project_root, payload, exe_path))
     return StoreMaterialsReport(checks)
