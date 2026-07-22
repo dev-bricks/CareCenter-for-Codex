@@ -51,7 +51,7 @@ Environment variables:
 Verification:
 - python -m compileall -q src tests
 - python -m pytest -q
-- Current local verification: 318 pytest tests pass on Python 3.12 (2026-07-16)
+- Current local verification: 323 pytest tests pass on Python 3.12 (2026-07-22)
 
 Public documentation:
 - README.md: overview, install, usage, safety boundaries
@@ -60,4 +60,4 @@ Public documentation:
 - STORE_LISTING.md, PRIVACY_POLICY.md, SUPPORT.md: Store release materials
 - SECURITY.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md: community health files
 
-Last-checked: 2026-07-16
+Last-checked: 2026-07-22

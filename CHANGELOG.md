@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Updated Last-checked timestamp in `llms.txt` to 2026-07-22 and verified full test suite (323/323 passed).
 - Added an opt-in `store-materials --live-pages` gate that checks the configured
   privacy and support URLs over HTTPS. GitHub Pages is now enabled for the
   repository and both public Store routes are deployed.
