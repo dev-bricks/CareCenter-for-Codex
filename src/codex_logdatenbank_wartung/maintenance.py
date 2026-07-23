@@ -429,6 +429,7 @@ class MaintenanceRunner:
         for directory in excess:
             shutil.rmtree(directory, ignore_errors=True)
             removed.append(directory.name)
+        removed.extend(self._prune_loose_backups(keep))
         if removed:
             result.add(
                 t("step_backup_retention"),
@@ -441,6 +442,36 @@ class MaintenanceRunner:
                 "ok",
                 t("retention_ok", keep=keep),
             )
+
+    def _prune_loose_backups(self, keep: int) -> list[str]:
+        """Begrenze lose Backup-Dateien, die flach im Backup-Verzeichnis liegen.
+
+        `thread_hygiene` legt seine Sicherungen als einzelne Dateien direkt in
+        `backup_path` ab (`<db>.carecenter-thread-db-bak-<stamp>`), nicht in ein
+        `logs_2-*`-Verzeichnis. Der bisherige Verzeichnis-Glob hat sie deshalb nie
+        erfasst: 122 Dateien / 2,5 GB waren so unbemerkt aufgelaufen -- dieselbe
+        Bugklasse, gegen die `prune_backups` ursprünglich gebaut wurde.
+
+        Es wird pro Backup-Art (Präfix vor `-bak-`) getrennt aufbewahrt, damit
+        verschiedene Sicherungstypen sich nicht gegenseitig verdrängen.
+        """
+        groups: dict[str, list[Path]] = {}
+        for path in self.config.backup_path.glob("*-bak-*"):
+            if not path.is_file():
+                continue
+            prefix = path.name.split("-bak-", 1)[0]
+            groups.setdefault(prefix, []).append(path)
+
+        removed: list[str] = []
+        for paths in groups.values():
+            ordered = sorted(paths, key=lambda item: item.name)
+            for path in ordered[:-keep]:
+                try:
+                    path.unlink()
+                except OSError:
+                    continue
+                removed.append(path.name)
+        return removed
 
     def integrity_check(self, db_path: Path) -> str:
         uri = f"file:{db_path.as_posix()}?mode=ro"
