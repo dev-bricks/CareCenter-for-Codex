@@ -11,8 +11,17 @@ if errorlevel 1 (
 set "PROJECT_ROOT=%CD%"
 set "PYTHONPATH=%PROJECT_ROOT%\src"
 set "PYGAME_HIDE_SUPPORT_PROMPT=1"
-REM _tools liegt im .SOFTWARE-Root; CCC liegt 2 Ebenen darunter (CODING\DEV_...).
+REM _tools liegt im .SOFTWARE-Root; CCC liegt dort 2 Ebenen darunter (CODING\DEV_...).
+REM Nach Plan D lebt das Repo aber unter C:\_Local_DEV\repos\ - dann greift der
+REM relative Pfad ins Leere. Fallback auf den .SOFTWARE-Root, danach fail-loud:
+REM ohne Scanner gaebe es still leere Excludes und damit eine aufgeblaehte EXE.
 set "SCANNER=%PROJECT_ROOT%\..\..\_tools\build_exclude_scanner.py"
+if not exist "%SCANNER%" set "SCANNER=%USERPROFILE%\OneDrive\.TOPICS\.SOFTWARE\_tools\build_exclude_scanner.py"
+if not exist "%SCANNER%" (
+    echo [FEHLER] build_exclude_scanner.py nicht gefunden - Pflicht laut .SOFTWARE\BUILD-VERFAHREN.md.
+    pause
+    exit /b 1
+)
 set "DIST_DIR=C:\_Local_DEV\codex-maintenance\bin"
 set "WORK_DIR=C:\_Local_DEV\codex_build\codex-logwartung"
 set "SPEC_DIR=C:\_Local_DEV\codex_build\codex-logwartung-spec"
