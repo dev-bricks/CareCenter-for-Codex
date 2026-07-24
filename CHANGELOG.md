@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- TASKPLAN #844/#850/#851: Status- und Bounded-Reparaturvertrag aktualisiert;
+  Safe Start ist in CI und Release-Build auf denselben Commit gepinnt.
+
 - Updated Last-checked timestamp in `llms.txt` to 2026-07-22 and verified full test suite (323/323 passed).
 - Added an opt-in `store-materials --live-pages` gate that checks the configured
   privacy and support URLs over HTTPS. GitHub Pages is now enabled for the

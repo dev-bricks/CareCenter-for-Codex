@@ -1,16 +1,11 @@
-"""Voll ausschoepfende, aber hang-sichere Codex-Start-Reparatur-Engine.
+"""Bounded, hang-safe Codex start-repair engine.
 
-Bewusst getrennt von der konservativen DB-Wartung (`maintenance.py`/`orchestrator.py`)
-und der gezielten Startblockaden-Reparatur (`health.py`). Dieses Modul adressiert den
-Fall "Codex (Store/Electron) startet nicht" als **automatische Eskalation durch alle
-Stufen**, bis ein Renderer-Fenster erscheint.
-
-Philosophie (siehe CODEX-AUTO-DEBUG-DESIGN.md, justiert 2026-05-29):
-Die Gefahr ist NICHT das Reparieren an sich, sondern das **Haengen/Stapeln** von
-AppX-Deployment-Operationen. Wird die Reparatur ausgeloest, wird sie **voll
-ausgeschoepft** -- alle Stufen automatisch, auch die aggressiven (reset_package,
-remove_staged_version, reinstall_package). Diese stehen aber bewusst SPAET in der
-Reihenfolge (billig+sicher zuerst) und laufen timeboxed.
+This is deliberately separate from conservative DB maintenance and targeted
+``health.py`` start-blocker repair. The binding automatic contract is **S1, S2,
+S3, then at most one ``reset_package`` fallback**. S4 removal and S6 reinstall
+are never started automatically; they require a separate, reviewed operator
+decision. The engine aborts on a deployment timeout, missing admin rights, or a
+confirmed absent package and never promises live AppX/PUI observation.
 
 EINZIGE HARTE REGEL: HAENGEN VERMEIDEN.
 * Jede Deploy-Op (complete_staged_update, remove_staged_version, reset_package,
