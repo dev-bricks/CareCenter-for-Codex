@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Updated `llms.txt` Last-checked date to 2026-07-25, verified 330/330 Pytest tests passing, added LLM readiness & test badges and AI agent callouts in `README.md` / `README.de.md`.
 - TASKPLAN #844/#850/#851: Status- und Bounded-Reparaturvertrag aktualisiert;
   Safe Start ist in CI und Release-Build auf denselben Commit gepinnt.
 

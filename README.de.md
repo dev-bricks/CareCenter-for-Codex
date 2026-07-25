@@ -5,11 +5,16 @@
 > Inoffizielles lokales Windows-Tray- und CLI-Werkzeug, das die OpenAI-Codex-Desktop-App gesund hält — repariert fehlgeschlagene Starts, entfernt hängende Reste und wartet die SQLite-Logdatenbank sicher. Vollständig offline, keine Telemetrie.
 
 [![CareCenter tests](https://github.com/dev-bricks/CareCenter-for-Codex/actions/workflows/tests.yml/badge.svg)](https://github.com/dev-bricks/CareCenter-for-Codex/actions/workflows/tests.yml)
+[![Pytest-Status](https://img.shields.io/badge/Tests-330%20bestanden-brightgreen.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
 [![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://www.python.org/)
 [![Lizenz](https://img.shields.io/badge/Lizenz-MIT-yellow.svg)](LICENSE)
 [![Plattform](https://img.shields.io/badge/Plattform-Windows-lightgrey.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
+[![KI-Indexierung](https://img.shields.io/badge/LLM--Bereit-llms.txt-blueviolet.svg)](llms.txt)
 
 Englische Dokumentation: [README.md](README.md)
+
+> [!NOTE]
+> Maschinenlesbare Architektur, CLI-Befehle und Sicherheitsregeln sind für KI-Agenten in [llms.txt](llms.txt) hinterlegt.
 
 > [!IMPORTANT]
 > Dieses Werkzeug ist ein unabhängiges Community-Projekt. Es wurde nicht von OpenAI erstellt, ist nicht mit OpenAI verbunden und wird nicht von OpenAI unterstützt oder gesponsert. „OpenAI“ und „Codex“ sind Marken von OpenAI und werden hier nur zur Beschreibung der Kompatibilität verwendet.

@@ -5,11 +5,16 @@
 > Unofficial Windows tray & CLI utility that keeps the OpenAI Codex desktop app healthy — repairs failed starts, removes hung leftovers, and safely maintains the local SQLite log database. Fully offline, no telemetry.
 
 [![CareCenter tests](https://github.com/dev-bricks/CareCenter-for-Codex/actions/workflows/tests.yml/badge.svg)](https://github.com/dev-bricks/CareCenter-for-Codex/actions/workflows/tests.yml)
+[![Pytest Status](https://img.shields.io/badge/Tests-330%20passed-brightgreen.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
 [![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
+[![AI Indexing](https://img.shields.io/badge/LLM--Ready-llms.txt-blueviolet.svg)](llms.txt)
 
 German documentation: [README.de.md](README.de.md)
+
+> [!NOTE]
+> Machine-readable architecture, CLI entry points, and safety rules are indexed for AI agents in [llms.txt](llms.txt).
 
 > [!IMPORTANT]
 > This is an independent community tool. It is not created by, affiliated with, endorsed by, or sponsored by OpenAI. "OpenAI" and "Codex" are trademarks of OpenAI and are used here only to describe compatibility.
