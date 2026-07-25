@@ -1,12 +1,9 @@
 # --- Build / packaging artifacts ---
 build/
 dist/
+store_package/
 _site/
 *.spec
-*.exe
-*.msi
-*.msix
-__pycache__/
 *.py[cod]
 *.egg-info/
 .pytest_cache/
