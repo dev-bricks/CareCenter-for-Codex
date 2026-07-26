@@ -4,7 +4,6 @@ from pathlib import Path
 
 import pytest
 
-
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -37,5 +36,5 @@ def test_current_metadata_marks_old_handoff_as_historical_via_current_state():
     if missing:
         pytest.skip(f"lokal-only (gitignored), im Checkout nicht vorhanden: {', '.join(missing)}")
 
-    assert "Stand: 2026-07-22 · Version 0.8.0" in state_path.read_text(encoding="utf-8")
+    assert "Stand: 2026-07-26 · Version 0.8.0" in state_path.read_text(encoding="utf-8")
     assert "version: 0.8.0" in claude_path.read_text(encoding="utf-8")
