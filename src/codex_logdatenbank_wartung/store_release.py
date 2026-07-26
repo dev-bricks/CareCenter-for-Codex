@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import tempfile
 from dataclasses import dataclass
 from importlib import util as importlib_util
@@ -53,8 +54,14 @@ PLACEHOLDER_HOSTS = {
     "example.invalid",
     "todo.invalid",
 }
+PLACEHOLDER_PUBLISHERS = {
+    "CN=TODO-PUBLISHER-DN",
+    "CN=YOUR-PUBLISHER-ID",
+    "CN=00000000-0000-0000-0000-000000000000",
+}
 VERSION_PATTERN = re.compile(r"^\d+\.\d+\.\d+\.\d+$")
 DIST_DIR_PATTERN = re.compile(r'^\s*set\s+"DIST_DIR=(?P<value>[^"]+)"\s*$', re.IGNORECASE)
+
 
 
 @dataclass(slots=True)
@@ -117,6 +124,43 @@ def _check_version(payload: dict[str, object]) -> StoreCheck:
             f"Windows-Store-Version muss vierteilig sein, gefunden: {version or '<leer>'}",
         )
     return StoreCheck("Version", "ok", version)
+
+
+def _check_publisher_dn(payload: dict[str, object]) -> StoreCheck:
+    publisher = str(payload.get("publisher", "")).strip()
+    if not publisher:
+        return StoreCheck("Publisher-DN", "failed", "Publisher-DN in store_package.json ist leer.")
+    if not publisher.startswith("CN="):
+        return StoreCheck("Publisher-DN", "failed", f"Publisher-DN muss mit 'CN=' beginnen, gefunden: {publisher}")
+    if publisher in PLACEHOLDER_PUBLISHERS or "TODO" in publisher.upper() or "PLACEHOLDER" in publisher.upper():
+        return StoreCheck("Publisher-DN", "warning", f"Publisher-DN ist noch ein Platzhalter: {publisher}")
+    return StoreCheck("Publisher-DN", "ok", publisher)
+
+
+def _check_version_alignment(payload: dict[str, object], project_root: Path) -> StoreCheck:
+    store_version = str(payload.get("version", "")).strip()
+    init_py = project_root / "src" / "codex_logdatenbank_wartung" / "__init__.py"
+    if not init_py.exists():
+        return StoreCheck("Version-Alignment", "warning", "__init__.py fuer Versionsabgleich nicht gefunden.")
+
+    try:
+        content = init_py.read_text(encoding="utf-8")
+        match = re.search(r'__version__\s*=\s*"([^"]+)"', content)
+        if not match:
+            return StoreCheck("Version-Alignment", "warning", "__version__ in __init__.py nicht gefunden.")
+        app_version = match.group(1)
+    except OSError as exc:
+        return StoreCheck("Version-Alignment", "warning", f"__init__.py unlesbar: {exc}")
+
+    app_prefix = f"{app_version}."
+    if not store_version.startswith(app_prefix):
+        return StoreCheck(
+            "Version-Alignment",
+            "warning",
+            f"Store-Version ({store_version}) stimmt nicht mit App-Release-Version ({app_version}) überein.",
+        )
+    return StoreCheck("Version-Alignment", "ok", f"App {app_version} == Store {store_version}")
+
 
 
 def _check_capabilities(payload: dict[str, object]) -> StoreCheck:
@@ -410,10 +454,30 @@ def _check_executable(project_root: Path, payload: dict[str, object], exe_path: 
     )
 
 
+def _check_msix_sdk_readiness() -> StoreCheck:
+    makeappx = shutil.which("makeappx") or shutil.which("makeappx.exe")
+    if not makeappx:
+        program_files_x86 = os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)")
+        kits_dir = Path(program_files_x86) / "Windows Kits" / "10" / "bin"
+        if kits_dir.exists():
+            for exe in kits_dir.glob("*/x64/makeappx.exe"):
+                makeappx = str(exe)
+                break
+
+    if makeappx:
+        return StoreCheck("MSIX/SDK-Readiness", "ok", f"Windows SDK makeappx gefunden: {makeappx}")
+    return StoreCheck(
+        "MSIX/SDK-Readiness",
+        "warning",
+        "Windows SDK makeappx.exe nicht im PATH oder Standardpfad; MSIX-Packaging erfordert Windows SDK.",
+    )
+
+
 def validate_store_materials(
     project_root: Path = PROJECT_ROOT,
     exe_path: Path | None = None,
     check_live_pages: bool = False,
+    check_msix_sdk: bool = False,
 ) -> StoreMaterialsReport:
     checks: list[StoreCheck] = []
     payload, config_check = _load_store_package(project_root / STORE_PACKAGE_PATH.name)
@@ -423,6 +487,8 @@ def validate_store_materials(
 
     checks.append(_check_required_fields(payload))
     checks.append(_check_version(payload))
+    checks.append(_check_version_alignment(payload, project_root))
+    checks.append(_check_publisher_dn(payload))
     checks.append(_check_capabilities(payload))
     checks.append(_check_urls(payload))
     checks.append(_check_docs(project_root))
@@ -432,4 +498,6 @@ def validate_store_materials(
         checks.append(_check_live_store_pages(payload))
     checks.append(_check_screenshot(project_root))
     checks.append(_check_executable(project_root, payload, exe_path))
+    if check_msix_sdk:
+        checks.append(_check_msix_sdk_readiness())
     return StoreMaterialsReport(checks)

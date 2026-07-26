@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Hardened the Store preflight with package-to-app version alignment, Publisher-DN placeholder detection, and an opt-in Windows-SDK `makeappx` readiness check.
 - Updated `llms.txt` Last-checked date to 2026-07-26 and verified 330/330 Pytest tests passing.
 - TASKPLAN #844/#850/#851: Status- und Bounded-Reparaturvertrag aktualisiert;
   Safe Start ist in CI und Release-Build auf denselben Commit gepinnt.

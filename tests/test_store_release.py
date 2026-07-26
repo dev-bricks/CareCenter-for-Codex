@@ -12,8 +12,15 @@ def _write_store_files(project_root: Path, payload: dict[str, object]) -> None:
         json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
+    pkg_dir = project_root / "src" / "codex_logdatenbank_wartung"
+    pkg_dir.mkdir(parents=True, exist_ok=True)
+    version_str = str(payload.get("version", "0.8.0.0"))
+    parts = version_str.split(".")
+    app_ver = ".".join(parts[:3]) if len(parts) >= 3 else "0.8.0"
+    (pkg_dir / "__init__.py").write_text(f'__version__ = "{app_ver}"\n', encoding="utf-8")
     for name in ("STORE_LISTING.md", "PRIVACY_POLICY.md", "SUPPORT.md"):
         (project_root / name).write_text(f"# {name}\n", encoding="utf-8")
+
     docs_dir = project_root / "docs"
     docs_dir.mkdir(parents=True, exist_ok=True)
     for name in ("privacy.md", "support.md"):
@@ -415,3 +422,89 @@ def test_validate_store_materials_warns_when_pages_builder_fails(tmp_path: Path)
         and "cannot build store pages" in check.message
         for check in report.checks
     )
+
+
+def test_validate_store_materials_warns_for_placeholder_publisher_dn(tmp_path: Path) -> None:
+    exe_path = tmp_path / "CareCenterForCodex.exe"
+    exe_path.write_bytes(b"exe")
+    _write_store_files(
+        tmp_path,
+        {
+            "app_name": "CareCenter for Codex",
+            "publisher": "CN=TODO-PUBLISHER-DN",
+            "publisher_display": "Lukas Geiger",
+            "identity_name": "LukasGeiger.CareCenterForCodex",
+            "version": "0.8.0.0",
+            "description": "Offline Wartung und Reparatur fuer die Codex-Desktop-App.",
+            "executable": "CareCenterForCodex.exe",
+            "capabilities": "runFullTrust",
+            "category": "Developer Tools",
+            "age_rating": "3+",
+            "privacy_url": "https://dev-bricks.github.io/CareCenter-for-Codex/privacy",
+            "support_url": "https://dev-bricks.github.io/CareCenter-for-Codex/support",
+        },
+    )
+
+    report = validate_store_materials(project_root=tmp_path, exe_path=exe_path)
+
+    assert report.status == "warning"
+    assert any(check.name == "Publisher-DN" and check.status == "warning" for check in report.checks)
+
+
+def test_validate_store_materials_warns_for_version_mismatch(tmp_path: Path) -> None:
+    exe_path = tmp_path / "CareCenterForCodex.exe"
+    exe_path.write_bytes(b"exe")
+    _write_store_files(
+        tmp_path,
+        {
+            "app_name": "CareCenter for Codex",
+            "publisher": "CN=01234567-89AB-CDEF-0123-456789ABCDEF",
+            "publisher_display": "Lukas Geiger",
+            "identity_name": "LukasGeiger.CareCenterForCodex",
+            "version": "0.9.0.0",
+            "description": "Offline Wartung und Reparatur fuer die Codex-Desktop-App.",
+            "executable": "CareCenterForCodex.exe",
+            "capabilities": "runFullTrust",
+            "category": "Developer Tools",
+            "age_rating": "3+",
+            "privacy_url": "https://dev-bricks.github.io/CareCenter-for-Codex/privacy",
+            "support_url": "https://dev-bricks.github.io/CareCenter-for-Codex/support",
+        },
+    )
+    # Force __init__.py to have app version 0.8.0 while store_package has 0.9.0.0
+    (tmp_path / "src" / "codex_logdatenbank_wartung" / "__init__.py").write_text('__version__ = "0.8.0"\n', encoding="utf-8")
+
+    report = validate_store_materials(project_root=tmp_path, exe_path=exe_path)
+
+    assert report.status == "warning"
+    assert any(check.name == "Version-Alignment" and check.status == "warning" for check in report.checks)
+
+
+def test_validate_store_materials_checks_msix_sdk_on_request(tmp_path: Path) -> None:
+    exe_path = tmp_path / "CareCenterForCodex.exe"
+    exe_path.write_bytes(b"exe")
+    _write_store_files(
+        tmp_path,
+        {
+            "app_name": "CareCenter for Codex",
+            "publisher": "CN=01234567-89AB-CDEF-0123-456789ABCDEF",
+            "publisher_display": "Lukas Geiger",
+            "identity_name": "LukasGeiger.CareCenterForCodex",
+            "version": "0.8.0.0",
+            "description": "Offline Wartung und Reparatur fuer die Codex-Desktop-App.",
+            "executable": "CareCenterForCodex.exe",
+            "capabilities": "runFullTrust",
+            "category": "Developer Tools",
+            "age_rating": "3+",
+            "privacy_url": "https://dev-bricks.github.io/CareCenter-for-Codex/privacy",
+            "support_url": "https://dev-bricks.github.io/CareCenter-for-Codex/support",
+        },
+    )
+
+    report = validate_store_materials(
+        project_root=tmp_path,
+        exe_path=exe_path,
+        check_msix_sdk=True,
+    )
+
+    assert any(check.name == "MSIX/SDK-Readiness" for check in report.checks)
