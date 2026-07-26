@@ -414,8 +414,35 @@ class MaintenanceRunner:
         shutil.copystat(source, target)
         return copied
 
+    @staticmethod
+    def _backup_day(path: Path) -> str:
+        """Tagesschluessel `YYYYMMDD` aus `logs_2-YYYYMMDD-HHMMSS`.
+
+        Faellt der Name aus dem Schema, wird der volle Name als eigener Schluessel
+        benutzt. Solche Verzeichnisse verdraengen dann nur sich selbst -- das ist
+        die konservative Wahl, weil unbekannte Namen sonst versehentlich einen
+        ganzen Tag belegen oder gar nicht aufgeraeumt wuerden.
+        """
+        parts = path.name.split("-")
+        if len(parts) >= 3 and len(parts[1]) == 8 and parts[1].isdigit():
+            return parts[1]
+        return path.name
+
     def prune_backups(self, result: MaintenanceResult) -> None:
-        """Begrenze die Zahl der DB-Backups (Lektion: unbegrenzte Backups fuellten 123 GB)."""
+        """Begrenze die Zahl der DB-Backups (Lektion: unbegrenzte Backups fuellten 123 GB).
+
+        Aufbewahrt werden `backup_keep` **Tage**, nicht `backup_keep` Laeufe: pro
+        Kalendertag ueberlebt nur die juengste Sicherung, danach werden die
+        juengsten `backup_keep` Tage behalten.
+
+        Grund (Nutzerbefund 2026-07-26): Bei laufzaehlender Rotation loeschen
+        mehrere Wartungslaeufe am selben Tag die komplette Historie -- real
+        standen nach drei Laeufen an einem Vormittag nur noch Sicherungen dieses
+        einen Tages, alle aelteren waren weg. Fuer eine Wiederherstellung ist das
+        der unguenstigste Fall. Die Tagesrotation ist zugleich nicht lockerer als
+        vorher: hoechstens eine Sicherung pro Tag mal `backup_keep` Tage ergibt
+        weiterhin hoechstens `backup_keep` Verzeichnisse.
+        """
         keep = self.config.backup_keep
         if keep <= 0:
             result.add(t("step_backup_retention"), "skipped", t("retention_unlimited"))
@@ -424,7 +451,19 @@ class MaintenanceRunner:
             (path for path in self.config.backup_path.glob("logs_2-*") if path.is_dir()),
             key=lambda path: path.name,
         )
-        excess = backups[:-keep]
+        by_day: dict[str, list[Path]] = {}
+        for path in backups:
+            by_day.setdefault(self._backup_day(path), []).append(path)
+
+        excess: list[Path] = []
+        for paths in by_day.values():
+            # innerhalb eines Tages: nur die juengste behalten
+            excess.extend(paths[:-1])
+        surviving_days = sorted(by_day)
+        for day in surviving_days[:-keep]:
+            # ganze Tage jenseits des Fensters: auch den juengsten Lauf entfernen
+            excess.append(by_day[day][-1])
+
         removed = []
         for directory in excess:
             shutil.rmtree(directory, ignore_errors=True)

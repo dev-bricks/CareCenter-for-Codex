@@ -109,3 +109,79 @@ def test_directory_backups_still_pruned(tmp_path: Path) -> None:
 
     remaining = sorted(p.name for p in backup_path.glob("logs_2-*"))
     assert remaining == ["logs_2-20260103-000000", "logs_2-20260104-000000"]
+
+
+def seed_dir_backups(backup_path: Path, stamps: list[str]) -> list[Path]:
+    """Legt `logs_2-<stamp>`-Verzeichnisse an; `stamp` im Schema `YYYYMMDD-HHMMSS`."""
+    backup_path.mkdir(parents=True, exist_ok=True)
+    created = []
+    for stamp in stamps:
+        path = backup_path / f"logs_2-{stamp}"
+        path.mkdir()
+        (path / "logs_2.sqlite").write_bytes(b"x")
+        created.append(path)
+    return created
+
+
+def test_same_day_runs_do_not_evict_older_days(tmp_path: Path) -> None:
+    """Mehrere Laeufe am selben Tag duerfen die Historie nicht verdraengen.
+
+    Nutzerbefund 2026-07-26: Drei Wartungslaeufe an einem Vormittag hatten bei
+    laufzaehlender Rotation alle aelteren Sicherungen geloescht -- es standen nur
+    noch drei Staende desselben Tages. Erwartet wird stattdessen: pro Tag der
+    juengste Lauf, insgesamt `keep` verschiedene Tage.
+    """
+    config = make_config(tmp_path, keep=3)
+    backup_path = Path(config.backup_dir)
+    seed_dir_backups(
+        backup_path,
+        [
+            "20260724-010000",
+            "20260725-010000",
+            "20260726-053347",
+            "20260726-054411",
+            "20260726-124350",
+        ],
+    )
+
+    runner = MaintenanceRunner(config, process_provider=lambda: [])
+    runner.prune_backups(make_result(Path(config.database_path)))
+
+    survivors = sorted(p.name for p in backup_path.glob("logs_2-*") if p.is_dir())
+    assert survivors == [
+        "logs_2-20260724-010000",
+        "logs_2-20260725-010000",
+        "logs_2-20260726-124350",
+    ], survivors
+
+
+def test_day_retention_never_keeps_more_than_keep(tmp_path: Path) -> None:
+    """Die Tagesrotation darf nie mehr Verzeichnisse behalten als die Laufrotation.
+
+    Absicherung gegen die Bugklasse, gegen die `prune_backups` gebaut wurde
+    (unbegrenzte Backups fuellten einmal 123 GB).
+    """
+    config = make_config(tmp_path, keep=2)
+    backup_path = Path(config.backup_dir)
+    stamps = [f"2026070{day}-{hour:02d}0000" for day in range(1, 6) for hour in (1, 2, 3)]
+    seed_dir_backups(backup_path, stamps)
+
+    runner = MaintenanceRunner(config, process_provider=lambda: [])
+    runner.prune_backups(make_result(Path(config.database_path)))
+
+    survivors = sorted(p.name for p in backup_path.glob("logs_2-*") if p.is_dir())
+    assert len(survivors) == 2, survivors
+    assert survivors == ["logs_2-20260704-030000", "logs_2-20260705-030000"], survivors
+
+
+def test_unknown_backup_names_are_not_grouped_into_one_day(tmp_path: Path) -> None:
+    """Namen ausserhalb des Schemas duerfen sich nicht gegenseitig loeschen."""
+    config = make_config(tmp_path, keep=3)
+    backup_path = Path(config.backup_dir)
+    seed_dir_backups(backup_path, ["manuell-vor-umzug", "kaputt", "20260726-010000"])
+
+    runner = MaintenanceRunner(config, process_provider=lambda: [])
+    runner.prune_backups(make_result(Path(config.database_path)))
+
+    survivors = sorted(p.name for p in backup_path.glob("logs_2-*") if p.is_dir())
+    assert len(survivors) == 3, survivors
