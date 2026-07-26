@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+import pytest
+
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -24,8 +26,16 @@ def test_repair_entrypoint_states_the_bounded_automatic_contract():
 
 
 def test_current_metadata_marks_old_handoff_as_historical_via_current_state():
-    state = (ROOT / "STATE.md").read_text(encoding="utf-8")
-    claude = (ROOT / "CLAUDE.md").read_text(encoding="utf-8")
+    # STATE.md und CLAUDE.md sind "internal working docs" und bewusst gitignored
+    # (.gitignore, Abschnitt "not part of the public release"). Im CI-Checkout
+    # existieren sie daher nicht -- dort ist dieser lokale Konsistenzcheck
+    # gegenstandslos und wird uebersprungen statt fehlzuschlagen.
+    state_path = ROOT / "STATE.md"
+    claude_path = ROOT / "CLAUDE.md"
 
-    assert "Stand: 2026-07-22 · Version 0.8.0" in state
-    assert "version: 0.8.0" in claude
+    missing = [p.name for p in (state_path, claude_path) if not p.exists()]
+    if missing:
+        pytest.skip(f"lokal-only (gitignored), im Checkout nicht vorhanden: {', '.join(missing)}")
+
+    assert "Stand: 2026-07-22 · Version 0.8.0" in state_path.read_text(encoding="utf-8")
+    assert "version: 0.8.0" in claude_path.read_text(encoding="utf-8")
