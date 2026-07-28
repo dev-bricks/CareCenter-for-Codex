@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Added direct normal-start worker regressions for renderer success, launcher failure,
+  process-inventory failure, and renderer timeout. Timeout feedback now includes the
+  AUMID, a tri-state package status, and a safe read-only diagnostic next step.
+- Added reproducible EXE provenance: clean-commit gating, embedded version/commit/UTC
+  build identity, Windows file metadata, configurable isolated build roots, and a
+  SHA-256 provenance sidecar. CLI diagnostics and tray startup logs expose the identity.
 - Hardened the Store preflight with package-to-app version alignment, Publisher-DN placeholder detection, and an opt-in Windows-SDK `makeappx` readiness check.
 - TASKPLAN #844: Synchronized the current 0.8.0 operational status, Store Pages live gate, and 333/333 local test verification across the project records.
 - TASKPLAN #844/#850/#851: Status- und Bounded-Reparaturvertrag aktualisiert;

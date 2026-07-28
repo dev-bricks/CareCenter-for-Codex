@@ -85,6 +85,19 @@ Build a standalone EXE:
 build_exe.bat
 ```
 
+For a controlled non-production build, override both local output roots:
+
+```powershell
+$env:CARECENTER_DIST_DIR = "C:\_Local_DEV\codex_build\artifacts\carecenter"
+$env:CARECENTER_BUILD_ROOT = "C:\_Local_DEV\codex_build\work\carecenter"
+build_exe.bat
+```
+
+The build refuses tracked uncommitted source changes. It embeds the project version,
+Git commit, and UTC build time in the EXE and writes
+`CareCenterForCodex.provenance.json` next to it with the artifact size and SHA-256.
+`status`, `doctor`, and the tray startup log report the embedded build identity.
+
 By default, the build uses the public Safe Start GitHub source pinned to an exact
 commit in `pyproject.toml`. This keeps the build reproducible without silently
 bundling a dirty local sibling checkout. Only use a local Safe Start source on

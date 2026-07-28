@@ -483,6 +483,7 @@ class NormalStartWorker(QObject):
 
         from .orchestrator import default_launcher
         from .processes import find_codex_processes_by_executable, process_type
+        from .start_repair import codex_installation_status_for_user
 
         ok, message = default_launcher(self.config)()
         if not ok:
@@ -490,20 +491,35 @@ class NormalStartWorker(QObject):
             return
 
         deadline = time.monotonic() + max(10.0, float(self.config.renderer_timeout_seconds))
+        inventory_error = ""
         while time.monotonic() < deadline:
             try:
                 processes = find_codex_processes_by_executable(self.config)
                 if any(process_type(process) == "renderer" for process in processes):
                     self.finished.emit({"ok": True, "message": message})
                     return
-            except Exception:  # noqa: BLE001 -- Timeout liefert den sicheren Diagnosepfad.
-                pass
+            except Exception as exc:  # noqa: BLE001 -- Fehler wird im Ergebnis datensparsam benannt.
+                inventory_error = type(exc).__name__
             time.sleep(2.0)
 
         aumid = getattr(self.config, "codex_store_aumid", "") or "-"
+        package_status = codex_installation_status_for_user(self.config)
+        package_label = {
+            "installed": "installiert",
+            "missing": "nicht für den aktuellen Benutzer registriert",
+            "unknown": "nicht ermittelbar",
+        }[package_status]
+        inventory_detail = (
+            f" Prozessinventarfehler: {inventory_error}." if inventory_error else ""
+        )
         self.finished.emit({
             "ok": False,
-            "message": f"Kein ChatGPT/Codex-Renderer nach Start innerhalb des Zeitlimits erkannt (AUMID: {aumid}).",
+            "message": (
+                "Kein ChatGPT/Codex-Renderer nach Start innerhalb des Zeitlimits erkannt "
+                f"(AUMID: {aumid}). Paketstatus: {package_label}.{inventory_detail} "
+                "Nächster sicherer Schritt: „Codex-Start prüfen (Diagnose)“ in CareCenter "
+                "ausführen; diese Prüfung verändert keine Chat- oder Threaddaten."
+            ),
         })
 
 

@@ -25,6 +25,7 @@ from typing import Literal
 from .config import MaintenanceConfig
 
 StartDecision = Literal["already_running", "needs_store_reinstall", "reap", "needs_escalation"]
+CodexInstallationStatus = Literal["installed", "missing", "unknown"]
 
 PowerShellRunner = Callable[[str], "tuple[int, str]"]
 
@@ -47,26 +48,43 @@ def classify_start_state(
     return "needs_escalation"
 
 
-def codex_installed_for_user(
+def codex_installation_status_for_user(
     config: MaintenanceConfig, *, runner: PowerShellRunner | None = None
-) -> bool:
-    """Ist irgendeine Codex-Desktop-Installation fuer den User da? (nicht-elevated pruefbar)
+) -> CodexInstallationStatus:
+    """Ermittle den lokalen Codex-Paketstatus ohne Mutation oder Elevation.
 
-    Wahr, wenn entweder die Standalone-Exe existiert ODER das Store-Paket fuer den
-    aktuellen User registriert ist (``Get-AppxPackage OpenAI.Codex`` OHNE ``-AllUsers``,
-    laeuft ohne Admin). Im Fehlerfall konservativ ``True`` -- lieber keinen faelschlichen
-    Reinstall-Vorschlag, als den User unnoetig in den Store schicken.
+    ``unknown`` trennt einen fehlgeschlagenen Inventarlauf von einem nachweislich
+    fehlenden Paket. So kann die Tray-Diagnose ehrlich fail-closed melden, ohne einen
+    falschen Reinstall-Vorschlag aus einer PowerShell-Störung abzuleiten.
     """
     try:
         if Path(config.codex_executable).exists():
-            return True
+            return "installed"
     except OSError:
         pass
     from .store_repair import default_ps_runner
 
     runner = runner or default_ps_runner
     try:
-        _rc, out = runner("$p = Get-AppxPackage OpenAI.Codex; if ($p) { 'yes' } else { 'no' }")
-        return out.strip().lower().startswith("yes")
-    except Exception:  # noqa: BLE001 -- im Zweifel als installiert behandeln
-        return True
+        rc, out = runner("$p = Get-AppxPackage OpenAI.Codex; if ($p) { 'yes' } else { 'no' }")
+    except Exception:  # noqa: BLE001 -- Diagnose bleibt bei Inventarfehler fail-closed
+        return "unknown"
+    if rc != 0:
+        return "unknown"
+    result = out.strip().lower()
+    if result.startswith("yes"):
+        return "installed"
+    if result.startswith("no"):
+        return "missing"
+    return "unknown"
+
+
+def codex_installed_for_user(
+    config: MaintenanceConfig, *, runner: PowerShellRunner | None = None
+) -> bool:
+    """Ist irgendeine Codex-Desktop-Installation fuer den User da?
+
+    Die bestehende Bool-API bleibt konservativ: Ein nicht ermittelbarer Status gilt
+    als vorhanden, damit CareCenter keinen unbelegten Store-Reinstall empfiehlt.
+    """
+    return codex_installation_status_for_user(config, runner=runner) != "missing"

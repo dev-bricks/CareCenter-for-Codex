@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 from typing import Protocol
 
+from .build_info import describe_build
 from .config import MaintenanceConfig, default_config_path, local_root
 from .i18n import normalize_language, set_language, t
 from .maintenance import MaintenanceRunner
@@ -37,6 +38,7 @@ def cmd_init_config(args: argparse.Namespace) -> int:
 def cmd_status(args: argparse.Namespace) -> int:
     config = load_config(args)
     db_path = config.db_path
+    print(describe_build())
     print(t("cli_config", path=Path(args.config)))
     print(t("cli_database", path=db_path))
     print(t("cli_database_exists", exists=db_path.exists()))
@@ -64,6 +66,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 
     config = load_config(args)
     report = diagnose(config)
+    print(describe_build())
     print(report.to_text())
     return 0 if report.status == "ok" else 2
 

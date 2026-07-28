@@ -5,6 +5,7 @@ from __future__ import annotations
 from codex_logdatenbank_wartung.config import MaintenanceConfig
 from codex_logdatenbank_wartung.start_repair import (
     classify_start_state,
+    codex_installation_status_for_user,
     codex_installed_for_user,
 )
 
@@ -76,3 +77,20 @@ def test_installed_conservative_true_on_runner_error(tmp_path) -> None:
         raise RuntimeError("PowerShell weg")
 
     assert codex_installed_for_user(config, runner=boom) is True
+
+
+def test_installation_status_distinguishes_installed_missing_and_unknown(tmp_path) -> None:
+    config = MaintenanceConfig(codex_executable=str(tmp_path / "fehlt.exe"))
+
+    assert codex_installation_status_for_user(config, runner=lambda _c: (0, "yes")) == "installed"
+    assert codex_installation_status_for_user(config, runner=lambda _c: (0, "no")) == "missing"
+    assert codex_installation_status_for_user(config, runner=lambda _c: (1, "denied")) == "unknown"
+
+
+def test_installation_status_is_unknown_on_inventory_error(tmp_path) -> None:
+    config = MaintenanceConfig(codex_executable=str(tmp_path / "fehlt.exe"))
+
+    def boom(_cmd: str) -> tuple[int, str]:
+        raise RuntimeError("PowerShell weg")
+
+    assert codex_installation_status_for_user(config, runner=boom) == "unknown"

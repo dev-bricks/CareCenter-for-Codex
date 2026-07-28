@@ -22,11 +22,15 @@ if not exist "%SCANNER%" (
     pause
     exit /b 1
 )
-set "DIST_DIR=C:\_Local_DEV\codex-maintenance\bin"
-set "WORK_DIR=C:\_Local_DEV\codex_build\codex-logwartung"
-set "SPEC_DIR=C:\_Local_DEV\codex_build\codex-logwartung-spec"
+if not defined CARECENTER_DIST_DIR set "CARECENTER_DIST_DIR=C:\_Local_DEV\codex-maintenance\bin"
+if not defined CARECENTER_BUILD_ROOT set "CARECENTER_BUILD_ROOT=C:\_Local_DEV\codex_build\codex-logwartung"
+set "DIST_DIR=%CARECENTER_DIST_DIR%"
+set "WORK_DIR=%CARECENTER_BUILD_ROOT%\work"
+set "SPEC_DIR=%CARECENTER_BUILD_ROOT%\spec"
 set "BUILD_VENV=C:\_Local_DEV\codex_build\codex-logwartung-venv"
 set "BUILD_PY=%BUILD_VENV%\Scripts\python.exe"
+set "PROVENANCE_JSON=%SPEC_DIR%\carecenter_build_provenance.json"
+set "VERSION_FILE=%SPEC_DIR%\carecenter_version_info.txt"
 
 if not exist "%BUILD_PY%" (
     echo [build] Erstelle Build-venv: %BUILD_VENV%
@@ -60,6 +64,9 @@ if errorlevel 1 pause & exit /b 1
 REM Keep the build isolated from unrelated projects that may be present in the parent shell.
 set "PYTHONPATH=%PROJECT_ROOT%\src"
 
+python "%PROJECT_ROOT%\scripts\build_provenance.py" prepare --project-root "%PROJECT_ROOT%" --output-dir "%SPEC_DIR%"
+if errorlevel 1 pause & exit /b 1
+
 REM --- PFLICHT (.SOFTWARE\BUILD-VERFAHREN.md): Auto-Excludes gegen Schwergewichte ---
 set "EXCLUDES="
 for /f "delims=" %%E in ('python "%SCANNER%" --project "%PROJECT_ROOT%" --emit pyinstaller') do set "EXCLUDES=%%E"
@@ -69,6 +76,8 @@ python -m PyInstaller --noconfirm --clean --onefile --windowed ^
   --name CareCenterForCodex ^
   --icon "%PROJECT_ROOT%\CareCenterForCodex.ico" ^
   --add-data "%PROJECT_ROOT%\CareCenterForCodex.ico;." ^
+  --add-data "%PROVENANCE_JSON%;." ^
+  --version-file "%VERSION_FILE%" ^
   --hidden-import safe_start_for_codex.cli ^
   --paths "%PROJECT_ROOT%\src" ^
   %EXCLUDES% ^
@@ -77,5 +86,7 @@ python -m PyInstaller --noconfirm --clean --onefile --windowed ^
   --specpath "%SPEC_DIR%" ^
   "%PROJECT_ROOT%\src\codex_logdatenbank_wartung\tray_app.py"
 
+if errorlevel 1 pause & exit /b 1
+python "%PROJECT_ROOT%\scripts\build_provenance.py" finalize --metadata "%PROVENANCE_JSON%" --exe "%DIST_DIR%\CareCenterForCodex.exe"
 if errorlevel 1 pause & exit /b 1
 echo EXE erstellt: %DIST_DIR%\CareCenterForCodex.exe

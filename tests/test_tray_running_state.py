@@ -697,3 +697,146 @@ def test_launch_codex_normal_waits_for_worker_confirmation():
         for key in list(mocks):
             if key in sys.modules and sys.modules[key] is mocks[key]:
                 del sys.modules[key]
+
+
+def test_normal_start_worker_reports_confirmed_renderer():
+    mocks = _mock_pyside6()
+    try:
+        for key in list(sys.modules):
+            if "codex_logdatenbank_wartung.tray" in key:
+                del sys.modules[key]
+
+        from codex_logdatenbank_wartung.config import MaintenanceConfig
+        from codex_logdatenbank_wartung.tray import NormalStartWorker
+
+        worker = NormalStartWorker(MaintenanceConfig())
+        worker.finished.reset_mock()
+        with patch(
+            "codex_logdatenbank_wartung.orchestrator.default_launcher",
+            return_value=lambda: (True, "launcher ok"),
+        ), patch(
+            "codex_logdatenbank_wartung.processes.find_codex_processes_by_executable",
+            return_value=[object()],
+        ), patch(
+            "codex_logdatenbank_wartung.processes.process_type",
+            return_value="renderer",
+        ):
+            worker.run()
+
+        worker.finished.emit.assert_called_once_with({"ok": True, "message": "launcher ok"})
+    finally:
+        for key in list(sys.modules):
+            if "codex_logdatenbank_wartung.tray" in key:
+                del sys.modules[key]
+        for key in list(mocks):
+            if key in sys.modules and sys.modules[key] is mocks[key]:
+                del sys.modules[key]
+
+
+def test_normal_start_worker_reports_launcher_failure():
+    mocks = _mock_pyside6()
+    try:
+        for key in list(sys.modules):
+            if "codex_logdatenbank_wartung.tray" in key:
+                del sys.modules[key]
+
+        from codex_logdatenbank_wartung.config import MaintenanceConfig
+        from codex_logdatenbank_wartung.tray import NormalStartWorker
+
+        worker = NormalStartWorker(MaintenanceConfig())
+        worker.finished.reset_mock()
+        with patch(
+            "codex_logdatenbank_wartung.orchestrator.default_launcher",
+            return_value=lambda: (False, "explorer failed"),
+        ):
+            worker.run()
+
+        worker.finished.emit.assert_called_once_with(
+            {"ok": False, "message": "explorer failed"}
+        )
+    finally:
+        for key in list(sys.modules):
+            if "codex_logdatenbank_wartung.tray" in key:
+                del sys.modules[key]
+        for key in list(mocks):
+            if key in sys.modules and sys.modules[key] is mocks[key]:
+                del sys.modules[key]
+
+
+def test_normal_start_worker_timeout_includes_package_status_and_safe_next_step():
+    mocks = _mock_pyside6()
+    try:
+        for key in list(sys.modules):
+            if "codex_logdatenbank_wartung.tray" in key:
+                del sys.modules[key]
+
+        from codex_logdatenbank_wartung.config import MaintenanceConfig
+        from codex_logdatenbank_wartung.tray import NormalStartWorker
+
+        config = MaintenanceConfig(
+            codex_store_aumid="OpenAI.Codex_2p2nqsd0c76g0!App",
+            renderer_timeout_seconds=1,
+        )
+        worker = NormalStartWorker(config)
+        worker.finished.reset_mock()
+        with patch(
+            "codex_logdatenbank_wartung.orchestrator.default_launcher",
+            return_value=lambda: (True, "launcher ok"),
+        ), patch(
+            "codex_logdatenbank_wartung.processes.find_codex_processes_by_executable",
+            return_value=[],
+        ), patch(
+            "codex_logdatenbank_wartung.start_repair.codex_installation_status_for_user",
+            return_value="installed",
+        ), patch("time.monotonic", side_effect=[0.0, 11.0]), patch("time.sleep"):
+            worker.run()
+
+        message = worker.finished.emit.call_args.args[0]["message"]
+        assert "OpenAI.Codex_2p2nqsd0c76g0!App" in message
+        assert "Paketstatus: installiert" in message
+        assert "Nächster sicherer Schritt:" in message
+        assert "Codex-Start prüfen (Diagnose)" in message
+    finally:
+        for key in list(sys.modules):
+            if "codex_logdatenbank_wartung.tray" in key:
+                del sys.modules[key]
+        for key in list(mocks):
+            if key in sys.modules and sys.modules[key] is mocks[key]:
+                del sys.modules[key]
+
+
+def test_normal_start_worker_reports_process_inventory_error_without_false_success():
+    mocks = _mock_pyside6()
+    try:
+        for key in list(sys.modules):
+            if "codex_logdatenbank_wartung.tray" in key:
+                del sys.modules[key]
+
+        from codex_logdatenbank_wartung.config import MaintenanceConfig
+        from codex_logdatenbank_wartung.tray import NormalStartWorker
+
+        worker = NormalStartWorker(MaintenanceConfig(renderer_timeout_seconds=1))
+        worker.finished.reset_mock()
+        with patch(
+            "codex_logdatenbank_wartung.orchestrator.default_launcher",
+            return_value=lambda: (True, "launcher ok"),
+        ), patch(
+            "codex_logdatenbank_wartung.processes.find_codex_processes_by_executable",
+            side_effect=RuntimeError("CIM unavailable"),
+        ), patch(
+            "codex_logdatenbank_wartung.start_repair.codex_installation_status_for_user",
+            return_value="unknown",
+        ), patch("time.monotonic", side_effect=[0.0, 1.0, 11.0]), patch("time.sleep"):
+            worker.run()
+
+        payload = worker.finished.emit.call_args.args[0]
+        assert payload["ok"] is False
+        assert "Prozessinventarfehler: RuntimeError" in payload["message"]
+        assert "Paketstatus: nicht ermittelbar" in payload["message"]
+    finally:
+        for key in list(sys.modules):
+            if "codex_logdatenbank_wartung.tray" in key:
+                del sys.modules[key]
+        for key in list(mocks):
+            if key in sys.modules and sys.modules[key] is mocks[key]:
+                del sys.modules[key]

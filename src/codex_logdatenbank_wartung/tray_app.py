@@ -9,10 +9,14 @@ from pathlib import Path
 
 def main() -> int:
     try:
+        import logging
+
+        from codex_logdatenbank_wartung.build_info import describe_build
         from codex_logdatenbank_wartung.config import default_config_path
         from codex_logdatenbank_wartung.runtime.app_logging import start as start_app_logging
 
         start_app_logging()
+        logging.getLogger("CareCenterForCodex").info(describe_build())
         from codex_logdatenbank_wartung.tray import run_tray
 
         return run_tray(default_config_path())
