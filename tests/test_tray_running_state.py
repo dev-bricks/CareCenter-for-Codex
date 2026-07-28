@@ -660,3 +660,40 @@ def test_launch_codex_normal_restores_safe_start_without_launching_codex():
         for key in list(mocks):
             if key in sys.modules and sys.modules[key] is mocks[key]:
                 del sys.modules[key]
+
+
+def test_launch_codex_normal_waits_for_worker_confirmation():
+    """Der Normalstart meldet nicht mehr schon nach dem Explorer-Aufruf Erfolg."""
+    mocks = _mock_pyside6()
+    try:
+        for key in list(sys.modules):
+            if "codex_logdatenbank_wartung.tray" in key:
+                del sys.modules[key]
+
+        from codex_logdatenbank_wartung.config import MaintenanceConfig
+        from codex_logdatenbank_wartung.tray import TrayController
+
+        with tempfile.TemporaryDirectory() as tmp:
+            config_path = Path(tmp) / "config.json"
+            config = MaintenanceConfig()
+            config.save(config_path)
+            controller = _bare_controller(TrayController, config_path, config)
+
+            with patch(
+                "codex_logdatenbank_wartung.safe_start_integration.safe_start_gate_active",
+                return_value=False,
+            ), patch("codex_logdatenbank_wartung.tray.NormalStartWorker"), patch(
+                "codex_logdatenbank_wartung.tray.QThread"
+            ):
+                controller.launch_codex_normal()
+
+            assert controller.normal_start_worker is not None
+            assert controller.normal_start_thread is not None
+            controller.window.set_state.assert_called_with("Codex starten und auf Fenster warten …")
+    finally:
+        for key in list(sys.modules):
+            if "codex_logdatenbank_wartung.tray" in key:
+                del sys.modules[key]
+        for key in list(mocks):
+            if key in sys.modules and sys.modules[key] is mocks[key]:
+                del sys.modules[key]

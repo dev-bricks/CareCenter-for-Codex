@@ -469,6 +469,44 @@ class StartRepairWorker(QObject):
         self.finished.emit({"outcome": "escalate", "reaped": 0, "message": t("repair_full_needed")})
 
 
+class NormalStartWorker(QObject):
+    """Startet die Store-App und bestaetigt einen echten Renderer im Prozessbaum."""
+
+    finished = Signal(object)
+
+    def __init__(self, config: MaintenanceConfig) -> None:
+        super().__init__()
+        self.config = config
+
+    def run(self) -> None:
+        import time
+
+        from .orchestrator import default_launcher
+        from .processes import find_codex_processes_by_executable, process_type
+
+        ok, message = default_launcher(self.config)()
+        if not ok:
+            self.finished.emit({"ok": False, "message": message})
+            return
+
+        deadline = time.monotonic() + max(10.0, float(self.config.renderer_timeout_seconds))
+        while time.monotonic() < deadline:
+            try:
+                processes = find_codex_processes_by_executable(self.config)
+                if any(process_type(process) == "renderer" for process in processes):
+                    self.finished.emit({"ok": True, "message": message})
+                    return
+            except Exception:  # noqa: BLE001 -- Timeout liefert den sicheren Diagnosepfad.
+                pass
+            time.sleep(2.0)
+
+        aumid = getattr(self.config, "codex_store_aumid", "") or "-"
+        self.finished.emit({
+            "ok": False,
+            "message": f"Kein ChatGPT/Codex-Renderer nach Start innerhalb des Zeitlimits erkannt (AUMID: {aumid}).",
+        })
+
+
 class DiagnosisWorker(QObject):
     """Diagnose im eigenen Thread.
 
@@ -930,6 +968,8 @@ class TrayController(QObject):
         self.watchdog_worker: WatchdogWorker | None = None
         self.start_repair_thread: QThread | None = None
         self.start_repair_worker: StartRepairWorker | None = None
+        self.normal_start_thread: QThread | None = None
+        self.normal_start_worker: NormalStartWorker | None = None
         self.config_audit_thread: QThread | None = None
         self.config_audit_worker: ConfigAuditWorker | None = None
         self.diagnosis_thread: QThread | None = None
@@ -1171,6 +1211,7 @@ class TrayController(QObject):
             or getattr(self, "safe_start_install_thread", None) is not None
             or getattr(self, "automation_thread", None) is not None
             or getattr(self, "full_repair_thread", None) is not None
+            or getattr(self, "normal_start_thread", None) is not None
             # Der Config-Audit repariert mit (MCP/Plugins/leere Threads) und ist damit
             # ebenfalls mutierend. Solange er synchron lief, war er zwangslaeufig
             # exklusiv — im eigenen Thread muss diese Exklusivitaet ausdruecklich gelten.
@@ -1605,21 +1646,42 @@ class TrayController(QObject):
             )
             return
 
-        from .orchestrator import default_launcher
+        self.running = True
+        self.window.set_running(True)
+        self.window.set_state(t("repair_launch_wait"))
+        self.window.set_result("")
+        self.show_window()
+        self.normal_start_thread = QThread(self)
+        self.normal_start_worker = NormalStartWorker(config)
+        self.normal_start_worker.moveToThread(self.normal_start_thread)
+        self.normal_start_thread.started.connect(self.normal_start_worker.run)
+        self.normal_start_worker.finished.connect(self.on_normal_start_finished)
+        self.normal_start_worker.finished.connect(self.normal_start_thread.quit)
+        self.normal_start_worker.finished.connect(self.normal_start_worker.deleteLater)
+        self.normal_start_thread.finished.connect(self.normal_start_thread.deleteLater)
+        self.normal_start_thread.finished.connect(self.clear_normal_start_thread)
+        self.normal_start_thread.start()
 
-        ok, message = default_launcher(config)()
+    def on_normal_start_finished(self, info: object) -> None:
+        data = info if isinstance(info, dict) else {}
+        ok = bool(data.get("ok"))
+        message = str(data.get("message") or "")
         summary = t("codex_start_ok") if ok else t("codex_start_failed")
+        self.running = False
+        self.window.set_running(False)
         self.window.set_state(summary)
         self.window.set_result(message)
         self.show_window()
         self.tray.showMessage(
             "CareCenter",
             summary,
-            QSystemTrayIcon.MessageIcon.Information
-            if ok
-            else QSystemTrayIcon.MessageIcon.Warning,
-            5000,
+            QSystemTrayIcon.MessageIcon.Information if ok else QSystemTrayIcon.MessageIcon.Warning,
+            7000,
         )
+
+    def clear_normal_start_thread(self) -> None:
+        self.normal_start_thread = None
+        self.normal_start_worker = None
 
     def install_safe_start(self) -> None:
         if self.safe_start_install_thread is not None:
