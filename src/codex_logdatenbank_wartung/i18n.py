@@ -34,6 +34,27 @@ _CATALOG: dict[str, dict[Language, str]] = {
         "de": "off = ignorieren, notify = bei Fund benachrichtigen, auto = plattform-inkompatible Plugins automatisch deaktivieren",
         "en": "off = ignore, notify = notify when found, auto = disable platform-incompatible plugins automatically",
     },
+    "settings_empty_threads": {"de": "Leere Threads:", "en": "Empty threads:"},
+    "settings_empty_threads_tooltip": {
+        "de": "off = ignorieren, notify = bei Fund benachrichtigen, auto = leere Threads beim nächsten sicheren Wartungslauf archivieren",
+        "en": "off = ignore, notify = notify when found, auto = archive empty threads during the next safe maintenance run",
+    },
+    "settings_auto_archive_days": {
+        "de": "Threads automatisch archivieren nach:",
+        "en": "Automatically archive threads after:",
+    },
+    "settings_auto_archive_days_tooltip": {
+        "de": "Alter in Tagen für die automatische Archivierung. 0 deaktiviert diese Regel.",
+        "en": "Age in days for automatic archiving. 0 disables this rule.",
+    },
+    "settings_auto_mark_read_days": {
+        "de": "Threads automatisch als gelesen markieren nach:",
+        "en": "Automatically mark threads as read after:",
+    },
+    "settings_auto_mark_read_days_tooltip": {
+        "de": "Alter in Tagen zum automatischen Markieren ungelesener Threads. 0 deaktiviert diese Regel.",
+        "en": "Age in days for automatically marking unread threads. 0 disables this rule.",
+    },
     "settings_audit_now": {"de": "Audit jetzt ausführen", "en": "Run audit now"},
     "settings_audit_now_tooltip": {
         "de": "Audit sofort starten: prüft Konfiguration, Plugins, CLI und bereinigt sicher erkannte alte Runtime-MCP-Prozessbäume.",

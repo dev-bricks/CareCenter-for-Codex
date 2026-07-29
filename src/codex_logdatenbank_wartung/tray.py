@@ -715,7 +715,7 @@ class StatusWindow(QWidget):
         settings_layout.addLayout(plugin_row)
 
         empty_threads_row = QHBoxLayout()
-        self.empty_threads_label = QLabel("Leere Threads")
+        self.empty_threads_label = QLabel()
         empty_threads_row.addWidget(self.empty_threads_label)
         self.empty_threads_combo = QComboBox()
         self.empty_threads_combo.addItems(["off", "notify", "auto"])
@@ -727,7 +727,7 @@ class StatusWindow(QWidget):
         self.empty_threads_combo.currentTextChanged.connect(self.empty_threads_mode_changed.emit)
 
         thread_archive_row = QHBoxLayout()
-        self.thread_archive_label = QLabel("Threads automatisch archivieren nach")
+        self.thread_archive_label = QLabel()
         self.thread_archive_days = QSpinBox()
         self.thread_archive_days.setRange(0, 3650)
         self.thread_archive_days.setSuffix(" Tagen")
@@ -738,7 +738,7 @@ class StatusWindow(QWidget):
         settings_layout.addLayout(thread_archive_row)
 
         thread_read_row = QHBoxLayout()
-        self.thread_read_label = QLabel("Threads automatisch als gelesen markieren nach")
+        self.thread_read_label = QLabel()
         self.thread_read_days = QSpinBox()
         self.thread_read_days.setRange(0, 3650)
         self.thread_read_days.setSuffix(" Tagen")
@@ -841,7 +841,7 @@ class StatusWindow(QWidget):
     def _accessible_label_text(label: QLabel) -> str:
         return label.text().rstrip(":：").strip()
 
-    def _set_accessible_context(self, widget: QComboBox, label: QLabel, description: str) -> None:
+    def _set_accessible_context(self, widget: QWidget, label: QLabel, description: str) -> None:
         widget.setAccessibleName(self._accessible_label_text(label))
         widget.setAccessibleDescription(description)
 
@@ -890,8 +890,14 @@ class StatusWindow(QWidget):
         self.language_combo.blockSignals(False)
         self.mcp_label.setText(t("settings_mcp_duplicates"))
         self.plugin_label.setText(t("settings_unused_plugins"))
+        self.empty_threads_label.setText(t("settings_empty_threads"))
+        self.thread_archive_label.setText(t("settings_auto_archive_days"))
+        self.thread_read_label.setText(t("settings_auto_mark_read_days"))
         self.mcp_combo.setToolTip(t("settings_audit_mode_tooltip"))
         self.plugin_combo.setToolTip(t("settings_plugin_mode_tooltip"))
+        self.empty_threads_combo.setToolTip(t("settings_empty_threads_tooltip"))
+        self.thread_archive_days.setToolTip(t("settings_auto_archive_days_tooltip"))
+        self.thread_read_days.setToolTip(t("settings_auto_mark_read_days_tooltip"))
         self._set_accessible_context(
             self.loop_interval_combo,
             self.loop_interval_label,
@@ -911,6 +917,21 @@ class StatusWindow(QWidget):
             self.plugin_combo,
             self.plugin_label,
             t("settings_plugin_mode_tooltip"),
+        )
+        self._set_accessible_context(
+            self.empty_threads_combo,
+            self.empty_threads_label,
+            t("settings_empty_threads_tooltip"),
+        )
+        self._set_accessible_context(
+            self.thread_archive_days,
+            self.thread_archive_label,
+            t("settings_auto_archive_days_tooltip"),
+        )
+        self._set_accessible_context(
+            self.thread_read_days,
+            self.thread_read_label,
+            t("settings_auto_mark_read_days_tooltip"),
         )
         self.audit_button.setText(t("settings_audit_now"))
         self.audit_button.setToolTip(t("settings_audit_now_tooltip"))

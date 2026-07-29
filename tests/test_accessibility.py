@@ -30,6 +30,12 @@ def test_status_window_comboboxes_expose_accessible_context(monkeypatch) -> None
     assert window.mcp_combo.accessibleDescription() == t("settings_audit_mode_tooltip")
     assert window.plugin_combo.accessibleName() == "Ungenutzte Plugins"
     assert window.plugin_combo.accessibleDescription() == t("settings_plugin_mode_tooltip")
+    assert window.empty_threads_combo.accessibleName() == "Leere Threads"
+    assert window.empty_threads_combo.accessibleDescription() == t("settings_empty_threads_tooltip")
+    assert window.thread_archive_days.accessibleName() == "Threads automatisch archivieren nach"
+    assert window.thread_archive_days.accessibleDescription() == t("settings_auto_archive_days_tooltip")
+    assert window.thread_read_days.accessibleName() == "Threads automatisch als gelesen markieren nach"
+    assert window.thread_read_days.accessibleDescription() == t("settings_auto_mark_read_days_tooltip")
 
     set_language("en")
     window.retranslate()
@@ -40,6 +46,10 @@ def test_status_window_comboboxes_expose_accessible_context(monkeypatch) -> None
     assert window.language_combo.accessibleDescription() == t("settings_language_tooltip")
     assert window.mcp_combo.accessibleName() == "MCP duplicates"
     assert window.plugin_combo.accessibleName() == "Unused plugins"
+    assert window.empty_threads_combo.accessibleName() == "Empty threads"
+    assert window.empty_threads_combo.accessibleDescription() == t("settings_empty_threads_tooltip")
+    assert window.thread_archive_days.accessibleName() == "Automatically archive threads after"
+    assert window.thread_read_days.accessibleName() == "Automatically mark threads as read after"
 
     window.close()
     app.processEvents()
