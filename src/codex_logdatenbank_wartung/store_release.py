@@ -376,12 +376,34 @@ def _discover_build_dist_dir(project_root: Path) -> Path | None:
         content = build_script.read_text(encoding="utf-8")
     except OSError:
         return None
+    local_vars: dict[str, str] = {}
+    for line in content.splitlines():
+        match_set = re.match(
+            r'^\s*(?:if\s+not\s+defined\s+\w+\s+)?set\s+"?(?P<key>\w+)=(?P<val>[^"]+)"?\s*$',
+            line,
+            re.IGNORECASE,
+        )
+        if match_set:
+            k, v = match_set.group("key"), match_set.group("val").strip()
+            if k not in local_vars:
+                local_vars[k] = v
+
     for line in content.splitlines():
         match = DIST_DIR_PATTERN.match(line)
         if not match:
             continue
-        raw_value = os.path.expandvars(match.group("value").strip())
-        if not raw_value:
+        raw = match.group("value").strip()
+        def replace_var(m: re.Match[str]) -> str:
+            var_name = m.group(1)
+            if var_name in os.environ:
+                return os.environ[var_name]
+            if var_name in local_vars:
+                return local_vars[var_name]
+            return m.group(0)
+
+        raw_expanded = re.sub(r"%(\w+)%", replace_var, raw)
+        raw_value = os.path.expandvars(raw_expanded)
+        if not raw_value or "%" in raw_value:
             return None
         dist_dir = Path(raw_value)
         if not dist_dir.is_absolute():

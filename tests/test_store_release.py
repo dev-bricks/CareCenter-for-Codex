@@ -508,3 +508,37 @@ def test_validate_store_materials_checks_msix_sdk_on_request(tmp_path: Path) -> 
     )
 
     assert any(check.name == "MSIX/SDK-Readiness" for check in report.checks)
+
+
+def test_discover_build_dist_dir_expands_local_set_variables(tmp_path: Path) -> None:
+    custom_bin = tmp_path / "custom_bin"
+    custom_bin.mkdir(parents=True)
+    (custom_bin / "CareCenterForCodex.exe").write_bytes(b"exe")
+
+    (tmp_path / "build_exe.bat").write_text(
+        f'@echo off\nif not defined CARECENTER_DIST_DIR set "CARECENTER_DIST_DIR={custom_bin}"\nset "DIST_DIR=%CARECENTER_DIST_DIR%"\n',
+        encoding="utf-8",
+    )
+    _write_store_files(
+        tmp_path,
+        {
+            "app_name": "CareCenter for Codex",
+            "publisher": "CN=01234567-89AB-CDEF-0123-456789ABCDEF",
+            "publisher_display": "Lukas Geiger",
+            "identity_name": "LukasGeiger.CareCenterForCodex",
+            "version": "0.8.0.0",
+            "description": "Offline Wartung und Reparatur fuer die Codex-Desktop-App.",
+            "executable": "CareCenterForCodex.exe",
+            "capabilities": "runFullTrust",
+            "category": "Developer Tools",
+            "age_rating": "3+",
+            "privacy_url": "https://dev-bricks.github.io/CareCenter-for-Codex/privacy",
+            "support_url": "https://dev-bricks.github.io/CareCenter-for-Codex/support",
+        },
+    )
+
+    report = validate_store_materials(project_root=tmp_path)
+    executable_check = next(check for check in report.checks if check.name == "Executable")
+    assert executable_check.status == "ok"
+    assert str((custom_bin / "CareCenterForCodex.exe").resolve()) in executable_check.message
+
