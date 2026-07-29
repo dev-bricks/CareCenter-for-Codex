@@ -1,5 +1,8 @@
 # CareCenter for Codex
 
+> Last-checked: 2026-07-29
+> Test suite: 345 passing tests (verified 2026-07-29)
+
 CareCenter for Codex is an unofficial local Windows tray and CLI utility for
 maintaining the OpenAI Codex desktop app installation. It repairs failed
 starts, cleans up inactive leftover desktop processes, checks Microsoft Store

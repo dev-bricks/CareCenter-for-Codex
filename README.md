@@ -5,7 +5,7 @@
 > Unofficial Windows tray & CLI utility that keeps the OpenAI Codex desktop app healthy — repairs failed starts, removes hung leftovers, and safely maintains the local SQLite log database. Fully offline, no telemetry.
 
 [![CareCenter tests](https://github.com/dev-bricks/CareCenter-for-Codex/actions/workflows/tests.yml/badge.svg)](https://github.com/dev-bricks/CareCenter-for-Codex/actions/workflows/tests.yml)
-[![Pytest Status](https://img.shields.io/badge/Tests-333%20passed-brightgreen.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
+[![Pytest Status](https://img.shields.io/badge/Tests-345%20passed-brightgreen.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
 [![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
@@ -22,6 +22,21 @@ German documentation: [README.de.md](README.de.md)
 ## Why
 
 On Windows, closing the Codex desktop window can leave a hung main process behind. That leftover process can hold the app singleton lock, so the next start appears to do nothing. CareCenter removes that first blocker safely: it only touches inactive ghost processes, stale lock files, and explicitly requested maintenance paths.
+
+## Architecture & System Flow
+
+```mermaid
+graph TD
+    A["CareCenter Tray / CLI"] --> B["Watcher Daemon (60s loop)"]
+    A --> C["Maintenance Engine (Fast / Safe)"]
+    B --> D["Process Tree Inspection"]
+    D --> E{"Leftover Blocker Found?"}
+    E -- Yes --> F["Fail-closed Ghost Reaper"]
+    E -- No --> G["Idle State"]
+    C --> H["SQLite Log Maintenance (state_5.sqlite)"]
+    H --> I["Backup -> Integrity Check -> WAL Checkpoint -> VACUUM"]
+    C --> J["Thread Inbox Hygiene & Config Audit"]
+```
 
 ## Features
 

@@ -1,0 +1,15 @@
+# MARKETING-LOG.txt — CareCenter for Codex (Pfad B Discoverability & Visibility Recommendations)
+
+Date: 2026-07-29
+Repo: dev-bricks/CareCenter-for-Codex
+
+## Automated Actions Applied:
+1. Updated `llms.txt` header metadata (`Last-checked: 2026-07-29`) and test suite verification notice (345 passing tests).
+2. Synced Pytest badges in `README.md` and `README.de.md` from 333 to 345 passed tests.
+3. Added interactive System Architecture & Data Flow Mermaid diagrams to both `README.md` and `README.de.md`.
+4. Updated `CHANGELOG.md` with audit log.
+
+## Non-Automated Marketing & Discoverability Recommendations:
+1. **GitHub Topics**: Ensure the GitHub repository has topics set: `#codex-maintenance`, `#windows-tray`, `#sqlite-maintenance`, `#pyside6`, `#desktop-utility`.
+2. **Community Showcase**: Post a brief update on Reddit / r/OpenAI or developer forums describing the offline singleton-lock repair for Codex desktop on Windows 10/11.
+3. **Glama / MCP Directories**: Register CareCenter for Codex CLI / MCP diagnostic hooks on Glama / Smithery if applicable.

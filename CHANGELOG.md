@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Maintenance (2026-07-29): Pfad B Discoverability, README & SEO audit. Updated `llms.txt` header metadata (`Last-checked: 2026-07-29`), synced Pytest badge to 345 passing tests, added System Architecture Mermaid diagram to `README.md` & `README.de.md`, and logged marketing recommendations.
 - Added direct normal-start worker regressions for renderer success, launcher failure,
   process-inventory failure, and renderer timeout. Timeout feedback now includes the
   AUMID, a tri-state package status, and a safe read-only diagnostic next step.

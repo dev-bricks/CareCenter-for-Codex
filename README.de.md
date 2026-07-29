@@ -5,7 +5,7 @@
 > Inoffizielles lokales Windows-Tray- und CLI-Werkzeug, das die OpenAI-Codex-Desktop-App gesund hält — repariert fehlgeschlagene Starts, entfernt hängende Reste und wartet die SQLite-Logdatenbank sicher. Vollständig offline, keine Telemetrie.
 
 [![CareCenter tests](https://github.com/dev-bricks/CareCenter-for-Codex/actions/workflows/tests.yml/badge.svg)](https://github.com/dev-bricks/CareCenter-for-Codex/actions/workflows/tests.yml)
-[![Pytest-Status](https://img.shields.io/badge/Tests-333%20bestanden-brightgreen.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
+[![Pytest-Status](https://img.shields.io/badge/Tests-345%20bestanden-brightgreen.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
 [![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://www.python.org/)
 [![Lizenz](https://img.shields.io/badge/Lizenz-MIT-yellow.svg)](LICENSE)
 [![Plattform](https://img.shields.io/badge/Plattform-Windows-lightgrey.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
@@ -22,6 +22,21 @@ Englische Dokumentation: [README.md](README.md)
 ## Warum
 
 Unter Windows kann nach dem Schließen des Codex-Desktopfensters ein hängender Hauptprozess übrig bleiben. Dieser Restprozess kann den Singleton-Lock der App halten, sodass der nächste Start scheinbar nichts tut. CareCenter entfernt genau diesen ersten Blocker sicher: Es greift nur bei inaktiven Ghost-Prozessen, verwaisten Lockfiles und ausdrücklich gestarteten Wartungspfaden ein.
+
+## Architektur & Systemfluss
+
+```mermaid
+graph TD
+    A["CareCenter Tray / CLI"] --> B["Wächter-Daemon (60s-Loop)"]
+    A --> C["Wartungs-Engine (Fast / Safe)"]
+    B --> D["Prozessbaum-Prüfung"]
+    D --> E{"Rest-Blocker gefunden?"}
+    E -- Ja --> F["Fail-closed Ghost Reaper"]
+    E -- Nein --> G["Leerlauf-Zustand"]
+    C --> H["SQLite-Logwartung (state_5.sqlite)"]
+    H --> I["Backup -> Integritätscheck -> WAL Checkpoint -> VACUUM"]
+    C --> J["Thread-Postfachpflege & Config-Audit"]
+```
 
 ## Funktionen
 
