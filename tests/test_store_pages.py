@@ -3,7 +3,6 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = PROJECT_ROOT / "scripts" / "build_store_pages.py"
 
@@ -29,7 +28,7 @@ def test_build_store_pages_creates_extensionless_routes(tmp_path: Path) -> None:
         output_dir / "index.html",
     }
     assert set(written) == expected
-    assert expected <= {path for path in output_dir.rglob("*.html")}
+    assert expected <= set(output_dir.rglob("*.html"))
 
 
 def test_build_store_pages_rewrites_internal_markdown_links(tmp_path: Path) -> None:

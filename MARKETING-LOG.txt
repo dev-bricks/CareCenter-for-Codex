@@ -22,3 +22,10 @@ Repo: dev-bricks/CareCenter-for-Codex
 2. **Community Showcase**: Post a brief update on Reddit / r/OpenAI or developer forums describing the offline singleton-lock repair for Codex desktop on Windows 10/11.
 3. **Glama / MCP Directories**: Register CareCenter for Codex CLI / MCP diagnostic hooks on Glama / Smithery if applicable.
 
+## Date: 2026-08-01
+Repo: dev-bricks/CareCenter-for-Codex
+
+### Maintenance Readback
+1. Revalidated the local suite: 346 collected tests, 345 passed, 1 skipped.
+2. Refreshed `llms.txt` verification metadata to 2026-08-01.
+3. Left pre-existing untracked tray-split files untouched and outside the maintenance commit.

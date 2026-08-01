@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import logging.handlers
 import sys
@@ -62,10 +63,8 @@ def setup_logging(
 
     use_console = _has_console() if console is None else console
     if use_console and _has_console():
-        try:
+        with contextlib.suppress(AttributeError, ValueError):
             sys.stderr.reconfigure(errors="replace")
-        except (AttributeError, ValueError):
-            pass
         stream_handler = logging.StreamHandler()
         stream_handler.setFormatter(formatter)
         stream_handler._app_logging = True  # type: ignore[attr-defined]

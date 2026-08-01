@@ -6,17 +6,13 @@ import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
 
-import pytest
-
 from codex_logdatenbank_wartung.config import MaintenanceConfig
 from codex_logdatenbank_wartung.maintenance import (
     MaintenanceResult,
     MaintenanceRunner,
     _archive_table,
-    _column_info,
     _cutoff_value,
     _detect_ts_column,
-    _table_names,
 )
 
 # Feste Testdaten: vor 100 Tagen (sicher archivierbar) und morgen (bleibt in DB).

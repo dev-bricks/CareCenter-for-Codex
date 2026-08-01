@@ -177,7 +177,7 @@ def _archive_table(
     with archive_file.open("a", encoding="utf-8") as fh:
         for row in rows:
             fh.write(
-                json.dumps(dict(zip(col_names, row)), ensure_ascii=False, default=str) + "\n"
+                json.dumps(dict(zip(col_names, row, strict=True)), ensure_ascii=False, default=str) + "\n"
             )
     conn.execute(f"DELETE FROM [{table}] WHERE [{ts_col}] < ?", (cutoff,))
     conn.commit()  # pro Tabelle committen — Fehler in anderer Tabelle rollt dies nicht zurück

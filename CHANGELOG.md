@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Maintenance (2026-08-01): Revalidated 346 collected tests (345 passed, 1 skipped) and refreshed
+  `llms.txt` verification metadata. Cleaned tracked Ruff findings without touching pre-existing
+  untracked tray-split work.
 - Maintenance (2026-07-30): Pfad B Discoverability, README & SEO audit. Updated `llms.txt` header metadata (`Last-checked: 2026-07-30`), synced verification metadata (345 total tests, 344 passed, 1 skipped), added open-bricks ecosystem badges in `README.md` & `README.de.md`, and updated changelog audit log.
 - Accessibility: The three thread-hygiene settings now expose localized labels, tooltips, accessible names, and descriptions for screen-reader users.
 - Maintenance (2026-07-29): Pfad B Discoverability, README & SEO audit. Updated `llms.txt` header metadata (`Last-checked: 2026-07-29`), synced Pytest badge to 345 passing tests, added System Architecture Mermaid diagram to `README.md` & `README.de.md`, and logged marketing recommendations.

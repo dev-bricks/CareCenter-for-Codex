@@ -14,8 +14,6 @@ import ast
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 TRAY = Path(__file__).parent.parent / "src" / "codex_logdatenbank_wartung" / "tray.py"
 
 # Funktionen, die messbar blockieren (subprocess.run, Dateisystem-Scans).
