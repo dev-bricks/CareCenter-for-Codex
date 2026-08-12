@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Maintenance (2026-08-12): Revalidated 346 collected tests (345 passed, 1 skipped),
+  Ruff, and Compileall on the clean Plan-D checkout; refreshed `llms.txt` verification metadata.
 - Maintenance (2026-08-01): Revalidated 346 collected tests (345 passed, 1 skipped) and refreshed
   `llms.txt` verification metadata. Cleaned tracked Ruff findings without touching pre-existing
   untracked tray-split work.
