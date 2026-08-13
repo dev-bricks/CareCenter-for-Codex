@@ -1,6 +1,6 @@
 # Support
 
-Stand: 2026-06-13
+Stand: 2026-08-13
 
 ## Zweck
 
@@ -16,6 +16,10 @@ eingetragen.
   geplanten GitHub-Pages-Ziele des Projekts.
 - Der Check `python -m codex_logdatenbank_wartung.cli store-materials` prüft
   diesen Stand vor einer Store-Einreichung.
+- Dieser Standardcheck bleibt lokal und kontaktiert keine Store-URL. Erst der
+  ausdrücklich manuelle Opt-in-Aufruf `store-materials --live-pages` prüft die
+  konfigurierten HTTPS-Seiten als separates Release-Gate. Der Aufruf gehört
+  nicht zur normalen CareCenter-Laufzeit und ist keine Telemetrie.
 
 ## Öffentlicher Supportpfad
 
@@ -29,7 +33,8 @@ MSIX/WACK-Stand auf dieselben URLs bezogen bleiben.
 
 ## Interner Support bis dahin
 
-- Projektdokumentation: `README.md`, `PORTIERUNGSPLAN.md`, `TODO.md`
-- Lokale technische Doku: `ARCHITECTURE.md`, `STATE.md`, `DECISIONS.md`
+- Projektdokumentation: `README.md`, `README.de.md`, `ARCHITECTURE.md`, `CHANGELOG.md`
+- Store-/Datenschutzunterlagen: `STORE_LISTING.md`, `PRIVACY_POLICY.md`,
+  `SUPPORT.md`, `THIRD_PARTY_LICENSES.txt`
 - Lokale Prüfung: `python -m pytest`
 - Store-Material-Check: `python -m codex_logdatenbank_wartung.cli store-materials`

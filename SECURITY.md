@@ -21,7 +21,13 @@ Dieses Tool führt sicherheitsrelevante lokale Operationen aus:
 - **Prozesse:** gezieltes Beenden hängender Codex-**Desktop**-Prozesse (Prozessbaum). Die node-basierte
   Codex-**CLI** wird über exakte Pfad-Erkennung bewusst nie erfasst.
 - **Windows-AppX/Store:** Registrieren/Zurücksetzen des Codex-Store-Pakets (elevated), Öffnen der Store-Produktseite
-- **Kein Netzwerk:** keine Telemetrie, keine externen API-Aufrufe (außer dem lokalen Öffnen der Store-Seite)
+- **Normale Laufzeit nur lokal:** keine Telemetrie, keine Cloud-Synchronisation,
+  keine Hintergrund-Uploads und keine externen API-Aufrufe (das Öffnen der
+  Microsoft-Store-Seite ist nur eine lokale Betriebssystemaktion). Der separate
+  Befehl `store-materials --live-pages` ist ein ausdrücklich manueller Release-
+  Vorabcheck; nur dieser Opt-in-Pfad ruft konfigurierte Store-URLs über HTTPS
+  ab und liefert ein eigenes Warnungs-/Fehlerergebnis. Er wird nie vom Tray,
+  Wächter, Wartungsloop oder den Standard-CLI-Befehlen aufgerufen.
 
 ### Reaktionszeit
 
@@ -51,7 +57,12 @@ This tool performs security-relevant local operations:
 - **Processes:** targeted termination of hung Codex **desktop** processes (process tree). The
   node-based Codex **CLI** is deliberately never matched (exact executable-path detection).
 - **Windows AppX/Store:** register/reset of the Codex Store package (elevated), opening the Store product page
-- **No network:** no telemetry, no external API calls (other than locally opening the Store page)
+- **Normal runtime is local-only:** no telemetry, cloud sync, background uploads,
+  or external API calls (opening the Microsoft Store page is only a local OS
+  action). The separate `store-materials --live-pages` command is an explicit
+  manual release preflight; only that opt-in path requests configured Store URLs
+  over HTTPS and returns its own warning/error result. It is never called by the
+  tray, watcher, maintenance loop, or default CLI commands.
 
 ### Response Time
 

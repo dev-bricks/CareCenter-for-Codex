@@ -155,6 +155,9 @@ lassen sich in `config.json` anpassen.
 
 ## Sicherheitsmodell
 
+- Die normale CareCenter-Laufzeit und die Standard-CLI-Befehle arbeiten nur
+  lokal: Sie senden keine Telemetrie, laden keine Daten hoch, rufen keine
+  externen APIs auf und verwenden keine Cloud-Synchronisation.
 - Konservative Wartung blockiert, solange Codex läuft.
 - Geplante Wartung schließt Codex nie.
 - Safe Auto-Maintain schließt Codex erst, wenn der gesamte Prozessbaum im Leerlauf ist.
@@ -188,7 +191,14 @@ python -m codex_logdatenbank_wartung.cli store-materials --live-pages
 python -m codex_logdatenbank_wartung.cli store-materials --exe-path C:\_Local_DEV\codex-maintenance\bin
 ```
 
-Mit `--live-pages` wird das externe Release-Gate geprüft: Der Befehl ruft beide konfigurierten Store-URLs über HTTPS ab und meldet nicht erreichbare Seiten als Warnung. Ohne `--exe-path` versucht der Check, die gebaute EXE automatisch aus `build_exe.bat` (`DIST_DIR`) zu finden. Mit `--exe-path` kann entweder die konkrete `.exe` oder nur der Build-Ordner übergeben werden.
+Ohne `--live-pages` ist der Materialcheck rein lokal und kontaktiert keine URL.
+`--live-pages` ist ein separater, ausdrücklich manuell gestarteter Release-
+Vorabcheck: Nur dieser Opt-in-Pfad ruft die beiden konfigurierten Store-URLs
+über HTTPS ab und meldet nicht erreichbare Seiten als Warnung. Er gehört nicht
+zur Tray-, Wächter-, Wartungs- oder normalen CLI-Laufzeit und ist keine
+Telemetrie. Ohne `--exe-path` versucht der Check, die gebaute EXE automatisch
+aus `build_exe.bat` (`DIST_DIR`) zu finden. Mit `--exe-path` kann entweder die
+konkrete `.exe` oder nur der Build-Ordner übergeben werden.
 
 Der Check baut die statischen GitHub-Pages-Dateien außerdem temporär und prüft `privacy/index.html`, `support/index.html`, `index.html` sowie den Build-Marker. Der aktive Workflow `.github/workflows/pages.yml` veröffentlicht die Routen `/privacy/` und `/support/` über GitHub Pages.
 
@@ -205,4 +215,6 @@ Die Testsuite deckt Wartungssicherheit, Reparatur-Eskalation, Safe-Start-Integra
 
 ## Lizenz
 
-CareCenter for Codex steht unter der [MIT-Lizenz](LICENSE). PySide6 wird unter der LGPL verwendet; siehe [THIRD_PARTY_LICENSES.txt](THIRD_PARTY_LICENSES.txt).
+CareCenter for Codex steht unter der [MIT-Lizenz](LICENSE). PySide6 wird unter
+der LGPL verwendet; das Verzeichnis der direkten Abhängigkeiten und sein
+Prüfumfang stehen in [THIRD_PARTY_LICENSES.txt](THIRD_PARTY_LICENSES.txt).

@@ -180,6 +180,8 @@ When set, `config.json`, `logs\`, and `backups\` are placed under that path inst
 
 ## Safety Model
 
+- Normal CareCenter runtime and the default CLI commands are local-only: they do
+  not send telemetry, upload data, call external APIs, or use cloud sync.
 - Conservative maintenance blocks while Codex is running.
 - Scheduled maintenance never closes Codex.
 - Safe auto-maintain only closes Codex after the full process tree is idle.
@@ -213,7 +215,14 @@ python -m codex_logdatenbank_wartung.cli store-materials --live-pages
 python -m codex_logdatenbank_wartung.cli store-materials --exe-path C:\_Local_DEV\codex-maintenance\bin
 ```
 
-Use `--live-pages` for the external release gate: it requests both configured Store URLs over HTTPS and reports unreachable pages as warnings. Without `--exe-path`, the check tries to discover the built EXE automatically from `build_exe.bat` (`DIST_DIR`). With `--exe-path`, you can pass either the exact `.exe` file or just the build directory.
+The command without `--live-pages` is a local-only material check and does not
+contact either URL. `--live-pages` is a separate, explicit manual release
+preflight: only this opt-in path requests both configured Store URLs over HTTPS
+and reports unreachable pages as warnings. It is not part of the tray, watcher,
+maintenance, or normal CLI runtime and is not telemetry. Without `--exe-path`,
+the check tries to discover the built EXE automatically from `build_exe.bat`
+(`DIST_DIR`). With `--exe-path`, you can pass either the exact `.exe` file or
+just the build directory.
 
 The Store privacy/support URLs are prepared for GitHub Pages. `store-materials` also runs a temporary static Pages build and verifies `privacy/index.html`, `support/index.html`, `index.html`, and the build marker. You can still build the artifact explicitly with:
 
@@ -236,4 +245,6 @@ The test suite covers maintenance safety, repair escalation, Safe Start integrat
 
 ## License
 
-CareCenter for Codex is licensed under [MIT](LICENSE). PySide6 is used under the LGPL; see [THIRD_PARTY_LICENSES.txt](THIRD_PARTY_LICENSES.txt).
+CareCenter for Codex is licensed under [MIT](LICENSE). PySide6 is used under the LGPL;
+the direct-dependency inventory and its update scope are documented in
+[THIRD_PARTY_LICENSES.txt](THIRD_PARTY_LICENSES.txt).

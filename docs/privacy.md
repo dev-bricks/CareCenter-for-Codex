@@ -10,7 +10,8 @@ maintaining the local Codex desktop installation.
 ### Data collection
 
 CareCenter for Codex does **not** collect, transmit, or sell personal data.
-There is no telemetry, analytics, crash reporting, or cloud sync.
+There is no telemetry, analytics, crash reporting, cloud sync, or background
+network activity during normal runtime.
 
 ### Local processing
 
@@ -26,8 +27,12 @@ All processing happens on the user's device.
 
 ### External services
 
-The tool does not call external APIs. Some actions may open the Microsoft Store
-or a local Windows repair command, but the tool itself does not upload data.
+Normal runtime does not call external APIs. Some actions may open the Microsoft
+Store or a local Windows repair command, but the tool itself does not upload
+data. The separately invoked `store-materials --live-pages` command is an
+explicit manual release preflight; only it requests the configured Store pages
+over HTTPS and reports reachability with release-gate warnings. It is not
+telemetry and is not part of normal runtime.
 
 ### Contact
 
@@ -45,7 +50,8 @@ und Wartung der lokalen Codex-Desktop-Installation.
 
 CareCenter for Codex erhebt, überträgt oder verkauft **keine**
 personenbezogenen Daten. Es gibt keine Telemetrie, keine Analysefunktionen,
-keine Absturzberichte und keine Cloud-Synchronisation.
+keine Absturzberichte, keine Cloud-Synchronisation und keine
+Hintergrund-Netzwerkaktivität im normalen Betrieb.
 
 ### Lokale Verarbeitung
 
@@ -61,9 +67,13 @@ Die gesamte Verarbeitung findet ausschließlich auf dem Gerät des Nutzers statt
 
 ### Externe Dienste
 
-Das Tool ruft keine externen APIs auf. Einige Aktionen können den Microsoft
-Store oder lokale Windows-Reparaturbefehle öffnen, aber das Tool selbst lädt
-keine Daten hoch.
+Im normalen Betrieb ruft das Tool keine externen APIs auf. Einige Aktionen
+können den Microsoft Store oder lokale Windows-Reparaturbefehle öffnen, aber
+das Tool selbst lädt keine Daten hoch. Der separat gestartete Befehl
+`store-materials --live-pages` ist ein ausdrücklich manueller Release-
+Vorabcheck; nur dieser Opt-in-Pfad ruft die konfigurierten Store-Seiten über
+HTTPS ab und meldet die Erreichbarkeit mit eigenen Gate-Warnungen. Er ist keine
+Telemetrie und gehört nicht zur normalen Laufzeit.
 
 ### Kontakt
 

@@ -3,7 +3,7 @@
 Bewusst getrennt vom konservativen Wartungskern (`maintenance.py`):
 
 * `maintenance.py` blockiert jede Wartung, sobald irgendein Codex-Prozess laeuft
-  (Datensicherheit, siehe DECISIONS.md). Dieses Verhalten bleibt unangetastet.
+  (Datensicherheit, siehe ARCHITECTURE.md). Dieses Verhalten bleibt unangetastet.
 * `health.py` adressiert das *Startproblem*: haengende (Zombie-)Prozesse und ein
   verwaistes Electron-Lockfile, die einen Neustart der App verhindern.
 

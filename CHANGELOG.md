@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Documentation (2026-08-13): clarified that CareCenter runtime and default CLI
+  commands are local-only. The opt-in `store-materials --live-pages` path is a
+  separate manual HTTPS release preflight with independent warning semantics;
+  it is not telemetry or a background runtime action. Removed active support
+  references to non-existent PORTIERUNGSPLAN.md, TODO.md, STATE.md, and
+  DECISIONS.md files; historical changelog wording remains unchanged.
 - Maintenance (2026-08-12): Revalidated 346 collected tests (345 passed, 1 skipped),
   Ruff, and Compileall on the clean Plan-D checkout; refreshed `llms.txt` verification metadata.
 - Maintenance (2026-08-01): Revalidated 346 collected tests (345 passed, 1 skipped) and refreshed

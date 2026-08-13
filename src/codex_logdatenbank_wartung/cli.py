@@ -453,7 +453,7 @@ def build_parser() -> argparse.ArgumentParser:
     store_materials_parser.add_argument(
         "--live-pages",
         action="store_true",
-        help="Oeffentliche Privacy-/Support-URLs per HTTPS pruefen.",
+        help="Explizites manuelles Release-Gate: oeffentliche Privacy-/Support-URLs per HTTPS pruefen (nicht Teil der Laufzeit).",
     )
     store_materials_parser.set_defaults(func=cmd_store_materials)
 

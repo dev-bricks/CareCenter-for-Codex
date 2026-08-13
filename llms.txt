@@ -20,6 +20,11 @@ Important boundaries:
   sponsored by OpenAI.
 - It targets Windows 10/11 and the Codex desktop app.
 - It never runs database maintenance while Codex processes are detected.
+- Normal runtime and default CLI commands are local-only: they do not send
+  telemetry, upload data, call external APIs, or use cloud sync. The explicit
+  `store-materials --live-pages` command is a separate manual release preflight
+  that requests configured Store URLs over HTTPS and reports its own warnings;
+  it is not runtime telemetry.
 - It stores config, logs, locks, and backups locally under
   %LOCALAPPDATA%\CareCenterForCodex by default, with automatic reuse of the
   legacy path C:\_Local_DEV\codex-maintenance when it already exists.
