@@ -1,7 +1,7 @@
 # CareCenter for Codex
 
-> Last-checked: 2026-08-12
-> Test suite: 346 collected tests (345 passed, 1 skipped, verified 2026-08-12)
+> Last-checked: 2026-08-14
+> Test suite: 350 collected tests (349 passed, 1 skipped, verified 2026-08-14)
 
 CareCenter for Codex is an unofficial local Windows tray and CLI utility for
 maintaining the OpenAI Codex desktop app installation. It repairs failed
@@ -59,7 +59,7 @@ Environment variables:
 Verification:
 - python -m compileall -q src tests
 - python -m pytest -q
-- Current local verification: 346 collected tests (345 passed, 1 skipped) pass on Python 3.12 (2026-08-12)
+- Current local verification: 350 collected tests (349 passed, 1 skipped) pass on Python 3.12 (2026-08-14)
 
 Public documentation:
 - README.md: overview, install, usage, safety boundaries
@@ -68,4 +68,4 @@ Public documentation:
 - STORE_LISTING.md, PRIVACY_POLICY.md, SUPPORT.md: Store release materials
 - SECURITY.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md: community health files
 
-Last-checked: 2026-08-12
+Last-checked: 2026-08-14

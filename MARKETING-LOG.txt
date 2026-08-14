@@ -29,3 +29,17 @@ Repo: dev-bricks/CareCenter-for-Codex
 1. Revalidated the local suite: 346 collected tests, 345 passed, 1 skipped.
 2. Refreshed `llms.txt` verification metadata to 2026-08-01.
 3. Left pre-existing untracked tray-split files untouched and outside the maintenance commit.
+
+## Date: 2026-08-14
+Repo: dev-bricks/CareCenter-for-Codex
+
+### Automated Actions Applied:
+1. Updated `llms.txt` header and verification metadata (`Last-checked: 2026-08-14`, 350 collected tests: 349 passed, 1 skipped).
+2. Synced Pytest badges in `README.md` and `README.de.md` from 345 to 349 passed tests.
+3. Updated `CHANGELOG.md` with audit entry under Unreleased.
+4. Validated test suite (349 passed, 1 skipped) and Python compilation (100% clean).
+
+### Non-Automated Marketing & Discoverability Recommendations:
+1. **Windows Store Release**: Keep Microsoft Store assets (`store_package/`, `STORE_LISTING.md`, `screenshots/store/`) updated for upcoming submission with version 0.8.0 / 0.8.1.
+2. **Ecosystem Cross-Linking**: Ensure siblings like `safe-start-for-codex` and `companion-for-agy` reference `CareCenter-for-Codex` in their respective tool tables.
+

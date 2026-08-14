@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Maintenance (2026-08-14): Pfad B Discoverability, README & SEO audit. Updated `llms.txt` header metadata (`Last-checked: 2026-08-14`), synced Pytest status badge to 349 passing tests (350 collected, 1 skipped), and updated marketing recommendations in `MARKETING-LOG.txt`.
 - Documentation (2026-08-13): clarified that CareCenter runtime and default CLI
   commands are local-only. The opt-in `store-materials --live-pages` path is a
   separate manual HTTPS release preflight with independent warning semantics;
