@@ -542,3 +542,87 @@ def test_runtime_mcp_reaper_skips_tree_with_cpu_activity() -> None:
 
     assert reaped == 0
     run.assert_not_called()
+
+
+def test_runtime_mcp_reaper_never_kills_fully_qualified_cohort_during_companion_turn() -> None:
+    """Regressionstest T-20260816-50 (Ende-zu-Ende, ohne Mock der Erkennung).
+
+    Belegter Vorfall 2026-08-16: der Watchdog toetete einen aktiv von einem
+    Claude-Code-Companion-Turn (``codex-companion.mjs``) genutzten alten MCP-
+    Launcher-Cohort mitten in einem ``fc_read_file``-Aufruf, weil die CPU-Tick-
+    Stichprobe (I/O-lastiger MCP-Server) faelschlich "idle" zeigte. Dieser Test
+    nutzt die ECHTE ``find_runtime_mcp_duplicate_roots``-Erkennung (kein Mock)
+    mit einem Cohort, der ohne Companion-Schutz eindeutig reap-faehig waere
+    (siehe test_processes.test_runtime_mcp_reaper_finds_duplicates_again_once_companion_turn_ends),
+    und stellt sicher, dass bei aktivem Companion-Turn NICHTS getoetet wird --
+    unabhaengig vom CPU-Tick-Ergebnis (``killer`` ist gesetzt, die Stichprobe
+    wird also gar nicht erst durchlaufen).
+    """
+    from datetime import datetime, timedelta
+
+    from codex_logdatenbank_wartung.processes import ProcessInfo
+
+    now = datetime.now()
+
+    def iso(delta_seconds: int) -> str:
+        return (now + timedelta(seconds=delta_seconds)).isoformat()
+
+    store_root = (
+        r"C:\Program Files\WindowsApps\OpenAI.Codex_26.707.3563.0_x64__2p2nqsd0c76g0"
+        r"\app\resources"
+    )
+    repl = r"C:\Users\Example\AppData\Local\OpenAI\Codex\runtimes\cua_node\abc\node_repl.exe"
+
+    processes = [
+        ProcessInfo(
+            100, "codex.exe", store_root + r"\codex.exe",
+            '"codex.exe" app-server --analytics-default-enabled',
+            parent_pid=10, created_at=iso(-6000),
+        ),
+        # Alte, vollstaendig wiederholte Generation -- laenger als min_age (3600s) alt,
+        # und wird gerade von einem Companion-Turn fuer fc_read_file benutzt.
+        ProcessInfo(110, "node_repl.exe", repl, f'"{repl}"', 100, iso(-5900)),
+        ProcessInfo(
+            111, "cmd.exe", r"C:\Windows\System32\cmd.exe",
+            'cmd.exe /c "npx.cmd -y ellmos-filecommander-mcp"', 100, iso(-5899),
+        ),
+        ProcessInfo(
+            112, "node.exe", r"C:\Program Files\nodejs\node.exe",
+            'node.exe ./mcp/server.mjs --stdio', 100, iso(-5898),
+        ),
+        # Neueste Generation liefert die Vergleichssignatur und schuetzt sich selbst.
+        ProcessInfo(210, "node_repl.exe", repl, f'"{repl}"', 100, iso(-30)),
+        ProcessInfo(
+            211, "cmd.exe", r"C:\Windows\System32\cmd.exe",
+            'cmd.exe /c "npx.cmd -y ellmos-filecommander-mcp"', 100, iso(-29),
+        ),
+        ProcessInfo(
+            212, "node.exe", r"C:\Program Files\nodejs\node.exe",
+            'node.exe ./mcp/server.mjs --stdio', 100, iso(-28),
+        ),
+        # Aktiver Companion-Turn -- ohne direkte Eltern-Kind-Beziehung zum App-Server.
+        ProcessInfo(
+            999, "node.exe", r"C:\Program Files\nodejs\node.exe",
+            (
+                r'node "C:\Users\dev\.claude\plugins\cache\openai-codex\codex\1.0.4'
+                r'\scripts\codex-companion.mjs" task --write --effort high "..."'
+            ),
+            created_at=iso(-5),
+        ),
+    ]
+
+    killed_pids: list[int] = []
+
+    def killer(pid: int) -> tuple[bool, str]:
+        killed_pids.append(pid)
+        return True, "ok"
+
+    reaped = reap_runtime_mcp_duplicates(
+        make_config(reap_runtime_mcp_duplicates=True),
+        execute=True,
+        provider=lambda: processes,
+        killer=killer,
+    )
+
+    assert reaped == 0
+    assert killed_pids == []

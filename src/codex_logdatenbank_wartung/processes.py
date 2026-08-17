@@ -233,6 +233,9 @@ def find_codex_processes_by_executable(
 _NPM_CODEX_MARKER = r"\npm\node_modules\@openai\codex"
 _EMBEDDED_CODEX_MARKER = r"\appdata\local\openai\codex\bin"
 
+# Companion-Turn-Marker (Claude-Code-Plugin codex-plugin-cc, codex-companion.mjs).
+_COMPANION_TASK_MARKER = "codex-companion.mjs"
+
 
 def is_companion_orphan(process: ProcessInfo, *, min_age_seconds: int = 300) -> bool:
     """Erkennt verwaiste Companion-app-server-Prozesse (codex-plugin-cc #277).
@@ -334,6 +337,31 @@ def _runtime_root_signature(process: ProcessInfo) -> str:
     return f"{process.name.lower()}|{executable}|{command}"
 
 
+def _companion_task_active(processes: Iterable[ProcessInfo]) -> bool:
+    """Erkennt einen laufenden Claude-Code-Companion-Turn (codex-companion.mjs).
+
+    Ein Companion-Turn kann laenger laufen als der Abstand zwischen zwei Runtime-
+    Generationen (``generation_gap_seconds``) und dabei weiter den MCP-Launcher-
+    Cohort seiner mittlerweile aelteren Generation benutzen. Ohne diese Pruefung
+    reisst der Start einer neueren Generation (z. B. ein weiterer Companion-Turn
+    oder codex-code-mode-host) den vom ersten Turn aktiv genutzten alten Cohort
+    als vermeintliches Duplikat mit -- belegter Vorfall T-20260816-50 (2026-08-16):
+    ein Companion-Worker wurde waehrend eines laufenden ``fc_read_file``-MCP-
+    Aufrufs getoetet. Die reine CPU-Tick-Stichprobe (siehe
+    ``reap_runtime_mcp_duplicates``) reicht dafuer NICHT, weil ein MCP-Server
+    waehrend eines Tool-Calls ueberwiegend auf I/O wartet und in einem kurzen
+    Messfenster wie ein Idle-Prozess aussehen kann. Es gibt keine verlaessliche
+    Eltern-Kind-Beziehung zwischen dem Companion-Prozess und dem App-Server-Kind,
+    ueber die sich der genutzte Cohort gezielt bestimmen liesse -- deshalb wird
+    bei JEDEM aktiven Companion-Turn systemweit konservativ pausiert, statt zu
+    raten, welcher Cohort betroffen ist. Der naechste Tick (Default alle 60 s)
+    holt eine echte Waise ohnehin nach, sobald kein Turn mehr laeuft.
+    """
+    return any(
+        _COMPANION_TASK_MARKER in process.command_line.lower() for process in processes
+    )
+
+
 def find_runtime_mcp_duplicate_roots(
     provider: ProcessProvider | None = None,
     *,
@@ -351,12 +379,16 @@ def find_runtime_mcp_duplicate_roots(
     behandelt und gemeinsam geschuetzt. Entfernt werden nur Roots, deren exakte
     Prozesssignatur auch im neuesten Cohort vorkommt. Der neueste Cohort, fremde
     Kindprozesse, der Desktop-App-Server selbst und CLI-app-server sind tabu.
+    Laeuft irgendwo ein aktiver Companion-Turn (``codex-companion.mjs``), werden
+    GAR KEINE Duplikate gemeldet (siehe ``_companion_task_active``).
 
     Die Rueckgabe enthaelt nur direkte Launcher-Roots. Der Aufrufer beendet deren
     Baum mit ``taskkill /T``; Nachfahren werden deshalb nicht separat geliefert.
     """
     provider = provider or windows_processes
     processes = provider()
+    if _companion_task_active(processes):
+        return []
     current = now or datetime.now()
     if current.tzinfo is not None:
         current = current.astimezone().replace(tzinfo=None)

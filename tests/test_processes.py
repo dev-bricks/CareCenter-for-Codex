@@ -301,6 +301,48 @@ def test_runtime_mcp_reaper_rejects_cli_app_server_and_incomplete_repeat() -> No
     assert not_enough_evidence == []
 
 
+def test_runtime_mcp_reaper_skips_everything_while_companion_turn_is_active() -> None:
+    """Regressionstest T-20260816-50: ein aktiver codex-companion.mjs-Turn schuetzt
+    den vollstaendig belegten alten Cohort, obwohl dessen CPU-Stichprobe (die hier
+    gar nicht erst durchgefuehrt wird) einen Ghost vortaeuschen koennte."""
+    processes = _desktop_runtime_generations() + [
+        ProcessInfo(
+            999,
+            "node.exe",
+            r"C:\Program Files\nodejs\node.exe",
+            (
+                r'node "C:\Users\dev\.claude\plugins\cache\openai-codex\codex\1.0.4'
+                r'\scripts\codex-companion.mjs" task --write --effort high "..."'
+            ),
+            created_at="2026-08-16T10:07:00",
+        ),
+    ]
+
+    result = find_runtime_mcp_duplicate_roots(
+        provider=lambda: processes,
+        now=datetime.fromisoformat("2026-07-16T09:20:30"),
+        min_age_seconds=300,
+        minimum_matching_mcp_roots=2,
+    )
+
+    assert result == []
+
+
+def test_runtime_mcp_reaper_finds_duplicates_again_once_companion_turn_ends() -> None:
+    """Ohne Companion-Prozess in der Liste greift die normale Duplikat-Erkennung
+    unveraendert (Abgrenzung zum vorigen Test -- kein pauschaler Blackout)."""
+    processes = _desktop_runtime_generations()
+
+    result = find_runtime_mcp_duplicate_roots(
+        provider=lambda: processes,
+        now=datetime.fromisoformat("2026-07-16T09:20:30"),
+        min_age_seconds=300,
+        minimum_matching_mcp_roots=2,
+    )
+
+    assert [process.pid for process in result] == [110, 111, 112]
+
+
 def test_tree_and_descendants() -> None:
     processes = [
         ProcessInfo(100, "Codex.exe", CODEX_EXE, f'"{CODEX_EXE}"', parent_pid=10),
