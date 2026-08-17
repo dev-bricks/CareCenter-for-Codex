@@ -87,6 +87,14 @@ def test_store_materials_parser_accepts_live_pages_flag() -> None:
     assert args.live_pages is True
 
 
+def test_store_materials_parser_accepts_check_msix_sdk_and_generate_manifest_flags() -> None:
+    args = build_parser().parse_args(["store-materials", "--check-msix-sdk", "--generate-manifest"])
+
+    assert args.check_msix_sdk is True
+    assert args.generate_manifest is True
+
+
+
 def test_store_screenshot_command_writes_png(tmp_path: Path, capsys, monkeypatch) -> None:
     cfg = tmp_path / "config.json"
     cfg.write_text("{}", encoding="utf-8")

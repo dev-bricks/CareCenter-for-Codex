@@ -144,16 +144,23 @@ def cmd_store_repair(args: argparse.Namespace) -> int:
 
 
 def cmd_store_materials(args: argparse.Namespace) -> int:
-    from .store_release import validate_store_materials
+    from .store_release import generate_appx_manifest, validate_store_materials
+
+    project_root = Path(args.project_root)
+    if args.generate_manifest:
+        manifest_path = generate_appx_manifest(project_root=project_root)
+        print(f"AppxManifest.xml erzeugt: {manifest_path}")
 
     exe_path = Path(args.exe_path) if args.exe_path else None
     report = validate_store_materials(
-        project_root=Path(args.project_root),
+        project_root=project_root,
         exe_path=exe_path,
         check_live_pages=args.live_pages,
+        check_msix_sdk=args.check_msix_sdk,
     )
     print(report.to_text())
     return {"ok": 0, "warning": 2, "failed": 1}[report.status]
+
 
 
 def cmd_store_screenshot(args: argparse.Namespace) -> int:
@@ -454,6 +461,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--live-pages",
         action="store_true",
         help="Explizites manuelles Release-Gate: oeffentliche Privacy-/Support-URLs per HTTPS pruefen (nicht Teil der Laufzeit).",
+    )
+    store_materials_parser.add_argument(
+        "--check-msix-sdk",
+        action="store_true",
+        help="Vorhandensein von Windows SDK makeappx.exe pruefen.",
+    )
+    store_materials_parser.add_argument(
+        "--generate-manifest",
+        action="store_true",
+        help="AppxManifest.xml aus store_package.json in der Projektwurzel generieren.",
     )
     store_materials_parser.set_defaults(func=cmd_store_materials)
 

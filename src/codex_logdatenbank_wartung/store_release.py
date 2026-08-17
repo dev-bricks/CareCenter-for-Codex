@@ -495,6 +495,85 @@ def _check_msix_sdk_readiness() -> StoreCheck:
     )
 
 
+def _check_appx_manifest(project_root: Path) -> StoreCheck:
+    manifest_path = project_root / "AppxManifest.xml"
+    if manifest_path.exists():
+        return StoreCheck("AppxManifest.xml", "ok", str(manifest_path))
+    return StoreCheck(
+        "AppxManifest.xml",
+        "warning",
+        "AppxManifest.xml fehlt noch (kann mit `codex-logwartung store-materials --generate-manifest` erzeugt werden).",
+    )
+
+
+def generate_appx_manifest(
+    project_root: Path = PROJECT_ROOT,
+    output_path: Path | None = None,
+) -> Path:
+    """Generiert eine AppxManifest.xml fuer das MSIX/Windows-Store-Packaging aus store_package.json."""
+    payload, _ = _load_store_package(project_root / STORE_PACKAGE_PATH.name)
+    if payload is None:
+        raise ValueError("store_package.json konnte nicht geladen werden.")
+
+    identity_name = str(payload.get("identity_name", "")).strip()
+    publisher = str(payload.get("publisher", "")).strip()
+    version = str(payload.get("version", "1.0.0.0")).strip()
+    app_name = str(payload.get("app_name", "")).strip()
+    publisher_display = str(payload.get("publisher_display", "")).strip()
+    description = str(payload.get("description", "")).strip()
+    executable = str(payload.get("executable", "")).strip()
+
+    manifest_xml = f"""<?xml version="1.0" encoding="utf-8"?>
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10">
+  <Identity
+    Name="{identity_name}"
+    Publisher="{publisher}"
+    Version="{version}"
+    ProcessorArchitecture="x64" />
+  <Properties>
+    <DisplayName>{app_name}</DisplayName>
+    <PublisherDisplayName>{publisher_display}</PublisherDisplayName>
+    <Logo>assets\\Square150x150Logo.png</Logo>
+    <Description>{description}</Description>
+  </Properties>
+  <Resources>
+    <Resource Language="de-DE" />
+    <Resource Language="en-US" />
+  </Resources>
+  <Dependencies>
+    <TargetDeviceFamily
+      Name="Windows.Desktop"
+      MinVersion="10.0.17763.0"
+      MaxVersionTested="10.0.22621.0" />
+  </Dependencies>
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+  <Applications>
+    <Application
+      Id="App"
+      Executable="{executable}"
+      EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="{app_name}"
+        Description="{description}"
+        Square150x150Logo="assets\\Square150x150Logo.png"
+        Square44x44Logo="assets\\Square44x44Logo.png"
+        BackgroundColor="transparent">
+      </uap:VisualElements>
+    </Application>
+  </Applications>
+</Package>
+"""
+    target = output_path or project_root / "AppxManifest.xml"
+    target.write_text(manifest_xml, encoding="utf-8")
+    return target
+
+
 def validate_store_materials(
     project_root: Path = PROJECT_ROOT,
     exe_path: Path | None = None,
@@ -520,6 +599,8 @@ def validate_store_materials(
         checks.append(_check_live_store_pages(payload))
     checks.append(_check_screenshot(project_root))
     checks.append(_check_executable(project_root, payload, exe_path))
+    checks.append(_check_appx_manifest(project_root))
     if check_msix_sdk:
         checks.append(_check_msix_sdk_readiness())
     return StoreMaterialsReport(checks)
+

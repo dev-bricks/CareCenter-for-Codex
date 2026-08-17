@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Windows Store Release (2026-08-17): Extended Windows Store packaging readiness with `generate_appx_manifest` in `store_release.py`, CLI flags `--generate-manifest` and `--check-msix-sdk` in `store-materials`, AppxManifest preflight validation check, `WINDOWS_STORE_PREP.md` documentation, and expanded test suite coverage.
 - Maintenance (2026-08-14): Pfad B Discoverability, README & SEO audit. Updated `llms.txt` header metadata (`Last-checked: 2026-08-14`), synced Pytest status badge to 349 passing tests (350 collected, 1 skipped), and updated marketing recommendations in `MARKETING-LOG.txt`.
 - Documentation (2026-08-13): clarified that CareCenter runtime and default CLI
   commands are local-only. The opt-in `store-materials --live-pages` path is a

@@ -12,6 +12,7 @@ def _write_store_files(project_root: Path, payload: dict[str, object]) -> None:
         json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
+    (project_root / "AppxManifest.xml").write_text("<Package></Package>\n", encoding="utf-8")
     pkg_dir = project_root / "src" / "codex_logdatenbank_wartung"
     pkg_dir.mkdir(parents=True, exist_ok=True)
     version_str = str(payload.get("version", "0.8.0.0"))
@@ -541,4 +542,63 @@ def test_discover_build_dist_dir_expands_local_set_variables(tmp_path: Path) -> 
     executable_check = next(check for check in report.checks if check.name == "Executable")
     assert executable_check.status == "ok"
     assert str((custom_bin / "CareCenterForCodex.exe").resolve()) in executable_check.message
+
+
+def test_generate_appx_manifest_creates_valid_xml(tmp_path: Path) -> None:
+    _write_store_files(
+        tmp_path,
+        {
+            "app_name": "CareCenter for Codex",
+            "publisher": "CN=01234567-89AB-CDEF-0123-456789ABCDEF",
+            "publisher_display": "Lukas Geiger",
+            "identity_name": "LukasGeiger.CareCenterForCodex",
+            "version": "0.8.0.0",
+            "description": "Offline Wartung und Reparatur fuer die Codex-Desktop-App.",
+            "executable": "CareCenterForCodex.exe",
+            "capabilities": "runFullTrust",
+            "category": "Developer Tools",
+            "age_rating": "3+",
+            "privacy_url": "https://dev-bricks.github.io/CareCenter-for-Codex/privacy",
+            "support_url": "https://dev-bricks.github.io/CareCenter-for-Codex/support",
+        },
+    )
+    manifest_path = store_release.generate_appx_manifest(project_root=tmp_path)
+
+    assert manifest_path.exists()
+    content = manifest_path.read_text(encoding="utf-8")
+    assert '<Identity' in content
+    assert 'Name="LukasGeiger.CareCenterForCodex"' in content
+    assert 'Publisher="CN=01234567-89AB-CDEF-0123-456789ABCDEF"' in content
+    assert 'Version="0.8.0.0"' in content
+    assert '<rescap:Capability Name="runFullTrust" />' in content
+
+
+def test_validate_store_materials_warns_missing_appx_manifest(tmp_path: Path) -> None:
+    exe_path = tmp_path / "CareCenterForCodex.exe"
+    exe_path.write_bytes(b"exe")
+    _write_store_files(
+        tmp_path,
+        {
+            "app_name": "CareCenter for Codex",
+            "publisher": "CN=01234567-89AB-CDEF-0123-456789ABCDEF",
+            "publisher_display": "Lukas Geiger",
+            "identity_name": "LukasGeiger.CareCenterForCodex",
+            "version": "0.8.0.0",
+            "description": "Offline Wartung und Reparatur fuer die Codex-Desktop-App.",
+            "executable": "CareCenterForCodex.exe",
+            "capabilities": "runFullTrust",
+            "category": "Developer Tools",
+            "age_rating": "3+",
+            "privacy_url": "https://dev-bricks.github.io/CareCenter-for-Codex/privacy",
+            "support_url": "https://dev-bricks.github.io/CareCenter-for-Codex/support",
+        },
+    )
+    (tmp_path / "AppxManifest.xml").unlink()
+
+    report = validate_store_materials(project_root=tmp_path, exe_path=exe_path)
+
+    assert report.status == "warning"
+    manifest_check = next(check for check in report.checks if check.name == "AppxManifest.xml")
+    assert manifest_check.status == "warning"
+    assert "AppxManifest.xml fehlt noch" in manifest_check.message
 

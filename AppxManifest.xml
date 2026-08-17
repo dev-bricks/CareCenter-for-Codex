@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10">
+  <Identity
+    Name="LukasGeiger.CareCenterForCodex"
+    Publisher="CN=52596601-BAB4-4F3F-B182-E8F3F273B202"
+    Version="0.8.0.0"
+    ProcessorArchitecture="x64" />
+  <Properties>
+    <DisplayName>CareCenter for Codex</DisplayName>
+    <PublisherDisplayName>Lukas Geiger</PublisherDisplayName>
+    <Logo>assets\Square150x150Logo.png</Logo>
+    <Description>Lokales Windows-Tray- und CLI-Werkzeug zur Offline-Reparatur und Wartung der Codex-Desktop-App.</Description>
+  </Properties>
+  <Resources>
+    <Resource Language="de-DE" />
+    <Resource Language="en-US" />
+  </Resources>
+  <Dependencies>
+    <TargetDeviceFamily
+      Name="Windows.Desktop"
+      MinVersion="10.0.17763.0"
+      MaxVersionTested="10.0.22621.0" />
+  </Dependencies>
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+  <Applications>
+    <Application
+      Id="App"
+      Executable="CareCenterForCodex.exe"
+      EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="CareCenter for Codex"
+        Description="Lokales Windows-Tray- und CLI-Werkzeug zur Offline-Reparatur und Wartung der Codex-Desktop-App."
+        Square150x150Logo="assets\Square150x150Logo.png"
+        Square44x44Logo="assets\Square44x44Logo.png"
+        BackgroundColor="transparent">
+      </uap:VisualElements>
+    </Application>
+  </Applications>
+</Package>
