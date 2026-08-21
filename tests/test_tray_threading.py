@@ -15,6 +15,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 TRAY = Path(__file__).parent.parent / "src" / "codex_logdatenbank_wartung" / "tray.py"
+TRAY_WORKERS = Path(__file__).parent.parent / "src" / "codex_logdatenbank_wartung" / "tray_workers.py"
 
 # Funktionen, die messbar blockieren (subprocess.run, Dateisystem-Scans).
 # Sie duerfen NUR in einer Worker-Klasse aufgerufen werden, nie im GUI-Thread.
@@ -30,13 +31,21 @@ BLOCKING = {
 }
 
 
-def _tree() -> ast.Module:
-    return ast.parse(TRAY.read_text(encoding="utf-8"))
+def _tree(path: Path = TRAY) -> ast.Module:
+    return ast.parse(path.read_text(encoding="utf-8"))
 
 
-def _worker_classes(tree: ast.Module) -> list[ast.ClassDef]:
-    return [n for n in ast.walk(tree)
-            if isinstance(n, ast.ClassDef) and n.name.endswith("Worker")]
+def _worker_classes(tree: ast.Module | None = None) -> list[ast.ClassDef]:
+    if tree is not None:
+        return [n for n in ast.walk(tree)
+                if isinstance(n, ast.ClassDef) and n.name.endswith("Worker")]
+    workers: list[ast.ClassDef] = []
+    for path in (TRAY, TRAY_WORKERS):
+        if path.exists():
+            t = _tree(path)
+            workers.extend(n for n in ast.walk(t)
+                           if isinstance(n, ast.ClassDef) and n.name.endswith("Worker"))
+    return workers
 
 
 def _spans(classes: list[ast.ClassDef]) -> list[tuple[int, int]]:
@@ -46,27 +55,30 @@ def _spans(classes: list[ast.ClassDef]) -> list[tuple[int, int]]:
 
 def test_no_blocking_call_outside_a_worker() -> None:
     """Der eigentliche Regressionstest: die Oberflaeche darf nicht einfrieren."""
-    tree = _tree()
-    spans = _spans(_worker_classes(tree))
+    for path in (TRAY, TRAY_WORKERS):
+        if not path.exists():
+            continue
+        tree = _tree(path)
+        spans = _spans(_worker_classes(tree))
 
-    offenders = []
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Call):
-            continue
-        name = getattr(node.func, "id", None) or getattr(node.func, "attr", None)
-        if name not in BLOCKING:
-            continue
-        # Methodenaufrufe auf self (self.diagnose(...)) sind Starter, keine Arbeit.
-        if isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name) \
-                and node.func.value.id == "self":
-            continue
-        if not any(start <= node.lineno <= end for start, end in spans):
-            offenders.append((node.lineno, name))
+        offenders = []
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            name = getattr(node.func, "id", None) or getattr(node.func, "attr", None)
+            if name not in BLOCKING:
+                continue
+            # Methodenaufrufe auf self (self.diagnose(...)) sind Starter, keine Arbeit.
+            if isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name) \
+                    and node.func.value.id == "self":
+                continue
+            if not any(start <= node.lineno <= end for start, end in spans):
+                offenders.append((path.name, node.lineno, name))
 
-    assert not offenders, (
-        "Blockierender Aufruf ausserhalb jeder Worker-Klasse — laeuft im GUI-Thread "
-        f"und friert die Oberflaeche ein: {offenders}"
-    )
+        assert not offenders, (
+            "Blockierender Aufruf ausserhalb jeder Worker-Klasse — laeuft im GUI-Thread "
+            f"und friert die Oberflaeche ein: {offenders}"
+        )
 
 
 def test_every_worker_is_moved_to_a_thread() -> None:
@@ -75,8 +87,8 @@ def test_every_worker_is_moved_to_a_thread() -> None:
     Eine Worker-Klasse ohne `moveToThread` laeuft trotz ihres Namens im
     GUI-Thread. Klaffen die Zahlen auseinander, laeuft die Differenz dort.
     """
-    tree = _tree()
-    workers = _worker_classes(tree)
+    workers = _worker_classes()
+    tree = _tree(TRAY)
     moves = sum(1 for n in ast.walk(tree)
                 if isinstance(n, ast.Call)
                 and getattr(n.func, "attr", "") == "moveToThread")
@@ -110,8 +122,8 @@ def test_config_audit_worker_returns_its_result_via_signal() -> None:
 
 def test_config_audit_worker_touches_no_widget() -> None:
     """Kein Widget-/Tray-Zugriff im Worker-Thread (Qt verzeiht das nicht zuverlaessig)."""
-    tree = _tree()
-    worker = next(c for c in _worker_classes(tree) if c.name == "ConfigAuditWorker")
+    workers = _worker_classes()
+    worker = next(c for c in workers if c.name == "ConfigAuditWorker")
     verboten = ("window", "tray", "showMessage", "setToolTip")
     hits = [n.attr for n in ast.walk(worker)
             if isinstance(n, ast.Attribute) and n.attr in verboten]
