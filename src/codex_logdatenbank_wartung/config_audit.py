@@ -447,13 +447,34 @@ def audit_threads(config: MaintenanceConfig) -> AuditReport:
 
 
 def _backup_config_toml(toml_path: Path) -> Path:
-    """Erstellt ein Zeitstempel-Backup von config.toml vor Mutation."""
+    """Erstellt ein Zeitstempel-Backup von config.toml vor Mutation.
+
+    Der Zeitstempel allein taugt NICHT als eindeutiger Name: ``datetime.now()``
+    hat unter Windows rund 15,6 ms Aufloesung, obwohl ``%f`` Mikrosekunden
+    suggeriert. Laufen zwei Auto-Fixes im selben Takt, erzeugten beide
+    denselben Dateinamen — und der zweite Schreibvorgang ueberschrieb die
+    erste Sicherung. Verloren ging dabei ausgerechnet die Datei mit dem
+    Zustand VOR der ersten Mutation, also die einzige, aus der sich der
+    Ausgangszustand haette wiederherstellen lassen.
+
+    Deshalb wird exklusiv angelegt (``"xb"``) und bei Kollision hochgezaehlt.
+    Das ``exists()``-Vorabpruefen waere hier zu schwach: Zwischen Pruefung und
+    Schreibvorgang koennte ein zweiter Prozess dieselbe Datei anlegen.
+    """
     from datetime import datetime
 
+    payload = toml_path.read_bytes()
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     backup = toml_path.with_suffix(f".{stamp}.bak")
-    backup.write_bytes(toml_path.read_bytes())
-    return backup
+    counter = 1
+    while True:
+        try:
+            with open(backup, "xb") as handle:
+                handle.write(payload)
+            return backup
+        except FileExistsError:
+            backup = toml_path.with_suffix(f".{stamp}-{counter}.bak")
+            counter += 1
 
 
 def _atomic_write_toml(toml_path: Path, content: str) -> None:

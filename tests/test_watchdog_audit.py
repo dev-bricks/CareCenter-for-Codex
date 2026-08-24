@@ -265,3 +265,39 @@ def test_both_auto_fixes_create_separate_backups():
         codex_home = Path(tmp) / ".codex"
         backups = list(codex_home.glob("config.*.bak"))
         assert len(backups) == 2, f"Erwartet 2 Backups (je eines pro Fix), gefunden: {len(backups)}"
+
+
+def test_backup_survives_a_forced_name_collision():
+    """Eine erzwungene Namenskollision darf keine Sicherung vernichten.
+
+    Der Nachbar-Test ``test_both_auto_fixes_create_separate_backups`` prueft
+    dasselbe Schutzziel, aber nur wenn beide Backups zufaellig im selben
+    Zeittakt landen — er war deshalb sporadisch rot und wurde als flaky
+    gelesen. Dieser Test erzwingt die Kollision, statt auf sie zu hoffen:
+
+    ``datetime.now()`` hat unter Windows rund 15,6 ms Aufloesung, obwohl das
+    Namensformat ``%f`` Mikrosekunden suggeriert. Fuenf Sicherungen in Folge
+    fallen dort zwangslaeufig in denselben Takt. Ohne Kollisionsschutz
+    ueberschreiben sie einander und es bleibt genau eine Datei uebrig.
+    """
+    from codex_logdatenbank_wartung.config_audit import _backup_config_toml
+
+    with tempfile.TemporaryDirectory() as tmp:
+        toml_path = Path(tmp) / "config.toml"
+        erwartet = {}
+        for lauf in range(5):
+            inhalt = f"stand = {lauf}\n".encode()
+            toml_path.write_bytes(inhalt)
+            erwartet[_backup_config_toml(toml_path)] = inhalt
+
+        self_check = list(Path(tmp).glob("config.*.bak"))
+        assert len(erwartet) == 5, (
+            f"Erwartet 5 verschiedene Backup-Namen, erhalten: {len(erwartet)}"
+        )
+        assert len(self_check) == 5, (
+            f"Erwartet 5 Backup-Dateien auf der Platte, gefunden: {len(self_check)}"
+        )
+        for pfad, inhalt in erwartet.items():
+            assert pfad.read_bytes() == inhalt, (
+                f"{pfad.name} wurde von einer spaeteren Sicherung ueberschrieben"
+            )

@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+- Fix (2026-08-24): `_backup_config_toml` could destroy a backup instead of
+  writing one. The filename was built from `datetime.now()` with `%f`, but
+  Windows only resolves that clock to about 15.6 ms -- two auto-fixes in the
+  same tick produced the same name and the second write overwrote the first,
+  losing exactly the snapshot taken before the first mutation. Backups are now
+  created exclusively (`"xb"`) and the suffix is incremented on collision;
+  `exists()` would have left a window open between check and write. This is the
+  second attempt at the same defect: an earlier fix added `%f` and only made
+  the collision less likely, which is why
+  `test_both_auto_fixes_create_separate_backups` kept going red at random and
+  was read as flaky rather than as a real report. Guarded deterministically by
+  `test_backup_survives_a_forced_name_collision`, which fails with 2 of 5
+  backups surviving when the fix is removed.
+- Maintenance (2026-08-24): Synced the active test claim to a measured run --
+  357 collected, 356 passed, 1 skipped on Python 3.12 at commit `fd1335b`,
+  reproduced twice. `README.md`, `README.de.md` and `llms.txt` had carried
+  349/350 from 2026-08-14; the historical figures in this changelog stay as
+  they are. TASKPLAN #2097 named 346/345/1 and 356/354/2 -- both were already
+  outdated, so the value was measured rather than copied.
 - Refactoring (2026-08-21): Modular split of `tray.py` (TW-CC-05). Extracted the 12 background threading worker QObjects into `tray_workers.py` and the UI layout / widget definitions into `tray_status_window.py`. `tray.py` now retains `TrayController`, `run_tray`, and backwards-compatible re-exports. All 350 test cases passing.
 - Windows Store Release (2026-08-17): Extended Windows Store packaging readiness with `generate_appx_manifest` in `store_release.py`, CLI flags `--generate-manifest` and `--check-msix-sdk` in `store-materials`, AppxManifest preflight validation check, `WINDOWS_STORE_PREP.md` documentation, and expanded test suite coverage.
 - Maintenance (2026-08-14): Pfad B Discoverability, README & SEO audit. Updated `llms.txt` header metadata (`Last-checked: 2026-08-14`), synced Pytest status badge to 349 passing tests (350 collected, 1 skipped), and updated marketing recommendations in `MARKETING-LOG.txt`.
