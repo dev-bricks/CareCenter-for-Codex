@@ -17,6 +17,8 @@ German documentation: [README.de.md](README.de.md)
 > [!NOTE]
 > Machine-readable architecture, CLI entry points, and safety rules are indexed for AI agents in [llms.txt](llms.txt).
 
+Local audit notes such as `BEFUNDE.md` and temporary `TASKPLAN*.md` status files are intentionally kept out of Git and are not part of the public release contract.
+
 > [!IMPORTANT]
 > This is an independent community tool. It is not created by, affiliated with, endorsed by, or sponsored by OpenAI. "OpenAI" and "Codex" are trademarks of OpenAI and are used here only to describe compatibility.
 

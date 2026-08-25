@@ -17,6 +17,8 @@ Englische Dokumentation: [README.md](README.md)
 > [!NOTE]
 > Maschinenlesbare Architektur, CLI-Befehle und Sicherheitsregeln sind für KI-Agenten in [llms.txt](llms.txt) hinterlegt.
 
+Lokale Audit-Notizen wie `BEFUNDE.md` und temporäre `TASKPLAN*.md`-Statusdateien bleiben bewusst außerhalb von Git und gehören nicht zum öffentlichen Release-Vertrag.
+
 > [!IMPORTANT]
 > Dieses Werkzeug ist ein unabhängiges Community-Projekt. Es wurde nicht von OpenAI erstellt, ist nicht mit OpenAI verbunden und wird nicht von OpenAI unterstützt oder gesponsert. „OpenAI“ und „Codex“ sind Marken von OpenAI und werden hier nur zur Beschreibung der Kompatibilität verwendet.
 

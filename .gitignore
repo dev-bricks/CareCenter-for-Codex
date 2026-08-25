@@ -37,12 +37,14 @@ backups/
 # --- Internal working docs (not part of the public release) ---
 AGENTS.md
 CLAUDE.md
+BEFUNDE.md
 BUGS.md
 DONE.md
 STATE.md
 START.md
 TODO.md
 DECISIONS.md
+TASKPLAN*.md
 HANDOFF-CODEX-START.md
 CODEX-AUTO-DEBUG-DESIGN.md
 LOCK*.txt

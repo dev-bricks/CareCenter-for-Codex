@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Maintenance (2026-08-25): Added explicit Gitignore coverage for local audit
+  notes (`BEFUNDE.md`) and temporary `TASKPLAN*.md` status files so
+  verification artifacts do not drift into the public repository. Synced the
+  English/German READMEs with that boundary and refreshed `llms.txt`
+  verification metadata to `Last-checked: 2026-08-25`.
 - Fix (2026-08-24): `_backup_config_toml` could destroy a backup instead of
   writing one. The filename was built from `datetime.now()` with `%f`, but
   Windows only resolves that clock to about 15.6 ms -- two auto-fixes in the
