@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 import tempfile
+import time
 from pathlib import Path
 from unittest.mock import patch
 
@@ -221,6 +222,24 @@ def test_find_empty_threads_detects_zero_token_threads():
         empty = find_empty_threads(config)
         assert len(empty) == 1
         assert empty[0].thread_id == "t1"
+
+
+def test_find_empty_threads_ignores_fresh_initializing_thread(tmp_path: Path):
+    config = _make_config(tmp_path, state_db=True)
+    config.audit_empty_thread_min_age_seconds = 1
+    now = 2_000_000_000
+    conn = sqlite3.connect(config.state_db_path)
+    try:
+        conn.execute(
+            "INSERT INTO threads (id, name, created_at, total_tokens, first_user_message) "
+            "VALUES ('fresh', 'Initialisiert', ?, 0, '')",
+            (now - 55,),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    assert find_empty_threads(config, now=now) == []
 
 
 def test_find_empty_threads_detects_whitespace_only_first_message():
@@ -564,3 +583,42 @@ def test_auto_audit_archives_empty_threads_when_codex_is_closed(tmp_path: Path) 
         for finding in report.findings
     )
     assert (home / "archived_sessions" / rollout.name).exists()
+
+
+def test_auto_audit_keeps_fresh_empty_thread_in_active_sessions(tmp_path: Path) -> None:
+    from codex_logdatenbank_wartung.config_audit import run_manual_audit
+
+    home = tmp_path / ".codex"
+    home.mkdir()
+    config = MaintenanceConfig(
+        database_path=str(home / "logs_2.sqlite"),
+        backup_dir=str(tmp_path / "backups"),
+        audit_duplicate_mcp="off",
+        audit_unused_plugins="off",
+        audit_empty_threads="auto",
+    )
+    rollout = home / "sessions" / "initializing.jsonl"
+    rollout.parent.mkdir()
+    rollout.write_text("{}\n", encoding="utf-8")
+    current = int(time.time())
+    with sqlite3.connect(config.state_db_path) as conn:
+        conn.execute(
+            "CREATE TABLE threads (id TEXT PRIMARY KEY, rollout_path TEXT NOT NULL, "
+            "created_at INTEGER, updated_at INTEGER NOT NULL, total_tokens INTEGER, "
+            "first_user_message TEXT, archived INTEGER NOT NULL DEFAULT 0, archived_at INTEGER)"
+        )
+        conn.execute(
+            "INSERT INTO threads VALUES (?, ?, ?, ?, ?, ?, 0, NULL)",
+            ("initializing", str(rollout), current - 55, current - 6, 0, ""),
+        )
+
+    _report, cycle = run_manual_audit(
+        config, renderer_present=False, process_provider=lambda: []
+    )
+
+    assert cycle.empty_threads_fixed == 0
+    assert rollout.exists()
+    with sqlite3.connect(config.state_db_path) as conn:
+        assert conn.execute(
+            "SELECT archived FROM threads WHERE id='initializing'"
+        ).fetchone()[0] == 0

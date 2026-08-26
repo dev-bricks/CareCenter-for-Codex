@@ -19,7 +19,8 @@ die Maintainer direkt über GitHub und veröffentlichen Sie keine Details in ein
 Dieses Tool führt sicherheitsrelevante lokale Operationen aus:
 - **Dateisystem:** Lesen/Schreiben der lokalen SQLite-Logdatenbank, Backups, Konfiguration und Logs
 - **Prozesse:** gezieltes Beenden hängender Codex-**Desktop**-Prozesse (Prozessbaum). Die node-basierte
-  Codex-**CLI** wird über exakte Pfad-Erkennung bewusst nie erfasst.
+  Codex-**CLI** wird niemals als Beendigungsziel erfasst; ein breiter read-only Prozessnachweis
+  blockiert jedoch Thread-Store-Mutationen, solange Desktop oder CLI aktiv sind.
 - **Windows-AppX/Store:** Registrieren/Zurücksetzen des Codex-Store-Pakets (elevated), Öffnen der Store-Produktseite
 - **Normale Laufzeit nur lokal:** keine Telemetrie, keine Cloud-Synchronisation,
   keine Hintergrund-Uploads und keine externen API-Aufrufe (das Öffnen der
@@ -55,7 +56,8 @@ through GitHub and do not publish details in a public issue.
 This tool performs security-relevant local operations:
 - **File system:** reads/writes the local SQLite log database, backups, configuration and logs
 - **Processes:** targeted termination of hung Codex **desktop** processes (process tree). The
-  node-based Codex **CLI** is deliberately never matched (exact executable-path detection).
+  node-based Codex **CLI** is never a termination target; broad read-only detection still blocks
+  thread-store mutation while either Desktop or CLI activity is present.
 - **Windows AppX/Store:** register/reset of the Codex Store package (elevated), opening the Store product page
 - **Normal runtime is local-only:** no telemetry, cloud sync, background uploads,
   or external API calls (opening the Microsoft Store page is only a local OS

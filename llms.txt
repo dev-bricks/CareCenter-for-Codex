@@ -1,7 +1,7 @@
 # CareCenter for Codex
 
-> Last-checked: 2026-08-25
-> Test suite: 357 collected tests (356 passed, 1 skipped, verified 2026-08-25)
+> Last-checked: 2026-08-26
+> Test suite: 368 collected tests (367 passed, 1 skipped, verified 2026-08-26)
 
 CareCenter for Codex is an unofficial local Windows tray and CLI utility for
 maintaining the OpenAI Codex desktop app installation. It repairs failed
@@ -28,8 +28,8 @@ Important boundaries:
 - It stores config, logs, locks, and backups locally under
   %LOCALAPPDATA%\CareCenterForCodex by default, with automatic reuse of the
   legacy path C:\_Local_DEV\codex-maintenance when it already exists.
-- It should not manipulate the node-based Codex CLI except through explicit
-  read-only/audit paths.
+- It never terminates the node-based Codex CLI. Broad read-only process
+  detection blocks thread-store mutation while either Desktop or npm CLI is active.
 - Runtime MCP cleanup only targets old, idle launcher trees repeated under the
   Codex Store desktop app-server. It always preserves the newest launch cohort,
   the app-server itself, unrelated children, and every CLI app-server.
@@ -47,6 +47,7 @@ Primary commands:
 - python -m codex_logdatenbank_wartung.cli auto-maintain --mode safe --execute
 - python -m codex_logdatenbank_wartung.cli fast-loop-cycle --execute
 - python -m codex_logdatenbank_wartung.cli mark-runs-read --dry-run
+- python -m codex_logdatenbank_wartung.cli startup-receipt ROLLOUT --boot-file GPT=PATH --format json
 - python -m codex_logdatenbank_wartung.cli store-repair --level repair --execute
 - python -m codex_logdatenbank_wartung.cli store-materials
 - python -m codex_logdatenbank_wartung.cli safe-start-report
@@ -59,7 +60,7 @@ Environment variables:
 Verification:
 - python -m compileall -q src tests
 - python -m pytest -q
-- Current local verification: 357 collected tests (356 passed, 1 skipped) pass on Python 3.12 (2026-08-25)
+- Current local verification: 368 collected tests (367 passed, 1 skipped) pass on Python 3.12 (2026-08-26)
 
 Public documentation:
 - README.md: overview, install, usage, safety boundaries
@@ -68,4 +69,4 @@ Public documentation:
 - STORE_LISTING.md, PRIVACY_POLICY.md, SUPPORT.md: Store release materials
 - SECURITY.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md: community health files
 
-Last-checked: 2026-08-25
+Last-checked: 2026-08-26

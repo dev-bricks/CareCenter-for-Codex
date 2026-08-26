@@ -17,7 +17,7 @@ from pathlib import Path
 
 from .config import MaintenanceConfig
 from .mark_runs_read import ATOM_STATE_KEY, UNREAD_KEY, _atomic_write_json, global_state_path
-from .processes import ProcessProvider, find_codex_processes_by_executable
+from .processes import ProcessProvider, find_codex_processes
 
 
 @dataclass(slots=True)
@@ -59,8 +59,11 @@ def maintain_threads(
     ``0`` deaktiviert die jeweilige Altersregel. ``mark_all_read`` leert unabhängig
     vom Alter alle lokalen Ungelesen-IDs. Unbekannte IDs bleiben bei Altersfiltern erhalten.
     """
-    if find_codex_processes_by_executable(config, provider=process_provider):
-        return ThreadHygieneResult("blocked", message="Codex läuft; Ausführung vorgemerkt/übersprungen.")
+    if find_codex_processes(config, provider=process_provider):
+        return ThreadHygieneResult(
+            "blocked",
+            message="Codex Desktop oder CLI läuft; Ausführung vorgemerkt/übersprungen.",
+        )
     explicit_archive_ids = set(archive_thread_ids or ())
     if not mark_all_read and mark_read_days <= 0 and archive_days <= 0 and not explicit_archive_ids:
         return ThreadHygieneResult("nothing", message="Keine Thread-Regel aktiviert.")
@@ -122,6 +125,15 @@ def maintain_threads(
         if not marked and not candidates:
             return ThreadHygieneResult("nothing", message="Keine passenden Threads gefunden.")
 
+        # Zweiter, frischer CIM-Snapshot unmittelbar vor dem ersten Backup. Der
+        # initiale Readback allein ließ ein TOCTOU-Fenster offen, in dem eine
+        # Codex-CLI starten und denselben Rollout weiterbeschreiben konnte.
+        if find_codex_processes(config, provider=process_provider):
+            return ThreadHygieneResult(
+                "blocked",
+                message="Codex Desktop oder CLI startete während der Prüfung; keine Änderung.",
+            )
+
         config.backup_path.mkdir(parents=True, exist_ok=True)
         db_backup = config.backup_path / _backup_path(db_path, "thread-db-bak").name
         backup_conn = sqlite3.connect(db_backup)
@@ -132,6 +144,17 @@ def maintain_threads(
         if marked and state_path.exists():
             state_backup = _backup_path(state_path, "thread-state-bak")
             state_backup.write_text(state_raw, encoding="utf-8")
+
+        # Das Backup kann Zeit benötigen. Vor dem eigentlichen Move/UPDATE wird
+        # deshalb nochmals fail-closed geprüft. Ein dann gestarteter Codex-Lauf
+        # hinterlässt höchstens das bereits sichere Backup, nie eine Mutation.
+        if candidates and find_codex_processes(config, provider=process_provider):
+            return ThreadHygieneResult(
+                "blocked",
+                message="Codex Desktop oder CLI startete vor der Archivierung; keine Änderung.",
+                state_backup=str(state_backup) if state_backup else None,
+                database_backup=str(db_backup),
+            )
 
         archive_root = config.codex_home / "archived_sessions"
         archive_root.mkdir(parents=True, exist_ok=True)

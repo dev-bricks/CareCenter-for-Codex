@@ -301,6 +301,28 @@ def cmd_mark_runs_read(args: argparse.Namespace) -> int:
     return {"ok": 0, "nothing": 0, "blocked": 2, "failed": 1}.get(result.status, 1)
 
 
+def _parse_boot_file_specification(value: str) -> tuple[str, Path]:
+    label, separator, raw_path = value.partition("=")
+    if separator:
+        return label.strip() or Path(raw_path).name, Path(raw_path)
+    path = Path(value)
+    return path.name, path
+
+
+def cmd_startup_receipt(args: argparse.Namespace) -> int:
+    import json as _json
+
+    from .startup_receipt import build_startup_receipt
+
+    external = [_parse_boot_file_specification(value) for value in args.boot_files]
+    report = build_startup_receipt(Path(args.rollout), external_boot_files=external)
+    if args.output_format == "json":
+        print(_json.dumps(report.to_dict(), ensure_ascii=False, indent=2))
+    else:
+        print(report.to_text())
+    return 0 if report.status == "ok" else 1
+
+
 def cmd_tray(args: argparse.Namespace) -> int:
     from .runtime.app_logging import start as start_app_logging
 
@@ -549,6 +571,31 @@ def build_parser() -> argparse.ArgumentParser:
         help="Zusätzlich Threads archivieren, die älter als X Tage sind; 0 = aus.",
     )
     mark_runs_parser.set_defaults(func=cmd_mark_runs_read)
+
+    receipt_parser = subparsers.add_parser(
+        "startup-receipt",
+        help="Ersten Rollout-Turn rein lesend und ohne Promptinhalte nach Quellen vermessen.",
+    )
+    receipt_parser.add_argument("rollout", help="Expliziter Pfad zu einer Rollout-JSONL-Datei.")
+    receipt_parser.add_argument(
+        "--boot-file",
+        dest="boot_files",
+        action="append",
+        default=[],
+        metavar="LABEL=PATH",
+        help=(
+            "Explizite externe Bootdatei als Snapshot vermessen; wiederholbar. "
+            "Der Snapshot behauptet keine Injection."
+        ),
+    )
+    receipt_parser.add_argument(
+        "--format",
+        dest="output_format",
+        choices=("text", "json"),
+        default="text",
+        help="Ausgabeformat; enthält niemals Promptinhalte.",
+    )
+    receipt_parser.set_defaults(func=cmd_startup_receipt)
 
     tray_parser = subparsers.add_parser("tray", help="Systemtray-App starten.")
     tray_parser.set_defaults(func=cmd_tray)

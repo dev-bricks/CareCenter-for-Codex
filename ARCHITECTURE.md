@@ -26,6 +26,7 @@ kann die Logik getestet werden, ohne die Tray-App zu starten (der interne Python
 | `store_screenshot.py` | reproduzierbaren README-/Store-Screenshot aus dem echten Statusfenster rendern |
 | `scheduler.py` | Optionaler Windows-Task-Scheduler-Helfer für periodische Aufrufe von `maintain --execute` |
 | `thread_hygiene.py` | Altersbasierte Thread-Pflege: Ungelesen-State, transactionales Archivieren und Backups bei geschlossenem Codex |
+| `startup_receipt.py` | Read-only First-Turn-Herkunftsbeleg: getrennte Größen/Hashes für Base-, Developer-, Skill-, AGENTS-, Hook- und User-Quellen ohne Promptausgabe |
 | `mark_runs_read.py` | Codex-Ungelesen-State für Automations-/Thread-Ergebnisse gesichert als gelesen markieren |
 | `config_audit.py` | Audit plus getrennte off/notify/auto-Fixes für MCP-Konfigurationsduplikate, Plattform-Plugins und leere Threads; manueller Audit startet zusätzlich den Runtime-MCP-Reaper |
 | `safe_start_integration.py` | Safe-Start-Status, Installation, Start-Gate, Wiederherstellung und Aufschublogik anbinden |
@@ -112,7 +113,7 @@ nicht in bereits laufende Datenbankoperationen ein.
 - Backups entstehen vor jeder echten SQLite-Operation; Backup-Anzahl ist begrenzt (`backup_keep`).
 - Die Integrität wird auf dem Backup geprüft, nicht nur behauptet.
 - Ohne explizite Archivkonfiguration werden keine Logdaten gelöscht.
-- Thread-Archivierung ist separat konfiguriert (`auto_archive_threads_days=0` bedeutet aus), läuft nur bei geschlossenem Codex und sichert `state_5.sqlite` vor Änderungen.
+- Thread-Archivierung ist separat konfiguriert (`auto_archive_threads_days=0` bedeutet aus), wartet beim Empty-Thread-Autofix mindestens 300 Sekunden und sichert `state_5.sqlite` vor Änderungen. Ein breiter Prozess-Snapshot blockiert bei Desktop oder npm-Codex-CLI und wird unmittelbar vor Backup sowie Move erneut erhoben.
 - Startup-Reparatur beendet ausschließlich Zombie-Hauptprozesse (kein Renderer); aktive Sitzungen nie.
 - Runtime-MCP-Bereinigung gilt nur für direkte Launcher unter dem Store-Desktop-App-Server: der neueste Start-Cohort bleibt immer bestehen, mindestens zwei verschiedene Signaturen müssen exakt wiederholt sein, die Karenzzeit muss abgelaufen sein und der vollständige Kandidatenbaum darf im CPU-Sample nicht arbeiten.
 - npm-/CLI-app-server, der Desktop-App-Server selbst, fremde Kindprozesse und Kandidaten mit unvollständigen Zeitdaten werden fail-closed ausgeschlossen.

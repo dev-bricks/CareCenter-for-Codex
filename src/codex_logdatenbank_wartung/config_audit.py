@@ -14,11 +14,13 @@ import json
 import re
 import shutil
 import sqlite3
+import time
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
-from .config import MaintenanceConfig
+from .config import DEFAULT_EMPTY_THREAD_MIN_AGE_SECONDS, MaintenanceConfig
 from .processes import ProcessProvider
 
 AuditSeverity = Literal["info", "warning", "critical"]
@@ -335,7 +337,49 @@ def _select_rows(conn: sqlite3.Connection, table: str, columns: set[str], *, lim
     return list(conn.execute(query))
 
 
-def find_empty_threads(config: MaintenanceConfig) -> list[EmptyThread]:
+def _timestamp_seconds(value: object) -> float | None:
+    """Normalisiert Unix-Sekunden/-Millisekunden oder ISO-Zeitstempel."""
+    if value in (None, ""):
+        return None
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        text = str(value).strip().replace("Z", "+00:00")
+        try:
+            parsed = datetime.fromisoformat(text)
+        except ValueError:
+            return None
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=UTC)
+        return parsed.timestamp()
+    while numeric > 10_000_000_000:
+        numeric /= 1000
+    return numeric
+
+
+def _old_enough_for_empty_thread_audit(
+    row: sqlite3.Row,
+    columns: set[str],
+    *,
+    current: int,
+    minimum_age_seconds: int,
+) -> bool:
+    references = [
+        parsed
+        for column in ("created_at", "updated_at", "timestamp", "ts")
+        if column in columns
+        if (parsed := _timestamp_seconds(row[column])) is not None
+    ]
+    if not references:
+        return False
+    return max(references) <= current - minimum_age_seconds
+
+
+def find_empty_threads(
+    config: MaintenanceConfig,
+    *,
+    now: int | None = None,
+) -> list[EmptyThread]:
     """Findet leere Threads/Nachrichten in state_5.sqlite (#19969-Signatur).
 
     Liest read-only; keine Modifikation an state_5.sqlite.
@@ -345,6 +389,12 @@ def find_empty_threads(config: MaintenanceConfig) -> list[EmptyThread]:
         return []
 
     empty: list[EmptyThread] = []
+    current = int(time.time() if now is None else now)
+    minimum_age_seconds = max(
+        DEFAULT_EMPTY_THREAD_MIN_AGE_SECONDS,
+        int(config.audit_empty_thread_min_age_seconds),
+    )
+    conn: sqlite3.Connection | None = None
     try:
         conn = sqlite3.connect(f"file:{state_path}?mode=ro", uri=True)
         conn.row_factory = sqlite3.Row
@@ -373,6 +423,13 @@ def find_empty_threads(config: MaintenanceConfig) -> list[EmptyThread]:
                     if not _token_empty(row, columns):
                         continue
                     if content_columns and not _row_empty_message(row, content_columns):
+                        continue
+                    if not _old_enough_for_empty_thread_audit(
+                        row,
+                        columns,
+                        current=current,
+                        minimum_age_seconds=minimum_age_seconds,
+                    ):
                         continue
                     thread_id = str(row[id_column] or "")
                     if not thread_id or thread_id in seen_ids:
@@ -404,6 +461,13 @@ def find_empty_threads(config: MaintenanceConfig) -> list[EmptyThread]:
             for row in _select_rows(conn, table, columns, limit=1000):
                 if not _row_empty_message(row, content_columns):
                     continue
+                if not _old_enough_for_empty_thread_audit(
+                    row,
+                    columns,
+                    current=current,
+                    minimum_age_seconds=minimum_age_seconds,
+                ):
+                    continue
                 thread_id = str(row[id_column] or "")
                 if not thread_id or thread_id in seen_ids:
                     continue
@@ -417,9 +481,11 @@ def find_empty_threads(config: MaintenanceConfig) -> list[EmptyThread]:
                     break
             if len(empty) >= 100:
                 break
-        conn.close()
     except (sqlite3.Error, OSError):
         pass
+    finally:
+        if conn is not None:
+            conn.close()
 
     return empty[:100]
 

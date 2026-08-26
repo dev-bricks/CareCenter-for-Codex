@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- Fix (2026-08-26): Empty-thread auto-fix now enforces a minimum five-minute
+  initialization grace, treats both Codex Desktop and npm Codex CLI activity as
+  a fail-closed thread-mutation blocker, and repeats process inventory directly
+  before backup and rollout move to close the observed TOCTOU window. Exact
+  Desktop/Store process targeting used by termination paths remains unchanged.
+- Added (2026-08-26): read-only `startup-receipt` CLI for an explicit rollout.
+  It stops at the first assistant boundary and reports only source-attributed
+  metadata, character/byte counts, and SHA-256 for session base instructions,
+  developer bootstrap, marked skill catalog, AGENTS injection, pre-user hooks,
+  and the actual user prompt. Explicit external boot files are snapshot-only
+  with `injection_claim=false`; no prompt content is emitted.
+- Verification (2026-08-26): 368 collected, 367 passed, 1 skipped; Ruff,
+  compileall, diff-check, focused thread/receipt tests, and a read-only live
+  receipt against the restored Root rollout passed.
 - Maintenance (2026-08-25): Added explicit Gitignore coverage for local audit
   notes (`BEFUNDE.md`) and temporary `TASKPLAN*.md` status files so
   verification artifacts do not drift into the public repository. Synced the

@@ -104,3 +104,103 @@ def test_blocks_while_codex_is_running(tmp_path: Path) -> None:
         ],
     )
     assert result.status == "blocked"
+
+
+def test_blocks_thread_mutation_while_npm_codex_cli_is_running(tmp_path: Path) -> None:
+    config = make_config(tmp_path)
+    rollout = add_thread(config, "cli-active", 1)
+    cli = ProcessInfo(
+        pid=35012,
+        name="codex.exe",
+        executable=(r"C:\Users\User\AppData\Roaming\npm\node_modules\@openai\codex"
+                    r"\vendor\x86_64-pc-windows-msvc\codex\codex.exe"),
+        command_line="codex.exe exec",
+    )
+
+    result = maintain_threads(
+        config,
+        archive_thread_ids={"cli-active"},
+        process_provider=lambda: [cli],
+        now=NOW,
+    )
+
+    assert result.status == "blocked"
+    assert rollout.exists()
+    with sqlite3.connect(config.state_db_path) as conn:
+        assert conn.execute(
+            "SELECT archived FROM threads WHERE id='cli-active'"
+        ).fetchone()[0] == 0
+
+
+def test_rechecks_codex_activity_immediately_before_backup_and_move(tmp_path: Path) -> None:
+    config = make_config(tmp_path)
+    rollout = add_thread(config, "starts-during-scan", 1)
+    cli = ProcessInfo(
+        pid=35012,
+        name="codex.exe",
+        executable=(r"C:\Users\User\AppData\Roaming\npm\node_modules\@openai\codex"
+                    r"\vendor\x86_64-pc-windows-msvc\codex\codex.exe"),
+        command_line="codex.exe exec",
+    )
+    snapshots = iter(([], [cli]))
+    calls = 0
+
+    def provider() -> list[ProcessInfo]:
+        nonlocal calls
+        calls += 1
+        return next(snapshots)
+
+    result = maintain_threads(
+        config,
+        archive_thread_ids={"starts-during-scan"},
+        process_provider=provider,
+        now=NOW,
+    )
+
+    assert calls == 2
+    assert result.status == "blocked"
+    assert rollout.exists()
+    assert not config.backup_path.exists()
+    with sqlite3.connect(config.state_db_path) as conn:
+        assert conn.execute(
+            "SELECT archived FROM threads WHERE id='starts-during-scan'"
+        ).fetchone()[0] == 0
+
+
+def test_rechecks_codex_activity_after_backup_immediately_before_move(tmp_path: Path) -> None:
+    config = make_config(tmp_path)
+    rollout = add_thread(config, "starts-during-backup", 1)
+    cli = ProcessInfo(
+        pid=35012,
+        name="codex.exe",
+        executable=(
+            r"C:\Users\User\AppData\Roaming\npm\node_modules\@openai\codex"
+            r"\vendor\x86_64-pc-windows-msvc\codex\codex.exe"
+        ),
+        command_line="codex.exe exec",
+    )
+    snapshots = iter(([], [], [cli]))
+    calls = 0
+
+    def provider() -> list[ProcessInfo]:
+        nonlocal calls
+        calls += 1
+        return next(snapshots)
+
+    result = maintain_threads(
+        config,
+        archive_thread_ids={"starts-during-backup"},
+        process_provider=provider,
+        now=NOW,
+    )
+
+    assert calls == 3
+    assert result.status == "blocked"
+    assert result.database_backup is not None
+    assert Path(result.database_backup).exists()
+    assert rollout.exists()
+    assert not (config.codex_home / "archived_sessions" / rollout.name).exists()
+    with sqlite3.connect(config.state_db_path) as conn:
+        assert conn.execute(
+            "SELECT archived FROM threads WHERE id='starts-during-backup'"
+        ).fetchone()[0] == 0

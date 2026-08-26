@@ -11,6 +11,10 @@ from typing import Any
 DEFAULT_DATA_DIR_NAME = "CareCenterForCodex"
 LEGACY_LOCAL_ROOT = Path(r"C:\_Local_DEV\codex-maintenance")
 DEFAULT_RUNTIME_MCP_DUPLICATE_MIN_AGE_SECONDS = 60 * 60
+# Fünf Minuten überdecken mehrere 60-Sekunden-Watcher-Takte und geben einem
+# frisch angelegten CLI-/Desktop-Thread Zeit für den ersten Token-/Prompt-Write.
+# Konfiguration darf die Karenz verlängern, aber niemals darunter absenken.
+DEFAULT_EMPTY_THREAD_MIN_AGE_SECONDS = 5 * 60
 
 
 def _local_appdata() -> Path:
@@ -107,6 +111,7 @@ class MaintenanceConfig:
     auto_archive_threads_days: int = 0
     auto_mark_threads_read_days: int = 0
     audit_empty_threads: str = "auto"
+    audit_empty_thread_min_age_seconds: int = DEFAULT_EMPTY_THREAD_MIN_AGE_SECONDS
     language: str = "de"
     # Hintergrund-Waechter (Start-Praevention): tickt periodisch read-only und raeumt bei
     # GESCHLOSSENEM Codex haengende Reste (Ghost-Hauptprozesse ohne Renderer + verwaistes
