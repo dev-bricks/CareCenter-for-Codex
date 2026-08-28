@@ -5,7 +5,7 @@
 > Inoffizielles lokales Windows-Tray- und CLI-Werkzeug, das die OpenAI-Codex-Desktop-App gesund hält — repariert fehlgeschlagene Starts, entfernt hängende Reste und wartet die SQLite-Logdatenbank sicher. Vollständig offline, keine Telemetrie.
 
 [![CareCenter tests](https://github.com/dev-bricks/CareCenter-for-Codex/actions/workflows/tests.yml/badge.svg)](https://github.com/dev-bricks/CareCenter-for-Codex/actions/workflows/tests.yml)
-[![Pytest-Status](https://img.shields.io/badge/Tests-367%20bestanden-brightgreen.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
+[![Pytest-Status](https://img.shields.io/badge/Tests-371%20bestanden-brightgreen.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
 [![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://www.python.org/)
 [![Lizenz](https://img.shields.io/badge/Lizenz-MIT-yellow.svg)](LICENSE)
 [![Plattform](https://img.shields.io/badge/Plattform-Windows-lightgrey.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
@@ -190,6 +190,7 @@ Das Projekt enthält die Grundlage für den Windows Store:
 - `SUPPORT.md`
 - `docs/privacy.md`
 - `docs/support.md`
+- `AppxManifest.xml` mit vier kanonischen Paketlogo-Quellen unter `store_assets/`
 
 Öffentliche Store-Seiten:
 
@@ -212,6 +213,11 @@ zur Tray-, Wächter-, Wartungs- oder normalen CLI-Laufzeit und ist keine
 Telemetrie. Ohne `--exe-path` versucht der Check, die gebaute EXE automatisch
 aus `build_exe.bat` (`DIST_DIR`) zu finden. Mit `--exe-path` kann entweder die
 konkrete `.exe` oder nur der Build-Ordner übergeben werden.
+
+Der lokale Vorabcheck parst `AppxManifest.xml`, gleicht Paketidentität,
+Publisher, Version, Executable und Anzeigenamen mit `store_package.json` ab und
+ordnet die Paketpfade unter `icons/` den Quellen des zentralen Builders unter
+`store_assets/` zu. Fehlende oder herausführende Quellpfade schlagen fehl.
 
 Der Check baut die statischen GitHub-Pages-Dateien außerdem temporär und prüft `privacy/index.html`, `support/index.html`, `index.html` sowie den Build-Marker. Der aktive Workflow `.github/workflows/pages.yml` veröffentlicht die Routen `/privacy/` und `/support/` über GitHub Pages.
 

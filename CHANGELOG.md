@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Windows Store (2026-08-28): Added the four canonical `store_assets/` package
+  logos consumed by the central MSIX builder. The generated manifest uses the
+  corresponding staged `icons/` paths and declares `uap`, `rescap`, and
+  `desktop` as ignorable namespaces. The local Store preflight parses the manifest,
+  verifies identity, publisher, version, executable, and display name against
+  `store_package.json`, rejects unsafe or missing asset paths, and XML-escapes
+  generated metadata. Regression tests cover missing logos and stale versions.
+- Verification (2026-08-28): 372 collected, 371 passed, 1 skipped; Ruff,
+  compileall, focused Store tests, and the real local Store-material preflight
+  passed. Actual staging, MSIX creation, and WACK remain unclaimed because the
+  central builder stops before staging when Windows SDK `makeappx.exe` is absent.
 - Fix (2026-08-26): Empty-thread auto-fix now enforces a minimum five-minute
   initialization grace, treats both Codex Desktop and npm Codex CLI activity as
   a fail-closed thread-mutation blocker, and repeats process inventory directly

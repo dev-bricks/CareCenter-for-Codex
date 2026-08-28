@@ -12,7 +12,6 @@ def _write_store_files(project_root: Path, payload: dict[str, object]) -> None:
         json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
-    (project_root / "AppxManifest.xml").write_text("<Package></Package>\n", encoding="utf-8")
     pkg_dir = project_root / "src" / "codex_logdatenbank_wartung"
     pkg_dir.mkdir(parents=True, exist_ok=True)
     version_str = str(payload.get("version", "0.8.0.0"))
@@ -77,6 +76,17 @@ def _write_store_files(project_root: Path, payload: dict[str, object]) -> None:
     screenshot.mkdir(parents=True, exist_ok=True)
     (screenshot / "main.png").write_bytes(b"png")
 
+    store_release.generate_appx_manifest(project_root=project_root)
+    assets_dir = project_root / "store_assets"
+    assets_dir.mkdir(parents=True, exist_ok=True)
+    for name in (
+        "Square150x150Logo.png",
+        "Square44x44Logo.png",
+        "Wide310x150Logo.png",
+        "Square310x310Logo.png",
+    ):
+        (assets_dir / name).write_bytes(b"png")
+
 
 def test_validate_store_materials_reports_ok_for_complete_materials(tmp_path: Path) -> None:
     exe_path = tmp_path / "CareCenterForCodex.exe"
@@ -104,6 +114,132 @@ def test_validate_store_materials_reports_ok_for_complete_materials(tmp_path: Pa
     assert report.status == "ok"
     pages_build_check = next(check for check in report.checks if check.name == "Store-Webseiten-Build")
     assert pages_build_check.status == "ok"
+
+
+def test_validate_store_materials_rejects_missing_manifest_asset(tmp_path: Path) -> None:
+    exe_path = tmp_path / "CareCenterForCodex.exe"
+    exe_path.write_bytes(b"exe")
+    payload = {
+        "app_name": "CareCenter for Codex",
+        "publisher": "CN=01234567-89AB-CDEF-0123-456789ABCDEF",
+        "publisher_display": "Lukas Geiger",
+        "identity_name": "LukasGeiger.CareCenterForCodex",
+        "version": "0.8.0.0",
+        "description": "Offline Wartung und Reparatur fuer die Codex-Desktop-App.",
+        "executable": "CareCenterForCodex.exe",
+        "capabilities": "runFullTrust",
+        "category": "Developer Tools",
+        "age_rating": "3+",
+        "privacy_url": "https://dev-bricks.github.io/CareCenter-for-Codex/privacy",
+        "support_url": "https://dev-bricks.github.io/CareCenter-for-Codex/support",
+    }
+    _write_store_files(tmp_path, payload)
+    (tmp_path / "store_assets" / "Square44x44Logo.png").unlink()
+
+    report = validate_store_materials(project_root=tmp_path, exe_path=exe_path)
+
+    manifest_check = next(check for check in report.checks if check.name == "AppxManifest.xml")
+    assert manifest_check.status == "failed"
+    assert "Square44x44Logo.png" in manifest_check.message
+
+
+def test_validate_store_materials_rejects_manifest_identity_mismatch(tmp_path: Path) -> None:
+    exe_path = tmp_path / "CareCenterForCodex.exe"
+    exe_path.write_bytes(b"exe")
+    payload = {
+        "app_name": "CareCenter for Codex",
+        "publisher": "CN=01234567-89AB-CDEF-0123-456789ABCDEF",
+        "publisher_display": "Lukas Geiger",
+        "identity_name": "LukasGeiger.CareCenterForCodex",
+        "version": "0.8.0.0",
+        "description": "Offline Wartung und Reparatur fuer die Codex-Desktop-App.",
+        "executable": "CareCenterForCodex.exe",
+        "capabilities": "runFullTrust",
+        "category": "Developer Tools",
+        "age_rating": "3+",
+        "privacy_url": "https://dev-bricks.github.io/CareCenter-for-Codex/privacy",
+        "support_url": "https://dev-bricks.github.io/CareCenter-for-Codex/support",
+    }
+    _write_store_files(tmp_path, payload)
+    manifest_path = tmp_path / "AppxManifest.xml"
+    manifest_path.write_text(
+        manifest_path.read_text(encoding="utf-8").replace('Version="0.8.0.0"', 'Version="9.9.9.9"'),
+        encoding="utf-8",
+    )
+
+    report = validate_store_materials(project_root=tmp_path, exe_path=exe_path)
+
+    manifest_check = next(check for check in report.checks if check.name == "AppxManifest.xml")
+    assert manifest_check.status == "failed"
+    assert "Version" in manifest_check.message
+
+
+def test_validate_store_materials_rejects_root_relative_manifest_asset(tmp_path: Path) -> None:
+    exe_path = tmp_path / "CareCenterForCodex.exe"
+    exe_path.write_bytes(b"exe")
+    payload = {
+        "app_name": "CareCenter for Codex",
+        "publisher": "CN=01234567-89AB-CDEF-0123-456789ABCDEF",
+        "publisher_display": "Lukas Geiger",
+        "identity_name": "LukasGeiger.CareCenterForCodex",
+        "version": "0.8.0.0",
+        "description": "Offline Wartung und Reparatur fuer die Codex-Desktop-App.",
+        "executable": "CareCenterForCodex.exe",
+        "capabilities": "runFullTrust",
+        "category": "Developer Tools",
+        "age_rating": "3+",
+        "privacy_url": "https://dev-bricks.github.io/CareCenter-for-Codex/privacy",
+        "support_url": "https://dev-bricks.github.io/CareCenter-for-Codex/support",
+    }
+    _write_store_files(tmp_path, payload)
+    manifest_path = tmp_path / "AppxManifest.xml"
+    manifest_path.write_text(
+        manifest_path.read_text(encoding="utf-8").replace(
+            "icons\\Square44x44Logo.png",
+            "\\Windows\\Square44x44Logo.png",
+        ),
+        encoding="utf-8",
+    )
+
+    report = validate_store_materials(project_root=tmp_path, exe_path=exe_path)
+
+    manifest_check = next(check for check in report.checks if check.name == "AppxManifest.xml")
+    assert manifest_check.status == "failed"
+    assert "ungueltiger Asset-Pfad" in manifest_check.message
+
+
+def test_validate_store_materials_requires_ignorable_rescap_namespace(tmp_path: Path) -> None:
+    exe_path = tmp_path / "CareCenterForCodex.exe"
+    exe_path.write_bytes(b"exe")
+    payload = {
+        "app_name": "CareCenter for Codex",
+        "publisher": "CN=01234567-89AB-CDEF-0123-456789ABCDEF",
+        "publisher_display": "Lukas Geiger",
+        "identity_name": "LukasGeiger.CareCenterForCodex",
+        "version": "0.8.0.0",
+        "description": "Offline Wartung und Reparatur fuer die Codex-Desktop-App.",
+        "executable": "CareCenterForCodex.exe",
+        "capabilities": "runFullTrust",
+        "category": "Developer Tools",
+        "age_rating": "3+",
+        "privacy_url": "https://dev-bricks.github.io/CareCenter-for-Codex/privacy",
+        "support_url": "https://dev-bricks.github.io/CareCenter-for-Codex/support",
+    }
+    _write_store_files(tmp_path, payload)
+    manifest_path = tmp_path / "AppxManifest.xml"
+    manifest_path.write_text(
+        manifest_path.read_text(encoding="utf-8").replace(
+            'IgnorableNamespaces="uap rescap desktop"',
+            'IgnorableNamespaces="uap desktop"',
+        ),
+        encoding="utf-8",
+    )
+
+    report = validate_store_materials(project_root=tmp_path, exe_path=exe_path)
+
+    manifest_check = next(check for check in report.checks if check.name == "AppxManifest.xml")
+    assert manifest_check.status == "failed"
+    assert "IgnorableNamespaces" in manifest_check.message
 
 
 def test_validate_store_materials_checks_live_pages_on_request(

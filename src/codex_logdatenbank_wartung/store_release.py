@@ -7,13 +7,15 @@ import os
 import re
 import shutil
 import tempfile
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from importlib import util as importlib_util
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from types import ModuleType
 from urllib import error as urlerror
 from urllib import request as urlrequest
 from urllib.parse import urlparse
+from xml.sax.saxutils import escape
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 STORE_PACKAGE_PATH = PROJECT_ROOT / "store_package.json"
@@ -49,6 +51,11 @@ REQUIRED_FIELDS = (
     "age_rating",
 )
 URL_FIELDS = ("privacy_url", "support_url")
+RESTRICTED_CAPABILITIES_NAMESPACE = (
+    "http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+)
+STORE_ASSET_SOURCE_DIR = "store_assets"
+STORE_ASSET_PACKAGE_DIR = "icons"
 PLACEHOLDER_HOSTS = {
     "example.com",
     "example.invalid",
@@ -495,14 +502,134 @@ def _check_msix_sdk_readiness() -> StoreCheck:
     )
 
 
-def _check_appx_manifest(project_root: Path) -> StoreCheck:
+def _check_appx_manifest(project_root: Path, payload: dict[str, object]) -> StoreCheck:
     manifest_path = project_root / "AppxManifest.xml"
-    if manifest_path.exists():
-        return StoreCheck("AppxManifest.xml", "ok", str(manifest_path))
+    if not manifest_path.exists():
+        return StoreCheck(
+            "AppxManifest.xml",
+            "warning",
+            "AppxManifest.xml fehlt noch (kann mit `codex-logwartung store-materials --generate-manifest` erzeugt werden).",
+        )
+
+    try:
+        namespace_prefixes = {
+            prefix: uri
+            for _event, (prefix, uri) in ET.iterparse(manifest_path, events=("start-ns",))
+        }
+        root = ET.parse(manifest_path).getroot()
+    except (ET.ParseError, OSError) as exc:
+        return StoreCheck("AppxManifest.xml", "failed", f"Manifest ist nicht lesbar: {exc}")
+
+    namespace = {"appx": "http://schemas.microsoft.com/appx/manifest/foundation/windows10"}
+    identity = root.find("appx:Identity", namespace)
+    properties = root.find("appx:Properties", namespace)
+    application = root.find("appx:Applications/appx:Application", namespace)
+    visual_elements = None
+    if application is not None:
+        visual_elements = next(
+            (child for child in application if child.tag.endswith("}VisualElements")),
+            None,
+        )
+
+    problems: list[str] = []
+    capabilities = str(payload.get("capabilities", "")).split(",")
+    if "runFullTrust" in {capability.strip() for capability in capabilities}:
+        ignorable_namespaces = set(root.get("IgnorableNamespaces", "").split())
+        restricted_prefixes = {
+            prefix
+            for prefix, uri in namespace_prefixes.items()
+            if uri == RESTRICTED_CAPABILITIES_NAMESPACE
+        }
+        if not restricted_prefixes.intersection(ignorable_namespaces):
+            problems.append("IgnorableNamespaces enthaelt den rescap-Namespace nicht")
+        restricted_capabilities = root.findall(f".//{{{RESTRICTED_CAPABILITIES_NAMESPACE}}}Capability")
+        if not any(element.get("Name") == "runFullTrust" for element in restricted_capabilities):
+            problems.append("rescap:Capability runFullTrust fehlt")
+
+    expected_attributes = (
+        (identity, "Identity", "Name", "identity_name"),
+        (identity, "Identity", "Publisher", "publisher"),
+        (identity, "Identity", "Version", "version"),
+        (application, "Application", "Executable", "executable"),
+    )
+    for element, element_name, attribute, payload_key in expected_attributes:
+        expected = str(payload.get(payload_key, "")).strip()
+        actual = element.get(attribute, "").strip() if element is not None else ""
+        if actual != expected:
+            problems.append(f"{element_name}.{attribute}: {actual or '<fehlt>'} != {expected or '<fehlt>'}")
+
+    display_name = properties.find("appx:DisplayName", namespace) if properties is not None else None
+    expected_display_name = str(payload.get("app_name", "")).strip()
+    actual_display_name = (display_name.text or "").strip() if display_name is not None else ""
+    if actual_display_name != expected_display_name:
+        problems.append(
+            f"Properties.DisplayName: {actual_display_name or '<fehlt>'} != {expected_display_name or '<fehlt>'}"
+        )
+
+    asset_references: set[str] = set()
+    logo = properties.find("appx:Logo", namespace) if properties is not None else None
+    if logo is not None and logo.text:
+        asset_references.add(logo.text.strip())
+    else:
+        problems.append("Properties.Logo fehlt")
+    if visual_elements is not None:
+        for attribute in ("Square150x150Logo", "Square44x44Logo"):
+            reference = visual_elements.get(attribute, "").strip()
+            if reference:
+                asset_references.add(reference)
+            else:
+                problems.append(f"VisualElements.{attribute} fehlt")
+    else:
+        problems.append("uap:VisualElements fehlt")
+
+    default_tile = None
+    if visual_elements is not None:
+        default_tile = next(
+            (child for child in visual_elements if child.tag.endswith("}DefaultTile")),
+            None,
+        )
+    for attribute in ("Wide310x150Logo", "Square310x310Logo"):
+        reference = default_tile.get(attribute, "").strip() if default_tile is not None else ""
+        if reference:
+            asset_references.add(reference)
+        else:
+            problems.append(f"DefaultTile.{attribute} fehlt")
+
+    if not asset_references:
+        problems.append("keine Logo-Assets referenziert")
+    project_root_resolved = project_root.resolve()
+    source_root = (project_root / STORE_ASSET_SOURCE_DIR).resolve()
+    if not source_root.is_relative_to(project_root_resolved):
+        problems.append(f"{STORE_ASSET_SOURCE_DIR}\\ verlaesst das Projekt")
+    for reference in sorted(asset_references):
+        windows_path = PureWindowsPath(reference)
+        if (
+            windows_path.is_absolute()
+            or windows_path.drive
+            or windows_path.root
+            or windows_path.anchor
+            or ".." in windows_path.parts
+        ):
+            problems.append(f"ungueltiger Asset-Pfad: {reference}")
+            continue
+        if (
+            len(windows_path.parts) != 2
+            or windows_path.parts[0].casefold() != STORE_ASSET_PACKAGE_DIR
+        ):
+            problems.append(f"Asset-Pfad liegt nicht unter {STORE_ASSET_PACKAGE_DIR}\\: {reference}")
+            continue
+        asset_path = source_root.joinpath(*windows_path.parts[1:]).resolve()
+        if not asset_path.is_relative_to(source_root):
+            problems.append(f"Asset-Pfad verlaesst {STORE_ASSET_SOURCE_DIR}\\: {reference}")
+        elif not asset_path.is_file():
+            problems.append(f"Asset-Quelle fehlt: {STORE_ASSET_SOURCE_DIR}\\{windows_path.parts[-1]}")
+
+    if problems:
+        return StoreCheck("AppxManifest.xml", "failed", "; ".join(problems))
     return StoreCheck(
         "AppxManifest.xml",
-        "warning",
-        "AppxManifest.xml fehlt noch (kann mit `codex-logwartung store-materials --generate-manifest` erzeugt werden).",
+        "ok",
+        f"Manifestvertrag und {len(asset_references)} Asset-Referenz(en) stimmen.",
     )
 
 
@@ -515,20 +642,25 @@ def generate_appx_manifest(
     if payload is None:
         raise ValueError("store_package.json konnte nicht geladen werden.")
 
-    identity_name = str(payload.get("identity_name", "")).strip()
-    publisher = str(payload.get("publisher", "")).strip()
-    version = str(payload.get("version", "1.0.0.0")).strip()
-    app_name = str(payload.get("app_name", "")).strip()
-    publisher_display = str(payload.get("publisher_display", "")).strip()
-    description = str(payload.get("description", "")).strip()
-    executable = str(payload.get("executable", "")).strip()
+    def xml_value(key: str, default: str = "") -> str:
+        value = str(payload.get(key, default)).strip()
+        return escape(value, {'"': "&quot;", "'": "&apos;"})
+
+    identity_name = xml_value("identity_name")
+    publisher = xml_value("publisher")
+    version = xml_value("version", "1.0.0.0")
+    app_name = xml_value("app_name")
+    publisher_display = xml_value("publisher_display")
+    description = xml_value("description")
+    executable = xml_value("executable")
 
     manifest_xml = f"""<?xml version="1.0" encoding="utf-8"?>
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
-  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10">
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  IgnorableNamespaces="uap rescap desktop">
   <Identity
     Name="{identity_name}"
     Publisher="{publisher}"
@@ -537,7 +669,7 @@ def generate_appx_manifest(
   <Properties>
     <DisplayName>{app_name}</DisplayName>
     <PublisherDisplayName>{publisher_display}</PublisherDisplayName>
-    <Logo>assets\\Square150x150Logo.png</Logo>
+    <Logo>icons\\Square150x150Logo.png</Logo>
     <Description>{description}</Description>
   </Properties>
   <Resources>
@@ -561,9 +693,12 @@ def generate_appx_manifest(
       <uap:VisualElements
         DisplayName="{app_name}"
         Description="{description}"
-        Square150x150Logo="assets\\Square150x150Logo.png"
-        Square44x44Logo="assets\\Square44x44Logo.png"
+        Square150x150Logo="icons\\Square150x150Logo.png"
+        Square44x44Logo="icons\\Square44x44Logo.png"
         BackgroundColor="transparent">
+        <uap:DefaultTile
+          Wide310x150Logo="icons\\Wide310x150Logo.png"
+          Square310x310Logo="icons\\Square310x310Logo.png" />
       </uap:VisualElements>
     </Application>
   </Applications>
@@ -599,7 +734,7 @@ def validate_store_materials(
         checks.append(_check_live_store_pages(payload))
     checks.append(_check_screenshot(project_root))
     checks.append(_check_executable(project_root, payload, exe_path))
-    checks.append(_check_appx_manifest(project_root))
+    checks.append(_check_appx_manifest(project_root, payload))
     if check_msix_sdk:
         checks.append(_check_msix_sdk_readiness())
     return StoreMaterialsReport(checks)

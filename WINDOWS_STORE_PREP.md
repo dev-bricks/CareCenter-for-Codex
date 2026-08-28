@@ -1,6 +1,6 @@
 # Windows Store Prep - CareCenter for Codex
 
-Stand: 2026-08-03
+Stand: 2026-08-28
 
 ## Ziel
 
@@ -12,11 +12,20 @@ Windows-Store-Release (Target `windows_store`) als belastbare Baseline vorbereit
 - `STORE_LISTING.md` in Deutsch und Englisch mit Kurzbeschreibung, Features und Abgrenzung vorbereitet.
 - `PRIVACY_POLICY.md` und `SUPPORT.md` sowie GitHub-Pages-Generator (`scripts/build_store_pages.py`) eingebunden.
 - CLI-Befehl `codex-logwartung store-materials` um `--generate-manifest` (erzeugt valide `AppxManifest.xml`) und `--check-msix-sdk` (prüft `makeappx.exe`) erweitert.
-- Preflight-Validierung via `validate_store_materials` inkl. Existenz- und Schema-Prüfung von `AppxManifest.xml`.
+- Die vier vom zentralen MSIX-Builder erwarteten Paketlogos unter
+  `store_assets/` sind aus dem vorhandenen App-Icon erzeugt. Der Builder kopiert
+  sie beim Staging nach `icons/`; genau diese Paketpfade referenziert das Manifest.
+- Preflight-Validierung via `validate_store_materials` inkl. XML-Parsing,
+  Abgleich von Identity, Publisher, Version, Executable und DisplayName mit
+  `store_package.json` sowie Prüfung aller referenzierten Logo-Dateien.
 - Automatisierte Testsuite (`tests/test_store_release.py` und `tests/test_cli.py`) erweitert.
 
 ## Status vor Store-Submission
 
-1. Metadaten in `store_package.json` und Doku vollständig. Preflight-Check via `codex-logwartung store-materials` bestanden.
+1. Metadaten, Doku, Manifest und die vier kanonischen `store_assets/`-Paketlogos
+   vollständig. Der lokale Manifest-/Quellmaterialvertrag via
+   `codex-logwartung store-materials` ist bestanden.
 2. Manifest-Generierung via `codex-logwartung store-materials --generate-manifest` einsatzbereit.
-3. MSIX-Build-Erzeugung via Windows SDK `makeappx` / `WinStorePackager` im Partner Center bereit.
+3. Restgates: Windows SDK mit `makeappx.exe` installieren; anschließend den
+   zentralen `_STORE/msstore_build_msix.ps1`-Staging-/Buildpfad tatsächlich
+   ausführen und erst danach MSIX, WACK und Partner Center attestieren.

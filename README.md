@@ -5,7 +5,7 @@
 > Unofficial Windows tray & CLI utility that keeps the OpenAI Codex desktop app healthy — repairs failed starts, removes hung leftovers, and safely maintains the local SQLite log database. Fully offline, no telemetry.
 
 [![CareCenter tests](https://github.com/dev-bricks/CareCenter-for-Codex/actions/workflows/tests.yml/badge.svg)](https://github.com/dev-bricks/CareCenter-for-Codex/actions/workflows/tests.yml)
-[![Pytest Status](https://img.shields.io/badge/Tests-367%20passed-brightgreen.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
+[![Pytest Status](https://img.shields.io/badge/Tests-371%20passed-brightgreen.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
 [![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
@@ -212,6 +212,7 @@ The project includes Windows Store groundwork:
 - `SUPPORT.md`
 - `docs/privacy.md`
 - `docs/support.md`
+- `AppxManifest.xml` with four canonical package-logo sources in `store_assets/`
 
 Public Store pages:
 
@@ -234,6 +235,11 @@ maintenance, or normal CLI runtime and is not telemetry. Without `--exe-path`,
 the check tries to discover the built EXE automatically from `build_exe.bat`
 (`DIST_DIR`). With `--exe-path`, you can pass either the exact `.exe` file or
 just the build directory.
+
+The local preflight parses `AppxManifest.xml`, compares its package identity,
+publisher, version, executable, and display name with `store_package.json`, and
+maps its staged `icons/` references to the central builder's `store_assets/`
+sources. It fails if a source logo is missing or escapes that source directory.
 
 The Store privacy/support URLs are prepared for GitHub Pages. `store-materials` also runs a temporary static Pages build and verifies `privacy/index.html`, `support/index.html`, `index.html`, and the build marker. You can still build the artifact explicitly with:
 

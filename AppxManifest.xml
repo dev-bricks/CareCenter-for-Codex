@@ -3,7 +3,8 @@
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
-  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10">
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  IgnorableNamespaces="uap rescap desktop">
   <Identity
     Name="LukasGeiger.CareCenterForCodex"
     Publisher="CN=52596601-BAB4-4F3F-B182-E8F3F273B202"
@@ -12,7 +13,7 @@
   <Properties>
     <DisplayName>CareCenter for Codex</DisplayName>
     <PublisherDisplayName>Lukas Geiger</PublisherDisplayName>
-    <Logo>assets\Square150x150Logo.png</Logo>
+    <Logo>icons\Square150x150Logo.png</Logo>
     <Description>Lokales Windows-Tray- und CLI-Werkzeug zur Offline-Reparatur und Wartung der Codex-Desktop-App.</Description>
   </Properties>
   <Resources>
@@ -36,9 +37,12 @@
       <uap:VisualElements
         DisplayName="CareCenter for Codex"
         Description="Lokales Windows-Tray- und CLI-Werkzeug zur Offline-Reparatur und Wartung der Codex-Desktop-App."
-        Square150x150Logo="assets\Square150x150Logo.png"
-        Square44x44Logo="assets\Square44x44Logo.png"
+        Square150x150Logo="icons\Square150x150Logo.png"
+        Square44x44Logo="icons\Square44x44Logo.png"
         BackgroundColor="transparent">
+        <uap:DefaultTile
+          Wide310x150Logo="icons\Wide310x150Logo.png"
+          Square310x310Logo="icons\Square310x310Logo.png" />
       </uap:VisualElements>
     </Application>
   </Applications>
