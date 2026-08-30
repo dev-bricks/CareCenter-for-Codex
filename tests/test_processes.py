@@ -163,6 +163,49 @@ def test_find_companion_orphans_filters_correctly() -> None:
     assert result[0].pid == 1
 
 
+def test_runtime_orphan_finder_requires_dead_parent_and_minimum_age() -> None:
+    now = datetime.fromisoformat("2026-08-30T03:00:00")
+    parent = ProcessInfo(
+        19848,
+        "codex.exe",
+        created_at="2026-08-29T01:00:00",
+    )
+    old_language_server = ProcessInfo(
+        82001,
+        "language_server_windows_x64.exe",
+        command_line="language_server_windows_x64.exe --stdio",
+        parent_pid=19848,
+        created_at="2026-08-29T02:00:00",
+    )
+    young_language_server = ProcessInfo(
+        82002,
+        "language_server_windows_x64.exe",
+        command_line="language_server_windows_x64.exe --stdio",
+        parent_pid=19848,
+        created_at="2026-08-30T02:45:00",
+    )
+
+    live_parent = find_companion_orphans(
+        provider=lambda: [parent, old_language_server],
+        min_age_seconds=1800,
+        now=now,
+    )
+    dead_parent = find_companion_orphans(
+        provider=lambda: [old_language_server],
+        min_age_seconds=1800,
+        now=now,
+    )
+    too_young = find_companion_orphans(
+        provider=lambda: [young_language_server],
+        min_age_seconds=1800,
+        now=now,
+    )
+
+    assert live_parent == []
+    assert [process.pid for process in dead_parent] == [82001]
+    assert too_young == []
+
+
 def _desktop_runtime_generations() -> list[ProcessInfo]:
     store_root = (
         r"C:\Program Files\WindowsApps\OpenAI.Codex_26.707.3563.0_x64__2p2nqsd0c76g0"
@@ -314,6 +357,29 @@ def test_runtime_mcp_reaper_skips_everything_while_companion_turn_is_active() ->
                 r'node "C:\Users\dev\.claude\plugins\cache\openai-codex\codex\1.0.4'
                 r'\scripts\codex-companion.mjs" task --write --effort high "..."'
             ),
+            created_at="2026-08-16T10:07:00",
+        ),
+    ]
+
+    result = find_runtime_mcp_duplicate_roots(
+        provider=lambda: processes,
+        now=datetime.fromisoformat("2026-07-16T09:20:30"),
+        min_age_seconds=300,
+        minimum_matching_mcp_roots=2,
+    )
+
+    assert result == []
+
+
+def test_runtime_mcp_reaper_skips_everything_while_codex_exec_is_active() -> None:
+    """Der verallgemeinerte externe Task-Schutz gilt auch ohne Companion-Marker."""
+    processes = _desktop_runtime_generations() + [
+        ProcessInfo(
+            998,
+            "codex.exe",
+            r"C:\Users\dev\AppData\Roaming\npm\node_modules\@openai\codex\codex.exe",
+            "codex.exe exec --sandbox workspace-write -",
+            parent_pid=0,
             created_at="2026-08-16T10:07:00",
         ),
     ]

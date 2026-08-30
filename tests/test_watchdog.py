@@ -6,12 +6,17 @@ keine echten Prozessabfragen und es wird nie etwas wirklich beendet.
 
 from __future__ import annotations
 
+import logging
+import os
 import types
+from datetime import datetime, timedelta
+from pathlib import Path
 
 from codex_logdatenbank_wartung.config import MaintenanceConfig
 from codex_logdatenbank_wartung.health import RepairResult
 from codex_logdatenbank_wartung.watchdog import (
     reap_runtime_mcp_duplicates,
+    reap_runtime_orphans,
     run_watchdog_tick,
 )
 
@@ -626,3 +631,231 @@ def test_runtime_mcp_reaper_never_kills_fully_qualified_cohort_during_companion_
 
     assert reaped == 0
     assert killed_pids == []
+
+
+# ---------------------------------------------------------------------------
+# Runtime-Orphan-Reaper: T-20260829-890385764
+# ---------------------------------------------------------------------------
+
+
+def test_runtime_orphan_reaper_spares_live_detached_codex_exec(tmp_path: Path) -> None:
+    """Fall b: CPU-, Rollout- oder Output-Lebenszeichen schützen ``codex exec``."""
+    from codex_logdatenbank_wartung.processes import ProcessInfo
+
+    now = datetime.now()
+    executable = (
+        r"C:\Users\Example\AppData\Roaming\npm\node_modules\@openai\codex"
+        r"\node_modules\@openai\codex-win32-x64\vendor\codex.exe"
+    )
+    killed_pids: list[int] = []
+
+    def run_case(
+        case_name: str,
+        pid: int,
+        *,
+        later_cpu_ticks: int,
+        fresh_session: bool,
+        output_exists: bool,
+        include_output_flag: bool = True,
+        session_age_seconds: int = 0,
+        configured_freshness_seconds: int = 120,
+    ) -> None:
+        case_dir = tmp_path / case_name
+        output_path = case_dir / "last-message.txt"
+        if output_exists:
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text("done\n", encoding="utf-8")
+        if fresh_session:
+            session = case_dir / "sessions" / "2026" / "08" / "30" / "rollout.jsonl"
+            session.parent.mkdir(parents=True, exist_ok=True)
+            session.write_text('{"type":"event_msg"}\n', encoding="utf-8")
+            session_mtime = now.timestamp() - session_age_seconds
+            os.utime(session, (session_mtime, session_mtime))
+
+        command_line = f'"{executable}" exec -'
+        if include_output_flag:
+            command_line = (
+                f'"{executable}" exec --output-last-message "{output_path}" -'
+            )
+        before = ProcessInfo(
+            pid,
+            "codex.exe",
+            executable,
+            command_line,
+            parent_pid=19848,
+            created_at=(now - timedelta(minutes=31)).isoformat(),
+            cpu_ticks=100,
+        )
+        after = ProcessInfo(
+            pid,
+            "codex.exe",
+            executable,
+            command_line,
+            parent_pid=19848,
+            created_at=before.created_at,
+            cpu_ticks=later_cpu_ticks,
+        )
+        snapshots = iter([[before], [after]])
+
+        reaped = reap_runtime_orphans(
+            make_config(
+                database_path=str(case_dir / "logs_2.sqlite"),
+                companion_orphan_min_age_seconds=1800,
+                companion_orphan_activity_sample_seconds=5.0,
+                companion_orphan_session_fresh_seconds=configured_freshness_seconds,
+            ),
+            provider=lambda: next(snapshots),
+            killer=lambda killed_pid: (not killed_pids.append(killed_pid), "ok"),
+            sleeper=lambda _seconds: None,
+            now=now,
+        )
+
+        assert reaped == 0
+        assert list(snapshots) == []  # zwei echte Messpunkte wurden verbraucht
+
+    run_case(
+        "cpu-active",
+        81001,
+        later_cpu_ticks=125,
+        fresh_session=False,
+        output_exists=True,
+    )
+    run_case(
+        "io-wait-fresh-session",
+        81002,
+        later_cpu_ticks=100,
+        fresh_session=True,
+        output_exists=True,
+        session_age_seconds=60,
+        configured_freshness_seconds=1,
+    )
+    run_case(
+        "io-wait-output-pending",
+        81003,
+        later_cpu_ticks=100,
+        fresh_session=False,
+        output_exists=False,
+    )
+    run_case(
+        "io-wait-no-output-contract",
+        81004,
+        later_cpu_ticks=100,
+        fresh_session=False,
+        output_exists=False,
+        include_output_flag=False,
+    )
+
+    # Ende-zu-Ende: Der Tick darf den gecachten Start-Snapshot nicht als
+    # CPU-Zweitmessung recyceln, sonst würde er diesen aktiven Lauf beenden.
+    tick_dir = tmp_path / "watchdog-tick"
+    tick_dir.mkdir()
+    output_path = tick_dir / "last-message.txt"
+    output_path.write_text("old\n", encoding="utf-8")
+    command_line = f'codex.exe exec --output-last-message "{output_path}" -'
+    before = ProcessInfo(
+        81101,
+        "codex.exe",
+        command_line=command_line,
+        parent_pid=19848,
+        created_at=(now - timedelta(minutes=31)).isoformat(),
+        cpu_ticks=100,
+    )
+    after = ProcessInfo(
+        81101,
+        "codex.exe",
+        command_line=command_line,
+        parent_pid=19848,
+        created_at=before.created_at,
+        cpu_ticks=125,
+    )
+    snapshots = iter([[before], [after]])
+    killed_pids: list[int] = []
+
+    result = run_watchdog_tick(
+        make_config(
+            database_path=str(tick_dir / "logs_2.sqlite"),
+            reap_runtime_mcp_duplicates=False,
+        ),
+        provider=lambda: next(snapshots),
+        killer=lambda pid: (not killed_pids.append(pid), "ok"),
+        diagnose_fn=diagnose_returning(_Report()),
+    )
+
+    assert result.action == "idle"
+    assert result.companion_orphans_reaped == 0
+    assert list(snapshots) == []
+    assert killed_pids == []
+
+
+def test_runtime_orphan_reaper_kills_idle_dead_parent_language_server_and_logs(
+    tmp_path: Path,
+    caplog,
+) -> None:
+    """Fall a: Alter, inaktiver language_server-Waise bleibt reap-fähig und auditierbar."""
+    from codex_logdatenbank_wartung.processes import ProcessInfo
+
+    now = datetime.now()
+    executable = r"C:\Tools\Codex\language_server_windows_x64.exe"
+    command_line = f'"{executable}" --stdio'
+    orphan = ProcessInfo(
+        82001,
+        "language_server_windows_x64.exe",
+        executable,
+        command_line,
+        parent_pid=19848,
+        created_at=(now - timedelta(days=8)).isoformat(),
+        cpu_ticks=700,
+    )
+    snapshots = iter([[orphan], [orphan]])
+    killed_pids: list[int] = []
+    caplog.set_level(logging.WARNING, logger="CareCenterForCodex.watchdog")
+
+    reaped = reap_runtime_orphans(
+        make_config(
+            database_path=str(tmp_path / "logs_2.sqlite"),
+            companion_orphan_min_age_seconds=1800,
+            companion_orphan_activity_sample_seconds=5.0,
+            companion_orphan_session_fresh_seconds=120,
+        ),
+        provider=lambda: next(snapshots),
+        killer=lambda pid: (not killed_pids.append(pid), "ok"),
+        sleeper=lambda _seconds: None,
+        now=now,
+    )
+
+    assert reaped == 1
+    assert killed_pids == [82001]
+    assert list(snapshots) == []
+    assert "pid=82001" in caplog.text
+    assert "language_server_windows_x64.exe" in caplog.text
+    assert (
+        "criterion=kind=language_server,parent=dead,age>=1800s,cpu=idle"
+        in caplog.text
+    )
+
+    # Auch eine bestehende Legacy-Config mit 300 Sekunden darf die neue feste
+    # 30-Minuten-Karenz nicht unterschreiten.
+    young_orphan = ProcessInfo(
+        82002,
+        "language_server_windows_x64.exe",
+        executable,
+        command_line,
+        parent_pid=19848,
+        created_at=(now - timedelta(minutes=20)).isoformat(),
+        cpu_ticks=700,
+    )
+    young_snapshots = iter([[young_orphan], [young_orphan]])
+    not_reaped = reap_runtime_orphans(
+        make_config(
+            database_path=str(tmp_path / "logs_2.sqlite"),
+            companion_orphan_min_age_seconds=300,
+        ),
+        provider=lambda: next(young_snapshots),
+        killer=lambda pid: (not killed_pids.append(pid), "ok"),
+        sleeper=lambda _seconds: None,
+        now=now,
+    )
+
+    assert not_reaped == 0
+    assert killed_pids == [82001]
+    assert list(young_snapshots) == [[young_orphan]]  # keine CPU-Probe vor 30 Minuten

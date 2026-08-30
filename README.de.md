@@ -5,7 +5,7 @@
 > Inoffizielles lokales Windows-Tray- und CLI-Werkzeug, das die OpenAI-Codex-Desktop-App gesund hält — repariert fehlgeschlagene Starts, entfernt hängende Reste und wartet die SQLite-Logdatenbank sicher. Vollständig offline, keine Telemetrie.
 
 [![CareCenter tests](https://github.com/dev-bricks/CareCenter-for-Codex/actions/workflows/tests.yml/badge.svg)](https://github.com/dev-bricks/CareCenter-for-Codex/actions/workflows/tests.yml)
-[![Pytest-Status](https://img.shields.io/badge/Tests-371%20bestanden-brightgreen.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
+[![Pytest-Status](https://img.shields.io/badge/Tests-376%20bestanden-brightgreen.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
 [![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://www.python.org/)
 [![Lizenz](https://img.shields.io/badge/Lizenz-MIT-yellow.svg)](LICENSE)
 [![Plattform](https://img.shields.io/badge/Plattform-Windows-lightgrey.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
@@ -43,7 +43,7 @@ graph TD
 
 ## Funktionen
 
-- Hintergrund-Wächter: prüft alle 60 Sekunden auf alte Startblocker und doppelte Runtime-MCP-Prozessgenerationen. Die Runtime-Bereinigung arbeitet fail-closed: Sie erfasst nur inaktive Launcher-Bäume, die unter demselben Store-Desktop-App-Server wiederholt wurden, behält immer den neuesten Start-Cohort und berührt weder den App-Server selbst noch die node-basierte Codex-CLI.
+- Hintergrund-Wächter: prüft alle 60 Sekunden auf alte Startblocker, abgelöste Runtime-Waisen und doppelte Runtime-MCP-Prozessgenerationen. Die Waisenbereinigung verlangt einen toten Parent, eine feste Karenzzeit von 30 Minuten und zwei CPU-Messpunkte. Abgelöste `codex exec`-Läufe bleiben geschützt, solange CPU-Zeit wächst, ein Session-Rollout jünger als zwei Minuten ist oder ihr `--output-last-message`-Ziel noch fehlt; inaktive `language_server*`-Waisen bleiben bereinigungsfähig. Jeder erfolgreiche Waisen-Kill schreibt PID, Commandline und Kriterium in `app.log`. Die Runtime-MCP-Bereinigung erfasst weiterhin nur inaktive Launcher-Bäume unter demselben Store-Desktop-App-Server und behält immer den neuesten Start-Cohort.
 - Spracheinstellung im Tray: Im Bereich Einstellungen kann zwischen Deutsch und Englisch gewechselt werden. Die Auswahl wird in `config.json` gespeichert und die sichtbare Tray-Oberfläche wird sofort neu beschriftet.
 - Automatisierungssteuerung im Tray: alle aktuell aktiven Codex-Automatisierungen ausschalten, nur von CCC ausgeschaltete Automatisierungen wieder aktivieren oder Automatisierungen sofort beziehungsweise gestaffelt nacheinander einschalten. Der Abstand ist über `automation_stagger_delay_seconds` konfigurierbar (Standard: 60 Sekunden).
 - Thread-Postfachpflege: alle als gelesen markieren, ungelesene Threads älter als X Tage markieren und Threads nach einem getrennt einstellbaren Alter automatisch archivieren. Der Empty-Thread-Autofix wartet mindestens 300 Sekunden, damit neue CLI-/Desktop-Threads ihren ersten Schreibvorgang abschließen können. Änderungen werden bei Desktop- oder npm-Codex-CLI-Aktivität blockiert, unmittelbar vor Backup/Move erneut geprüft und nur mit Backups, atomarem State-Schreiben und transaktionaler Archivierung ausgeführt.
@@ -162,6 +162,13 @@ aktiv. Ihre konservativen Vorgaben sind ein konfigurierbares Mindestalter von 36
 wiederholte MCP-Signaturen und eine Sekunde CPU-Aktivitätsmessung. Alle Schwellen
 lassen sich in `config.json` anpassen.
 
+Die Runtime-Waisenbereinigung behält aus Kompatibilitätsgründen das Präfix
+`reap_companion_orphans`. Für `companion_orphan_min_age_seconds` gilt eine feste
+Sicherheitsuntergrenze von 1800 Sekunden; die CPU-Messung dauert standardmäßig
+5 Sekunden und das Frischefenster für Session-Rollouts 120 Sekunden. Der Abstand
+zwischen den beiden CPU-Messpunkten lässt sich nicht unter 2 Sekunden und das
+Rollout-Fenster nicht unter 120 Sekunden absenken.
+
 `audit_empty_thread_min_age_seconds` steht standardmäßig auf 300 Sekunden.
 Kleinere Werte werden auf diese konservative Initialisierungskarenz angehoben;
 größere Werte verlängern sie.
@@ -177,7 +184,8 @@ größere Werte verlängern sie.
 - Der Safe-Abbruch stoppt nur das Warten vor dem Schließen von Codex; laufende Datenbankoperationen werden nicht hart unterbrochen.
 - Der Wächter beendet inaktive Ghosts ohne Renderer nur nach der konfigurierten Altersschwelle.
 - Die Runtime-MCP-Bereinigung behält immer den neuesten Start-Cohort und überspringt Kandidaten, deren CPU-Zähler noch steigen.
-- Der Codex-Desktop-App-Server, fremde Kindprozesse, die Codex-CLI und aktive Desktop-Arbeit sind von Prozessbeendigungen ausdrücklich ausgeschlossen. Der breite read-only Detektor behandelt Desktop- und npm-CLI-Aktivität dennoch als Blocker für Thread-Store-Mutationen.
+- Die Runtime-Waisenbereinigung verlangt einen toten Parent sowie Alters- und CPU-Leerlaufbelege. Ein abgelöster `codex exec` bleibt zusätzlich ausgeschlossen, solange ein CPU-, Rollout- oder ausstehendes Output-Lebenszeichen vorliegt; ohne `--output-last-message`-Vertrag wird er fail-closed ausgeschlossen. Inaktive `language_server*`-Prozesse mit totem Parent bleiben Bereinigungsziele.
+- Der Codex-Desktop-App-Server, fremde Kindprozesse, aktive Codex-CLI-Arbeit und aktive Desktop-Arbeit sind von Prozessbeendigungen ausgeschlossen. Der breite read-only Detektor behandelt Desktop- und npm-CLI-Aktivität dennoch als Blocker für Thread-Store-Mutationen.
 - Destruktive Pfade wie Store-Reset, Admin-Reparatur, Neuinstallation und Reboot sind Vorschläge oder ausdrückliche Nutzeraktionen, keine automatischen Überraschungen.
 
 ## Windows-Store-Materialien

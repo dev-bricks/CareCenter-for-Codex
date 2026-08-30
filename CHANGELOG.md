@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+- Fix (2026-08-30): Generalized the existing Companion task/orphan guards instead
+  of adding a parallel reaper. Runtime-orphan candidates now require a dead or
+  PID-reused parent, a hard 30-minute age floor, and two CPU snapshots at least
+  two seconds apart. Detached `codex exec` additionally remains protected by CPU
+  growth, a session rollout inside a hard 120-second freshness floor, or a missing
+  `--output-last-message` target; runs without that option are excluded fail-closed.
+  Inactive dead-parent `language_server*`
+  processes remain eligible. Each successful orphan kill emits PID, command
+  line, and criterion through the existing rotating app logger. Windows Job
+  Objects were not used because CareCenter does not create or own these already
+  detached processes and cannot retroactively recover their intended lifetime.
+- Verification (2026-08-30): 377 collected, 376 passed, 1 skipped; Ruff,
+  compileall, diff-check, and focused runtime-orphan tests passed. The CareCenter
+  service remained stopped; all process acceptance checks used injected dummy
+  snapshots and killers.
 - Windows Store (2026-08-28): Added the four canonical `store_assets/` package
   logos consumed by the central MSIX builder. The generated manifest uses the
   corresponding staged `icons/` paths and declares `uap`, `rescap`, and

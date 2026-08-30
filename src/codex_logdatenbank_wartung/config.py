@@ -11,6 +11,9 @@ from typing import Any
 DEFAULT_DATA_DIR_NAME = "CareCenterForCodex"
 LEGACY_LOCAL_ROOT = Path(r"C:\_Local_DEV\codex-maintenance")
 DEFAULT_RUNTIME_MCP_DUPLICATE_MIN_AGE_SECONDS = 60 * 60
+DEFAULT_RUNTIME_ORPHAN_MIN_AGE_SECONDS = 30 * 60
+DEFAULT_RUNTIME_ORPHAN_ACTIVITY_SAMPLE_SECONDS = 5.0
+DEFAULT_RUNTIME_ORPHAN_SESSION_FRESH_SECONDS = 2 * 60
 # Fünf Minuten überdecken mehrere 60-Sekunden-Watcher-Takte und geben einem
 # frisch angelegten CLI-/Desktop-Thread Zeit für den ersten Token-/Prompt-Write.
 # Konfiguration darf die Karenz verlängern, aber niemals darunter absenken.
@@ -133,11 +136,17 @@ class MaintenanceConfig:
     # state_5.sqlite Backup: bei jeder Wartung mitsichern (Automations-Schutz).
     # KEIN VACUUM auf state_5 -- Korruption dort wedgt den Start (#21750).
     backup_state_db: bool = True
-    # Companion-Orphan-Reaper: bereinigt verwaiste app-server-Prozesse die vom
-    # codex-companion.mjs (Claude-Code-Plugin codex-plugin-cc) zurueckbleiben (#277).
-    # Laeuft unabhaengig vom Desktop-Zustand bei jedem Watchdog-Tick.
+    # Runtime-Orphan-Reaper (historischer Config-Name bleibt kompatibel): bereinigt
+    # verwaiste Companion-app-server und language_server, schuetzt aber abgeloeste
+    # codex-exec-Hauptprozesse mit Lebenszeichen. Laeuft bei jedem Watchdog-Tick.
     reap_companion_orphans: bool = True
-    companion_orphan_min_age_seconds: int = 300  # 5 Minuten Karenzzeit nach Task-Ende
+    companion_orphan_min_age_seconds: int = DEFAULT_RUNTIME_ORPHAN_MIN_AGE_SECONDS
+    companion_orphan_activity_sample_seconds: float = (
+        DEFAULT_RUNTIME_ORPHAN_ACTIVITY_SAMPLE_SECONDS
+    )
+    companion_orphan_session_fresh_seconds: int = (
+        DEFAULT_RUNTIME_ORPHAN_SESSION_FRESH_SECONDS
+    )
     # Runtime-MCP-Reaper: Codex Desktop kann bei wiederholter Runtime-Initialisierung
     # vollstaendige MCP-Prozessgruppen unter demselben App-Server ansammeln. Nur alte,
     # exakt im neuesten Start-Cohort wiederholte Launcher werden als Baum entfernt.

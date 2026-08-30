@@ -5,7 +5,7 @@
 > Unofficial Windows tray & CLI utility that keeps the OpenAI Codex desktop app healthy — repairs failed starts, removes hung leftovers, and safely maintains the local SQLite log database. Fully offline, no telemetry.
 
 [![CareCenter tests](https://github.com/dev-bricks/CareCenter-for-Codex/actions/workflows/tests.yml/badge.svg)](https://github.com/dev-bricks/CareCenter-for-Codex/actions/workflows/tests.yml)
-[![Pytest Status](https://img.shields.io/badge/Tests-371%20passed-brightgreen.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
+[![Pytest Status](https://img.shields.io/badge/Tests-376%20passed-brightgreen.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
 [![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
@@ -43,7 +43,7 @@ graph TD
 
 ## Features
 
-- Background watcher: checks every 60 seconds for old start blockers and duplicate runtime MCP process generations. Runtime cleanup is fail-closed: it only targets idle launcher trees repeated under the same Store desktop app-server, always keeps the newest launch cohort, and never touches the app-server itself or the node-based Codex CLI.
+- Background watcher: checks every 60 seconds for old start blockers, detached runtime orphans, and duplicate runtime MCP process generations. Runtime-orphan cleanup requires a dead parent, a hard 30-minute grace period, and two CPU snapshots. Detached `codex exec` runs remain protected while CPU advances, a session rollout is newer than two minutes, or their `--output-last-message` target is still missing; inactive `language_server*` orphans remain eligible. Every successful orphan kill records PID, command line, and criterion in `app.log`. Runtime MCP cleanup still targets only idle launcher trees repeated under the same Store desktop app-server and always keeps the newest launch cohort.
 - Tray settings with language switching: choose English or German in the Settings area. The choice is saved in `config.json` and the visible tray UI is relabeled immediately.
 - Tray automation controls: pause all currently active Codex automations, restore only automations disabled by CCC, or turn automations back on immediately or gradually. The spacing is configurable via `automation_stagger_delay_seconds` (default: 60 seconds).
 - Thread inbox hygiene: mark every result as read, mark only unread threads older than a configurable number of days, and automatically archive threads older than a separate configurable age. Empty-thread auto-fix waits at least 300 seconds so new CLI/Desktop threads can finish their first write. Current Codex thread ages and archive flags come from `state_5.sqlite`; unread IDs come from `.codex-global-state.json`. Changes are blocked by either Desktop or npm Codex CLI activity, rechecked immediately before backup/move, and use database/state backups, atomic JSON writes, and transactional archive updates.
@@ -177,6 +177,12 @@ every candidate root, a 90-second launch-cohort
 gap, a 30-second launcher window, at least two distinct repeated MCP signatures,
 and a 1-second CPU activity sample. Each threshold can be overridden in `config.json`.
 
+Runtime-orphan cleanup keeps the compatible `reap_companion_orphans` configuration
+prefix. `companion_orphan_min_age_seconds` has a hard 1800-second safety floor;
+the default CPU sample is 5 seconds and the session-rollout freshness window is
+120 seconds. Configured CPU windows cannot reduce the two-snapshot interval below
+2 seconds, and the rollout window cannot be shortened below 120 seconds.
+
 `audit_empty_thread_min_age_seconds` defaults to 300 seconds. Values below 300
 are clamped to that conservative initialization grace; larger values extend it.
 
@@ -199,7 +205,8 @@ When set, `config.json`, `logs\`, and `backups\` are placed under that path inst
 - Safe cancellation stops only the waiting phase before Codex is closed; active database operations are not force-interrupted.
 - The watcher kills inactive ghosts without a renderer only after the configured age threshold.
 - Duplicate runtime MCP cleanup always keeps the newest launch cohort and skips candidate trees whose CPU counters still advance.
-- The Codex desktop app-server, unrelated child processes, the Codex CLI, and active desktop work are explicitly excluded from process termination. The broad read-only detector still treats Desktop and npm CLI activity as a blocker for thread-store mutation.
+- Runtime-orphan cleanup requires a dead parent plus age and CPU-idle evidence. A detached `codex exec` is additionally excluded while any CPU, recent rollout, or pending-output signal remains; a run without an `--output-last-message` contract is excluded fail-closed. Idle dead-parent `language_server*` processes remain cleanup targets.
+- The Codex desktop app-server, unrelated child processes, active Codex CLI work, and active desktop work are excluded from process termination. The broad read-only detector still treats Desktop and npm CLI activity as a blocker for thread-store mutation.
 - Destructive paths such as Store reset, admin repair, reinstall, and reboot are suggestions or explicit user actions, not automatic surprises.
 
 ## Windows Store Materials

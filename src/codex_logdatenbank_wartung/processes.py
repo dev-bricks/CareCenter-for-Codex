@@ -9,7 +9,7 @@ import subprocess
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, Literal
 
 from .config import (
     DEFAULT_RUNTIME_MCP_DUPLICATE_MIN_AGE_SECONDS,
@@ -235,6 +235,72 @@ _EMBEDDED_CODEX_MARKER = r"\appdata\local\openai\codex\bin"
 
 # Companion-Turn-Marker (Claude-Code-Plugin codex-plugin-cc, codex-companion.mjs).
 _COMPANION_TASK_MARKER = "codex-companion.mjs"
+_CODEX_EXEC_PATTERN = re.compile(r"(?:^|\s)exec(?:\s|$)", re.IGNORECASE)
+_LANGUAGE_SERVER_NAME_PATTERN = re.compile(
+    r"^language_server(?:[._-]|$)", re.IGNORECASE
+)
+RuntimeOrphanKind = Literal["companion_app_server", "language_server", "codex_exec"]
+
+
+def _is_companion_app_server(process: ProcessInfo) -> bool:
+    cmd = process.command_line.lower()
+    exe = (process.executable or "").lower()
+    full = f"{exe} {cmd}"
+
+    if "app-server" not in cmd or "--analytics-default-enabled" in cmd:
+        return False
+
+    is_npm = _NPM_CODEX_MARKER.lower() in full
+    is_embedded = _EMBEDDED_CODEX_MARKER.lower() in full and "--listen stdio://" in cmd
+    return is_npm or is_embedded
+
+
+def runtime_orphan_kind(process: ProcessInfo) -> RuntimeOrphanKind | None:
+    """Klassifiziere nur die eng definierten Runtime-Waisen-Zieltypen."""
+    if _is_companion_app_server(process):
+        return "companion_app_server"
+    if _LANGUAGE_SERVER_NAME_PATTERN.match(process.name):
+        return "language_server"
+    if process.name.lower() == "codex.exe" and _CODEX_EXEC_PATTERN.search(
+        process.command_line
+    ):
+        return "codex_exec"
+    return None
+
+
+def _old_enough(
+    process: ProcessInfo,
+    *,
+    min_age_seconds: int,
+    now: datetime | None = None,
+) -> bool:
+    if min_age_seconds <= 0:
+        return True
+    created = _created_datetime(process)
+    if created is None:
+        return False
+    current = now or datetime.now()
+    if current.tzinfo is not None:
+        current = current.astimezone().replace(tzinfo=None)
+    return (current - created).total_seconds() >= min_age_seconds
+
+
+def _parent_is_dead(
+    process: ProcessInfo,
+    processes_by_pid: dict[int, ProcessInfo],
+) -> bool:
+    """Behandle fehlende oder nach dem Kind neu belegte Parent-PIDs als tot."""
+    if process.parent_pid <= 0:
+        return True
+    parent = processes_by_pid.get(process.parent_pid)
+    if parent is None:
+        return True
+
+    child_created = _created_datetime(process)
+    parent_created = _created_datetime(parent)
+    if child_created is not None and parent_created is not None:
+        return parent_created > child_created
+    return False
 
 
 def is_companion_orphan(process: ProcessInfo, *, min_age_seconds: int = 300) -> bool:
@@ -246,46 +312,33 @@ def is_companion_orphan(process: ProcessInfo, *, min_age_seconds: int = 300) -> 
     2. embedded: Pfad enthaelt AppData/Local/OpenAI/Codex/bin/, CommandLine enthaelt
        'app-server --listen stdio://'.
     """
-    cmd = process.command_line.lower()
-    exe = (process.executable or "").lower()
-    full = f"{exe} {cmd}"
-
-    if "app-server" not in cmd:
+    if not _is_companion_app_server(process):
         return False
-    if "--analytics-default-enabled" in cmd:
-        return False
-
-    is_npm = _NPM_CODEX_MARKER.lower() in full
-    is_embedded = _EMBEDDED_CODEX_MARKER.lower() in full and "--listen stdio://" in cmd
-
-    if not (is_npm or is_embedded):
-        return False
-
-    if min_age_seconds > 0 and process.created_at:
-        from datetime import datetime
-
-        try:
-            created = datetime.fromisoformat(process.created_at)
-            age = (datetime.now() - created).total_seconds()
-            if age < min_age_seconds:
-                return False
-        except (ValueError, TypeError):
-            pass
-
-    return True
+    return _old_enough(process, min_age_seconds=min_age_seconds)
 
 
 def find_companion_orphans(
     provider: ProcessProvider | None = None,
     *,
     min_age_seconds: int = 300,
+    now: datetime | None = None,
 ) -> list[ProcessInfo]:
-    """Finde alle verwaisten Companion-app-server-Prozesse."""
+    """Finde alte Runtime-Waisen; Name bleibt fuer Config/API-Kompatibilitaet.
+
+    Ein fehlender Parent allein reicht nicht: Diese Funktion liefert nur eng
+    klassifizierte Zieltypen mit belegtem Parent-Tod und ausreichendem Alter.
+    Lebenszeichen werden anschliessend im Watchdog ueber zwei Snapshots und bei
+    ``codex exec`` zusaetzlich ueber Session-/Ausgabedateien bewertet.
+    """
     provider = provider or windows_processes
+    processes = provider()
+    processes_by_pid = {process.pid: process for process in processes}
     return [
-        p
-        for p in provider()
-        if is_companion_orphan(p, min_age_seconds=min_age_seconds)
+        process
+        for process in processes
+        if runtime_orphan_kind(process) is not None
+        and _old_enough(process, min_age_seconds=min_age_seconds, now=now)
+        and _parent_is_dead(process, processes_by_pid)
     ]
 
 
@@ -337,8 +390,8 @@ def _runtime_root_signature(process: ProcessInfo) -> str:
     return f"{process.name.lower()}|{executable}|{command}"
 
 
-def _companion_task_active(processes: Iterable[ProcessInfo]) -> bool:
-    """Erkennt einen laufenden Claude-Code-Companion-Turn (codex-companion.mjs).
+def _external_codex_task_active(processes: Iterable[ProcessInfo]) -> bool:
+    """Erkennt aktive externe Codex-Turns aus Companion und ``codex exec``.
 
     Ein Companion-Turn kann laenger laufen als der Abstand zwischen zwei Runtime-
     Generationen (``generation_gap_seconds``) und dabei weiter den MCP-Launcher-
@@ -353,12 +406,15 @@ def _companion_task_active(processes: Iterable[ProcessInfo]) -> bool:
     Messfenster wie ein Idle-Prozess aussehen kann. Es gibt keine verlaessliche
     Eltern-Kind-Beziehung zwischen dem Companion-Prozess und dem App-Server-Kind,
     ueber die sich der genutzte Cohort gezielt bestimmen liesse -- deshalb wird
-    bei JEDEM aktiven Companion-Turn systemweit konservativ pausiert, statt zu
-    raten, welcher Cohort betroffen ist. Der naechste Tick (Default alle 60 s)
-    holt eine echte Waise ohnehin nach, sobald kein Turn mehr laeuft.
+    bei JEDEM aktiven externen Turn systemweit konservativ pausiert, statt zu
+    raten, welcher Cohort betroffen ist. Das gilt auch fuer einen direkt
+    laufenden ``codex exec`` ohne Companion-Marker. Der naechste Tick (Default
+    alle 60 s) holt eine echte Waise ohnehin nach, sobald kein Turn mehr laeuft.
     """
     return any(
-        _COMPANION_TASK_MARKER in process.command_line.lower() for process in processes
+        _COMPANION_TASK_MARKER in process.command_line.lower()
+        or runtime_orphan_kind(process) == "codex_exec"
+        for process in processes
     )
 
 
@@ -379,15 +435,15 @@ def find_runtime_mcp_duplicate_roots(
     behandelt und gemeinsam geschuetzt. Entfernt werden nur Roots, deren exakte
     Prozesssignatur auch im neuesten Cohort vorkommt. Der neueste Cohort, fremde
     Kindprozesse, der Desktop-App-Server selbst und CLI-app-server sind tabu.
-    Laeuft irgendwo ein aktiver Companion-Turn (``codex-companion.mjs``), werden
-    GAR KEINE Duplikate gemeldet (siehe ``_companion_task_active``).
+    Laeuft irgendwo ein externer Companion- oder ``codex exec``-Turn, werden GAR
+    KEINE Duplikate gemeldet (siehe ``_external_codex_task_active``).
 
     Die Rueckgabe enthaelt nur direkte Launcher-Roots. Der Aufrufer beendet deren
     Baum mit ``taskkill /T``; Nachfahren werden deshalb nicht separat geliefert.
     """
     provider = provider or windows_processes
     processes = provider()
-    if _companion_task_active(processes):
+    if _external_codex_task_active(processes):
         return []
     current = now or datetime.now()
     if current.tzinfo is not None:

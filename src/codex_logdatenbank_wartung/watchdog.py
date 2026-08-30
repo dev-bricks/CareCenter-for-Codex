@@ -20,15 +20,22 @@ einem Worker-Thread + Benachrichtigung) liegt in `tray.py`.
 
 from __future__ import annotations
 
+import logging
+import re
 import subprocess
 import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field
+from datetime import datetime
+from pathlib import Path
 from typing import Literal
 
 from .config import (
     DEFAULT_RUNTIME_MCP_DUPLICATE_MIN_AGE_SECONDS,
+    DEFAULT_RUNTIME_ORPHAN_ACTIVITY_SAMPLE_SECONDS,
+    DEFAULT_RUNTIME_ORPHAN_MIN_AGE_SECONDS,
+    DEFAULT_RUNTIME_ORPHAN_SESSION_FRESH_SECONDS,
     MaintenanceConfig,
 )
 from .health import RepairResult, diagnose, repair_start
@@ -37,11 +44,22 @@ from .processes import (
     ProcessProvider,
     find_companion_orphans,
     find_runtime_mcp_duplicate_roots,
+    runtime_orphan_kind,
     tree_pids,
     windows_processes,
 )
 
 WatchdogAction = Literal["codex_active", "idle", "disabled", "busy", "failed", "reaped"]
+_LOGGER = logging.getLogger("CareCenterForCodex.watchdog")
+_OUTPUT_LAST_MESSAGE_PATTERN = re.compile(
+    r"--output-last-message(?:=|\s+)(?:\"([^\"]+)\"|'([^']+)'|(\S+))",
+    re.IGNORECASE,
+)
+_UNSET = object()
+
+
+def _no_sleep(_seconds: float) -> None:
+    return None
 
 
 @dataclass(slots=True)
@@ -61,37 +79,173 @@ class WatchdogTickResult:
         return asdict(self)
 
 
-def _reap_companion_orphans(
+def _output_last_message_path(process: ProcessInfo) -> Path | None:
+    match = _OUTPUT_LAST_MESSAGE_PATTERN.search(process.command_line)
+    if match is None:
+        return None
+    raw_path = next((group for group in match.groups() if group), "")
+    return Path(raw_path).expanduser() if raw_path else None
+
+
+def _has_recent_session_rollout(
+    config: MaintenanceConfig,
+    *,
+    freshness_seconds: int,
+    now: datetime,
+) -> bool | None:
+    """True = frisches Lebenszeichen, None = nicht sicher lesbar (fail-closed)."""
+    sessions_root = config.codex_home / "sessions"
+    try:
+        if not sessions_root.is_dir():
+            return False
+        cutoff = now.timestamp() - max(0, freshness_seconds)
+        for rollout in sessions_root.rglob("*.jsonl"):
+            if rollout.stat().st_mtime >= cutoff:
+                return True
+    except OSError:
+        return None
+    return False
+
+
+def _log_runtime_orphan_kill(process: ProcessInfo, criterion: str) -> None:
+    command_line = " ".join(process.command_line.splitlines())
+    _LOGGER.warning(
+        "orphan_kill pid=%d command_line=%r criterion=%s",
+        process.pid,
+        command_line,
+        criterion,
+    )
+
+
+def reap_runtime_orphans(
     config: MaintenanceConfig,
     *,
     execute: bool = True,
     provider: ProcessProvider | None = None,
+    activity_provider: ProcessProvider | None = None,
     killer: Callable[[int], tuple[bool, str]] | None = None,
+    sleeper: Callable[[float], None] | None = None,
+    now: datetime | None = None,
 ) -> int:
-    """Bereinigt verwaiste Companion-app-server-Prozesse (codex-plugin-cc #277).
+    """Bereinige nur alte, tote-Parent-Runtime-Prozesse ohne Lebenszeichen.
 
-    Laeuft unabhaengig vom Desktop-Zustand — Companion-Orphans koennen auch bei
-    aktivem Desktop existieren. Gibt die Anzahl erfolgreich beendeter Prozesse zurueck.
+    Die historische Companion-Erkennung ist hier verallgemeinert: Companion-
+    app-server und inaktive ``language_server*`` bleiben reap-faehig. Ein
+    abgeloester ``codex exec`` wird dagegen geschuetzt, sobald CPU-Zeit waechst,
+    ein frisches Session-Rollout existiert oder sein ``--output-last-message``-
+    Ziel noch fehlt. Jeder erfolgreiche Kill erzeugt eine strukturierte Zeile
+    im bereits vorhandenen App-Logger.
     """
     if not getattr(config, "reap_companion_orphans", True):
         return 0
 
-    min_age = getattr(config, "companion_orphan_min_age_seconds", 300)
-    orphans = find_companion_orphans(provider=provider, min_age_seconds=min_age)
-    if not orphans:
+    resolved_provider = provider or windows_processes
+    current = now or datetime.now()
+    min_age = max(
+        DEFAULT_RUNTIME_ORPHAN_MIN_AGE_SECONDS,
+        int(
+            getattr(
+                config,
+                "companion_orphan_min_age_seconds",
+                DEFAULT_RUNTIME_ORPHAN_MIN_AGE_SECONDS,
+            )
+        ),
+    )
+    initial = find_companion_orphans(
+        provider=resolved_provider,
+        min_age_seconds=min_age,
+        now=current,
+    )
+    if not initial:
         return 0
 
+    sample_seconds = max(
+        2.0,
+        float(
+            getattr(
+                config,
+                "companion_orphan_activity_sample_seconds",
+                DEFAULT_RUNTIME_ORPHAN_ACTIVITY_SAMPLE_SECONDS,
+            )
+        ),
+    )
+    resolved_sleeper = sleeper
+    if resolved_sleeper is None:
+        # Ein injizierter Killer ist ein hermetischer Testpfad. Er bekommt zwei
+        # Snapshots, aber keine reale Wartezeit, sofern kein Sleeper injiziert ist.
+        resolved_sleeper = time.sleep if killer is None else _no_sleep
+    resolved_sleeper(sample_seconds)
+
+    later = find_companion_orphans(
+        provider=activity_provider or resolved_provider,
+        min_age_seconds=min_age,
+        now=current,
+    )
+    later_by_pid = {process.pid: process for process in later}
+    freshness_seconds = max(
+        DEFAULT_RUNTIME_ORPHAN_SESSION_FRESH_SECONDS,
+        int(
+            getattr(
+                config,
+                "companion_orphan_session_fresh_seconds",
+                DEFAULT_RUNTIME_ORPHAN_SESSION_FRESH_SECONDS,
+            )
+        ),
+    )
+    recent_session: bool | None | object = _UNSET
+    killable: list[tuple[ProcessInfo, str]] = []
+
+    for orphan in initial:
+        later_process = later_by_pid.get(orphan.pid)
+        if later_process is None:
+            continue
+        if later_process.cpu_ticks > orphan.cpu_ticks:
+            continue
+
+        kind = runtime_orphan_kind(orphan)
+        if kind is None:
+            continue
+        criterion_parts = [
+            f"kind={kind}",
+            "parent=dead",
+            f"age>={min_age}s",
+            "cpu=idle",
+        ]
+
+        if kind == "codex_exec":
+            if recent_session is _UNSET:
+                recent_session = _has_recent_session_rollout(
+                    config,
+                    freshness_seconds=freshness_seconds,
+                    now=current,
+                )
+            if recent_session is not False:
+                continue
+
+            output_path = _output_last_message_path(orphan)
+            if output_path is None:
+                continue
+            try:
+                output_exists = output_path.exists()
+            except OSError:
+                continue
+            if not output_exists:
+                continue
+            criterion_parts.append("output_last_message=present")
+            criterion_parts.append("session_rollout=stale")
+
+        killable.append((orphan, ",".join(criterion_parts)))
+
     if not execute:
-        return len(orphans)
+        return len(killable)
 
     from .processes import no_window_kwargs
 
     reaped = 0
-    for orphan in orphans:
+    for orphan, criterion in killable:
+        ok = False
         if killer:
             ok, _ = killer(orphan.pid)
-            if ok:
-                reaped += 1
         else:
             try:
                 subprocess.run(
@@ -100,10 +254,29 @@ def _reap_companion_orphans(
                     capture_output=True,
                     **no_window_kwargs(),
                 )
-                reaped += 1
+                ok = True
             except (subprocess.CalledProcessError, OSError):
                 pass
+        if ok:
+            reaped += 1
+            _log_runtime_orphan_kill(orphan, criterion)
     return reaped
+
+
+def _reap_companion_orphans(
+    config: MaintenanceConfig,
+    *,
+    execute: bool = True,
+    provider: ProcessProvider | None = None,
+    killer: Callable[[int], tuple[bool, str]] | None = None,
+) -> int:
+    """Kompatibilitaets-Wrapper fuer den verallgemeinerten Runtime-Reaper."""
+    return reap_runtime_orphans(
+        config,
+        execute=execute,
+        provider=provider,
+        killer=killer,
+    )
 
 
 def reap_runtime_mcp_duplicates(
@@ -228,10 +401,11 @@ def _reap_runtime_residue(
             cache = (provider or windows_processes)()
         return cache
 
-    companion = _reap_companion_orphans(
+    companion = reap_runtime_orphans(
         config,
         execute=execute,
         provider=cached_provider,
+        activity_provider=provider or windows_processes,
         killer=killer,
     )
     runtime_mcp = reap_runtime_mcp_duplicates(
@@ -247,7 +421,7 @@ def _reap_runtime_residue(
 def _reap_message(companion: int, runtime_mcp: int) -> str:
     parts: list[str] = []
     if companion:
-        parts.append(f"{companion} Companion-Orphan(s) bereinigt")
+        parts.append(f"{companion} Runtime-Waise(n) bereinigt")
     if runtime_mcp:
         parts.append(f"{runtime_mcp} alte Runtime-MCP-Prozessbäume bereinigt")
     return (" " + "; ".join(parts) + ".") if parts else ""

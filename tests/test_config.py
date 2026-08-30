@@ -13,6 +13,14 @@ def test_runtime_mcp_reaper_default_safety_interval_is_one_hour() -> None:
     assert MaintenanceConfig().runtime_mcp_duplicate_min_age_seconds == 3600
 
 
+def test_runtime_orphan_reaper_defaults_cover_grace_and_liveness_windows() -> None:
+    config = MaintenanceConfig()
+
+    assert config.companion_orphan_min_age_seconds == 1800
+    assert config.companion_orphan_activity_sample_seconds == 5.0
+    assert config.companion_orphan_session_fresh_seconds == 120
+
+
 def test_load_returns_defaults_on_corrupt_json(tmp_path: Path) -> None:
     """Bug-Fix: beschaedigte Config (leere Datei, ungueltig JSON, non-dict) -> Defaults, kein Crash."""
     for bad_content in ("", "{bad json", "null", "[]", "42"):

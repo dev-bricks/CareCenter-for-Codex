@@ -12,12 +12,12 @@ kann die Logik getestet werden, ohne die Tray-App zu starten (der interne Python
 |---|---|
 | `config.py` | lokale Konfiguration, Standardpfade (aus `%LOCALAPPDATA%`/`%APPDATA%`/`~/.codex`), Schwellwerte |
 | `i18n.py` | leichtgewichtige DE-/EN-Lokalisierung und persistierte Sprachauswahl |
-| `processes.py` | Codex-Prozessprüfung über PowerShell/CIM; Klassifikation (`--type`), exaktes Exe-Matching, Prozessbaum und fail-closed Erkennung wiederholter Runtime-MCP-Launcher |
+| `processes.py` | Codex-Prozessprüfung über PowerShell/CIM; Klassifikation (`--type`), exaktes Exe-Matching, Prozessbaum, Parent-/Altersprüfung für Runtime-Waisen und fail-closed Erkennung wiederholter Runtime-MCP-Launcher |
 | `maintenance.py` | Backup + Retention, Integritätscheck, WAL-Checkpoint, `PRAGMA optimize`, `VACUUM`, Protokolle |
 | `health.py` | Startup-Diagnose (`diagnose`) und gezielte Reparatur (`repair_start`) — getrennt vom Wartungsblocker |
 | `orchestrator.py` | Autonome Wartung (`auto_maintain`): Aktivitätsmessung (CPU+DB des ganzen Baums), zwei Modi (safe/fast) |
 | `automation_control.py` | aktive Codex-Automatisierungen pausieren, CareCenter-eigene Pausen nachhalten und gezielt reaktivieren |
-| `watchdog.py` | Hintergrund-Wächter: reapt bei geschlossenem Codex idle Ghosts und bei aktivem Desktop sicher wiederholte, CPU-inaktive Runtime-MCP-Prozessbäume |
+| `watchdog.py` | Hintergrund-Wächter: reapt idle Ghosts, alte Runtime-Waisen ohne Lebenszeichen und sicher wiederholte, CPU-inaktive Runtime-MCP-Prozessbäume; erfolgreiche Waisen-Kills landen mit PID, Commandline und Kriterium im App-Log |
 | `start_repair.py` | Klassifikation der Start-Lage für die zusammengefasste „Codex reparieren"-Eskalation |
 | `repair_workflow.py` | Hang-sichere S1–S7-Eskalationsengine (rein, injizierbare Bausteine) |
 | `repair_live.py` | Echte Windows-/AppX-Implementierungen der Reparatur-Bausteine (P11 absent-Erkennung, Reinstall-Prävention) |
@@ -116,5 +116,6 @@ nicht in bereits laufende Datenbankoperationen ein.
 - Thread-Archivierung ist separat konfiguriert (`auto_archive_threads_days=0` bedeutet aus), wartet beim Empty-Thread-Autofix mindestens 300 Sekunden und sichert `state_5.sqlite` vor Änderungen. Ein breiter Prozess-Snapshot blockiert bei Desktop oder npm-Codex-CLI und wird unmittelbar vor Backup sowie Move erneut erhoben.
 - Startup-Reparatur beendet ausschließlich Zombie-Hauptprozesse (kein Renderer); aktive Sitzungen nie.
 - Runtime-MCP-Bereinigung gilt nur für direkte Launcher unter dem Store-Desktop-App-Server: der neueste Start-Cohort bleibt immer bestehen, mindestens zwei verschiedene Signaturen müssen exakt wiederholt sein, die Karenzzeit muss abgelaufen sein und der vollständige Kandidatenbaum darf im CPU-Sample nicht arbeiten.
+- Runtime-Waisen müssen einen toten oder nach dem Kind neu belegten Parent haben, mindestens 30 Minuten alt sein und in zwei Messpunkten CPU-inaktiv bleiben. Bei `codex exec` blockieren zusätzlich ein Session-Rollout jünger als 120 Sekunden, ein noch fehlendes `--output-last-message`-Ziel oder das vollständige Fehlen dieser Output-Option den Kill. Der systemweite externe Task-Schutz pausiert außerdem die Runtime-MCP-Bereinigung bei `codex-companion.mjs` oder laufendem `codex exec`.
 - npm-/CLI-app-server, der Desktop-App-Server selbst, fremde Kindprozesse und Kandidaten mit unvollständigen Zeitdaten werden fail-closed ausgeschlossen.
-- Kill-Targeting nur über den exakten konfigurierten Exe-Pfad plus Prozessbaum — keine Substring-Treffer.
+- Ghost-Targeting nutzt den exakten konfigurierten Exe-Pfad plus Prozessbaum. Runtime-Waisen nutzen stattdessen enge Typ-Signaturen: Companion-app-server, Prozessnamen mit Präfix `language_server` oder den exakten Prozessnamen `codex.exe` mit `exec`-Subcommand.
