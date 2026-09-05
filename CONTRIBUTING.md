@@ -2,9 +2,9 @@
 
 ## Deutsch
 
-Vielen Dank fuer Ihr Interesse, zu diesem Projekt beizutragen!
+Vielen Dank für Ihr Interesse, zu diesem Projekt beizutragen!
 
-### Wie Sie beitragen koennen
+### Wie Sie beitragen können
 
 1. **Bug melden:** Erstellen Sie ein Issue mit dem Label `bug`
 2. **Feature vorschlagen:** Erstellen Sie ein Issue mit dem Label `enhancement`
@@ -14,27 +14,29 @@ Vielen Dank fuer Ihr Interesse, zu diesem Projekt beizutragen!
 
 1. Forken Sie das Repository
 2. Erstellen Sie einen Feature-Branch: `git checkout -b feature/mein-feature`
-3. Committen Sie Ihre Aenderungen: `git commit -m "Beschreibung der Aenderung"`
+3. Committen Sie Ihre Änderungen: `git commit -m "Beschreibung der Änderung"`
 4. Pushen Sie den Branch: `git push origin feature/mein-feature`
 5. Erstellen Sie einen Pull Request
 
 ### Code-Richtlinien
 
-- Python: PEP 8 Stil, Python 3.10+
-- Encoding: UTF-8 fuer alle Dateien
+- Python: PEP 8 Stil, Python 3.12+
+- Encoding: UTF-8 für alle Dateien
 - Sprache: Code und Kommentare auf Deutsch oder Englisch
 - Keine hardcoded Pfade oder API-Keys
-- Tests muessen gruen sein: `python -m pytest`
+- Ruff muss erfolgreich sein: `python -m ruff check src tests`
+- Tests müssen grün sein: `python -m pytest`
 
 ### Erste Schritte
 
 ```powershell
 $env:PYTHONPATH="$PWD\src"
+python -m ruff check src tests
 python -m pytest
 python -m codex_logdatenbank_wartung.cli status
 ```
 
-Ohne ausdrueckliche Zusatzregel gelten Pull Requests unter der Lizenz des Projekts (MIT).
+Ohne ausdrückliche Zusatzregel gelten Pull Requests unter der Lizenz des Projekts (MIT).
 
 ---
 
@@ -58,10 +60,11 @@ Thank you for your interest in contributing to this project!
 
 ### Code Guidelines
 
-- Python: PEP 8 style, Python 3.10+
+- Python: PEP 8 style, Python 3.12+
 - Encoding: UTF-8 for all files
 - Language: Code and comments in German or English
 - No hardcoded paths or API keys
+- Ruff must pass: `python -m ruff check src tests`
 - Tests must pass: `python -m pytest`
 
 Unless stated otherwise, pull requests are understood to be submitted under the
