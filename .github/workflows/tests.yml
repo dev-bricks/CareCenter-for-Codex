@@ -45,5 +45,8 @@ jobs:
       - name: Compile sources
         run: python -m compileall -q src tests
 
+      - name: Lint sources and tests
+        run: python -m ruff check src tests
+
       - name: Run tests
         run: python -m pytest -q
