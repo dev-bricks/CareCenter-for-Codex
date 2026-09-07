@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Maintenance & Hygiene (2026-09-07): Standardized PEP 621 metadata in `pyproject.toml`
+  with complete `[project.urls]` (Homepage, Documentation, Repository, Issues,
+  Changelog, Security, Umbrella) and extended environment/topic classifiers.
+  Hardened `.github/workflows/tests.yml` with `concurrency: cancel-in-progress: true`
+  and an explicit `ruff check .` step. Enriched `SECURITY.md` with supported
+  version matrix and official security contact addresses (`security@open-bricks.org`,
+  `support@lukasgeiger.com`). Added contract test suite `tests/test_metadata.py` (5 tests)
+  validating metadata completeness, CI guardrails, and security policies. Synchronized
+  `llms.txt` and README test badges to 381 passed (382 collected, 1 skipped).
+- Verification (2026-09-07): 382 collected, 381 passed, 1 skipped; Ruff check clean (0 errors),
+  compileall clean (0 errors), git diff --check clean.
 - Fix (2026-08-30): Generalized the existing Companion task/orphan guards instead
   of adding a parallel reaper. Runtime-orphan candidates now require a dead or
   PID-reused parent, a hard 30-minute age floor, and two CPU snapshots at least

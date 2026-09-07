@@ -11,12 +11,27 @@ authors = [
 classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Operating System :: Microsoft :: Windows",
+    "License :: OSI Approved :: MIT License",
+    "Intended Audience :: Developers",
+    "Topic :: System :: Systems Administration",
+    "Environment :: Win32 (MS Windows)",
 ]
+
 dependencies = [
     "PySide6>=6.7",
     "tomlkit>=0.13",
 ]
+
+[project.urls]
+Homepage = "https://github.com/dev-bricks/CareCenter-for-Codex"
+Documentation = "https://github.com/dev-bricks/CareCenter-for-Codex#readme"
+Repository = "https://github.com/dev-bricks/CareCenter-for-Codex.git"
+Issues = "https://github.com/dev-bricks/CareCenter-for-Codex/issues"
+Changelog = "https://github.com/dev-bricks/CareCenter-for-Codex/blob/main/CHANGELOG.md"
+Security = "https://github.com/dev-bricks/CareCenter-for-Codex/blob/main/SECURITY.md"
+Umbrella = "https://github.com/open-bricks"
 
 [project.optional-dependencies]
 dev = [

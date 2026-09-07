@@ -36,6 +36,18 @@ Bei kleineren Einzelprojekten können Reaktionszeiten variieren. Kritische
 Probleme werden priorisiert. Bitte geben Sie ausreichend Zeit, bevor Sie
 Details öffentlich machen.
 
+### Unterstützte Versionen
+
+| Version | Unterstützt |
+| ------- | ----------- |
+| 0.8.x   | :white_check_mark: |
+| < 0.8   | :x:         |
+
+### Kontakt
+
+- E-Mail: `security@open-bricks.org` / `support@lukasgeiger.com`
+- GitHub Security Advisories: https://github.com/dev-bricks/CareCenter-for-Codex/security/advisories
+
 ---
 
 ## English
@@ -70,3 +82,15 @@ This tool performs security-relevant local operations:
 
 For smaller solo projects, response times may vary. Critical issues will be
 prioritized. Please allow reasonable time before public disclosure.
+
+### Supported Versions
+
+| Version | Supported |
+| ------- | --------- |
+| 0.8.x   | :white_check_mark: |
+| < 0.8   | :x:         |
+
+### Contact
+
+- Email: `security@open-bricks.org` / `support@lukasgeiger.com`
+- GitHub Security Advisories: https://github.com/dev-bricks/CareCenter-for-Codex/security/advisories
