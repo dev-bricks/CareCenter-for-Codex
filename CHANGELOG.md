@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Discoverability & Ecosystem (2026-09-08): Completed Pfad B discoverability and visual design refresh. Added bilingual Quick Navigation (14 anchors), expanded Shields.io badges (Version v0.8.0, PySide6, Local-First Zero-Egress, Non-Elevation Security, dev-bricks / open-bricks ecosystem, llms.txt), Dual Mermaid diagrams (Architecture Flowchart `flowchart TD` with 5 stylized subgraphs and Complete Lifecycle Sequence `sequenceDiagram` with 10 transactional stages), 10-row Key Capabilities & Safety Invariants matrix, and 12-partner Sibling Ecosystem matrix in both `README.md` and `README.de.md`. Updated `pyproject.toml` URLs with `Parent Organization` and `Umbrella Ecosystem`. Refreshed `llms.txt` and local `MARKETING-LOG.txt`. Expanded contract test suite `tests/test_metadata.py` to 11 tests covering Quick Navigation anchors, Mermaid diagram syntax, governance invariants table parity, sibling ecosystem matrix parity, and UTF-8 umlaut integrity.
+- Verification (2026-09-08): Ruff check clean (0 errors), compileall clean (0 errors), git diff --check clean.
 - Maintenance & Hygiene (2026-09-07): Standardized PEP 621 metadata in `pyproject.toml`
   with complete `[project.urls]` (Homepage, Documentation, Repository, Issues,
   Changelog, Security, Umbrella) and extended environment/topic classifiers.

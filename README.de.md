@@ -4,15 +4,20 @@
 
 > Inoffizielles lokales Windows-Tray- und CLI-Werkzeug, das die OpenAI-Codex-Desktop-App gesund hält — repariert fehlgeschlagene Starts, entfernt hängende Reste und wartet die SQLite-Logdatenbank sicher. Vollständig offline, keine Telemetrie.
 
-[![CareCenter tests](https://github.com/dev-bricks/CareCenter-for-Codex/actions/workflows/tests.yml/badge.svg)](https://github.com/dev-bricks/CareCenter-for-Codex/actions/workflows/tests.yml)
-[![Pytest-Status](https://img.shields.io/badge/Tests-381%20bestanden-brightgreen.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
-[![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://www.python.org/)
+[![CareCenter Tests](https://github.com/dev-bricks/CareCenter-for-Codex/actions/workflows/tests.yml/badge.svg)](https://github.com/dev-bricks/CareCenter-for-Codex/actions/workflows/tests.yml)
+[![Pytest-Status](https://img.shields.io/badge/Tests-387%20bestanden-brightgreen.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
+[![Version](https://img.shields.io/badge/Version-0.8.0-blue.svg)](https://github.com/dev-bricks/CareCenter-for-Codex/releases)
+[![Python](https://img.shields.io/badge/Python-3.12%20%7C%203.13-blue.svg)](https://www.python.org/)
+[![Plattform](https://img.shields.io/badge/Plattform-Windows%2010%20%7C%2011-lightgrey.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
+[![Lokal-Erstmals](https://img.shields.io/badge/100%25%20Lokal--Erstmals-Zero--Egress-success.svg)](SECURITY.md)
+[![Sicherheits-Richtlinie](https://img.shields.io/badge/Sicherheit-Richtlinie%20%7C%20Non--Elevation-informational.svg)](SECURITY.md)
 [![Lizenz](https://img.shields.io/badge/Lizenz-MIT-yellow.svg)](LICENSE)
-[![Plattform](https://img.shields.io/badge/Plattform-Windows-lightgrey.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
-[![open-bricks](https://img.shields.io/badge/Ökosystem-open--bricks-blue.svg)](https://github.com/open-bricks)
+[![GUI Framework](https://img.shields.io/badge/GUI-PySide6-41CD52.svg)](https://pypi.org/project/PySide6/)
+[![Ökosystem dev-bricks](https://img.shields.io/badge/Ökosystem-dev--bricks-blue.svg)](https://github.com/dev-bricks)
+[![Dachorganisation open-bricks](https://img.shields.io/badge/Dach-open--bricks-blue.svg)](https://github.com/open-bricks)
 [![KI-Indexierung](https://img.shields.io/badge/LLM--Bereit-llms.txt-blueviolet.svg)](llms.txt)
 
-Englische Dokumentation: [README.md](README.md)
+[English](README.md) · [Deutsch](README.de.md)
 
 > [!NOTE]
 > Maschinenlesbare Architektur, CLI-Befehle und Sicherheitsregeln sind für KI-Agenten in [llms.txt](llms.txt) hinterlegt.
@@ -22,24 +27,163 @@ Lokale Audit-Notizen wie `BEFUNDE.md` und temporäre `TASKPLAN*.md`-Statusdateie
 > [!IMPORTANT]
 > Dieses Werkzeug ist ein unabhängiges Community-Projekt. Es wurde nicht von OpenAI erstellt, ist nicht mit OpenAI verbunden und wird nicht von OpenAI unterstützt oder gesponsert. „OpenAI“ und „Codex“ sind Marken von OpenAI und werden hier nur zur Beschreibung der Kompatibilität verwendet.
 
-## Warum
+---
+
+### 🧭 Schnellnavigation
+
+- [1. Warum & Problemstellung](#warum--problemstellung)
+- [2. Architektur & Systemfluss](#architektur--systemfluss)
+- [3. Vollständiger Lebenszyklus-Ablauf](#vollständiger-lebenszyklus-ablauf)
+- [4. Kernfähigkeiten & Sicherheitsinvarianten](#kernfähigkeiten--sicherheitsinvarianten)
+- [5. Geschwisterwerkzeuge & Partner-Ökosystem](#geschwisterwerkzeuge--partner-ökosystem)
+- [6. Funktionen](#funktionen)
+- [7. Screenshot](#screenshot)
+- [8. Voraussetzungen](#voraussetzungen)
+- [9. Installation und Start](#installation-und-start)
+- [10. CLI-Befehle](#cli-befehle)
+- [11. Konfiguration](#konfiguration)
+- [12. Sicherheitsmodell & Invarianten](#sicherheitsmodell--invarianten)
+- [13. Windows-Store-Materialien](#windows-store-materialien)
+- [14. Entwicklung & Lizenz](#entwicklung--lizenz)
+
+---
+
+## Warum & Problemstellung
 
 Unter Windows kann nach dem Schließen des Codex-Desktopfensters ein hängender Hauptprozess übrig bleiben. Dieser Restprozess kann den Singleton-Lock der App halten, sodass der nächste Start scheinbar nichts tut. CareCenter entfernt genau diesen ersten Blocker sicher: Es greift nur bei inaktiven Ghost-Prozessen, verwaisten Lockfiles und ausdrücklich gestarteten Wartungspfaden ein.
 
 ## Architektur & Systemfluss
 
 ```mermaid
-graph TD
-    A["CareCenter Tray / CLI"] --> B["Wächter-Daemon (60s-Loop)"]
-    A --> C["Wartungs-Engine (Fast / Safe)"]
-    B --> D["Prozessbaum-Prüfung"]
-    D --> E{"Rest-Blocker gefunden?"}
-    E -- Ja --> F["Fail-closed Ghost Reaper"]
-    E -- Nein --> G["Leerlauf-Zustand"]
-    C --> H["SQLite-Logwartung (state_5.sqlite)"]
-    H --> I["Backup -> Integritätscheck -> WAL Checkpoint -> VACUUM"]
-    C --> J["Thread-Postfachpflege & Config-Audit"]
+flowchart TD
+    subgraph UI["Benutzeroberflächen & CLI"]
+        TRAY["PySide6 System-Tray\n(start.bat / debug.bat)"]
+        WIN["Tray-Statusfenster\n(Live-Fortschritt & Steuerung)"]
+        CLI["CLI-Befehlsrouter\n(codex-logwartung)"]
+    end
+
+    subgraph DAEMON["Wächter- & Scheduler-Engine"]
+        WATCH["Hintergrund-Wächter\n(60s-Prüfschleife)"]
+        SCHED["Loop-Modus-Engine\n(2h bis 24h Intervalle)"]
+        TH_HYG["Thread-Postfachpflege\n(Gelesen markieren / Archivieren)"]
+        CFG_AUD["Konfigurations-Audit\n(MCP / Plugins / Leere Threads)"]
+    end
+
+    subgraph GUARDS["Prozessprüfung & Sicherheits-Guards"]
+        SCAN["Prozessbaum-Scanner\n(Codex.exe & ChatGPT.exe)"]
+        GHOST["Fail-closed Ghost Reaper\n(Inaktive Desktop-Reste)"]
+        MCP_REAP["Runtime-MCP-Reaper\n(Doppelte Launcher-Bäume)"]
+        ORPHAN["Runtime-Waisen-Reaper\n(Toter Parent + 30m Karenz)"]
+        SAFE_START["Safe-Start-Koordinator\n(Burst- & Storm-Schutz)"]
+    end
+
+    subgraph STORAGE["SQLite-Log- & Thread-Speicher"]
+        DB["Codex-Statusdatenbank\n(state_5.sqlite)"]
+        BAK["Pre-Mutation Backup\n(DB + WAL + SHM Snapshot)"]
+        CHECK["Integritätsprüfung\n(PRAGMA integrity_check)"]
+        VAC["Datenbank-Optimierung\n(WAL Checkpoint & VACUUM)"]
+    end
+
+    subgraph STORE_OS["Windows OS- & Store-Bridge"]
+        APPX["Microsoft-Store AppX-Resolver\n(Paket-Reset & Neuinstallations-PDP)"]
+        PROV["Build-Provenienz & Manifest\n(AppxManifest.xml & store_assets/)"]
+    end
+
+    TRAY --> WATCH
+    TRAY --> WIN
+    CLI --> SCHED
+    WATCH --> SCAN
+    SCAN -->|Startblocker erkannt| GHOST
+    SCAN -->|Doppelte Launcher-Generation| MCP_REAP
+    SCAN -->|Toter Parent + Leerlauf| ORPHAN
+    SCHED -->|Fast- / Safe-Auslöser| DB
+    DB --> BAK --> CHECK --> VAC
+    DAEMON --> TH_HYG
+    DAEMON --> CFG_AUD
+    TRAY --> SAFE_START
+    CLI --> APPX
 ```
+
+## Vollständiger Lebenszyklus-Ablauf
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as Benutzer / Scheduler / CLI
+    participant Tray as CareCenter Tray / Engine
+    participant Scanner as Prozessbaum-Scanner
+    participant Guard as Sicherheits- & Aktivitäts-Guard
+    participant Codex as Codex Desktop (Store App)
+    participant DB as SQLite-Speicher (state_5.sqlite)
+    participant SafeStart as Safe-Start-Bridge
+
+    User->>Tray: Starte Wartung (Fast / Safe / Geplanter Loop)
+    Tray->>Scanner: Prüfe Prozessbaum & aktive Handles
+    Scanner-->>Tray: Liefert laufende Bäume (Codex / CLI / MCP)
+
+    alt Safe-Modus: Wartephase
+        Tray->>Guard: Verifiziere CPU-Leerlauf des Prozessbaums
+        Guard-->>Tray: Prozess beschäftigt (Warten oder Abbruch durch Benutzer)
+        Note over Tray,Guard: Safe-Modus wartet bis kompletter Baum im Leerlauf ist
+    end
+
+    Tray->>SafeStart: Pausiere aktive Codex-Automatisierungen (Sturmschutz)
+    Tray->>Codex: Sauberes Beenden anfordern (bis zu 3 Wiederholungen)
+    Codex-->>Tray: Beenden bestätigt (Alle Fenster & App-Server geschlossen)
+
+    rect rgb(240, 248, 255)
+        Note over Tray,DB: Isolierte Wartungstransaktion
+        Tray->>DB: Erstelle Snapshot-Backup (inklusive WAL & SHM)
+        Tray->>DB: Führe PRAGMA integrity_check auf Backup-Kopie aus
+        DB-->>Tray: Integrität verifiziert (OK)
+        Tray->>DB: Führe WAL-Checkpoint & VACUUM-Optimierung aus
+        DB-->>Tray: Datenbank komprimiert & optimiert
+    end
+
+    rect rgb(255, 250, 240)
+        Note over Tray,Codex: Thread-Postfachpflege & Konfigurations-Audit
+        Tray->>DB: Wende altersbasierte Regeln an (Gelesen / Archivieren)
+        Tray->>DB: Bereinige leere Threads (mind. 300s Initialisierungskarenz)
+        Tray->>DB: Bereinige doppelte MCP- und inkompatible Plugin-Einträge
+    end
+
+    Tray->>Codex: Starte verifizierte saubere Codex-Sitzung neu
+    Codex-->>Tray: Codex-Hauptfenster aktiv bestätigt
+    Tray->>SafeStart: Gestaffelte Reaktivierung pausierter Automatisierungen (60s-Takt)
+    Tray-->>User: Wartungszyklus abgeschlossen (Fortschritt & Log aktualisiert)
+```
+
+## Kernfähigkeiten & Sicherheitsinvarianten
+
+| Invariante / Kernfähigkeit | Architektonische Garantie | Durchsetzungs-Mechanismus | Sicherheits-Grenze |
+|---|---|---|---|
+| **1. 100% Lokal-Erstmals** | Keine externe Telemetrie, keine Hintergrund-Uploads, keine Cloud-Abhängigkeit | Vollständig lokaler Betrieb; alle Pfade liegen im lokalen Dateisystem | Ausgehender Netzwerkverkehr strikt unterbunden; manuelle Prüfung (`--live-pages`) isoliert |
+| **2. Unprivilegierter User-Modus** | Standardbetrieb erfordert keinerlei Administrator-Rechte | Nicht-elevierte Benutzerrechte für Wächter, Tray und Datenbankpflege | Administrative Reparaturen (Store AppX Reset) erfordern ausdrückliche Bestätigung |
+| **3. Fail-Closed Prozess-Schutz** | Aktive Prozesse und produktive Arbeit werden niemals abgebrochen | Mehrstufige CPU-Delta-Messung und Parent-PID-Prüfung | Jede gemessene CPU-Aktivität bricht Beendigungsversuche sofort sicher ab |
+| **4. CLI-Sitzungs-Immunität** | Node-basierte Codex-CLI und abgelöste `codex exec`-Läufe sind geschützt | Expliziter CLI-Filter und Rollout-Zeitstempel-Überprüfung | Aktive CLI-Ausführung blockiert Schreibvorgänge auf dem Thread-Speicher global |
+| **5. Pre-Mutation DB-Snapshot** | SQLite-Datenbank wird niemals ohne verifiziertes Backup bearbeitet | Vollständiger Snapshot der Datenbankdatei inklusive WAL- und SHM-Journale | Jeder Backup-Fehler stoppt die Wartung vor VACUUM und Prüfpunkten sofort |
+| **6. Kryptografischer Integritäts-Check**| Datenbankbeschädigungen werden vor Schreiboperationen erkannt | Ausführung von `PRAGMA integrity_check` direkt auf der erstellten Backup-Kopie | Beschädigte Integritätsprüfungen blockieren alle nachgelagerten Schreibaktionen |
+| **7. Verbindliche Schutz-Karenzzeiten**| Neue Prozesse und leere Threads erhalten garantierte Zeit zur Initialisierung | Feste 30-Minuten-Karenz für Waisen; 300s Mindestkarenz für leere Threads | Frühe Initialisierungsphasen werden niemals als hängende Reste fehlinterpretiert |
+| **8. Gestaffeltes Wiederanlaufen** | System-Erholung überflutet Codex nicht mit gleichzeitigen Automationsstarts | Konfigurierbare Verzögerung (Standard: 60s-Fenster) via Safe-Start-Koordinator | Verhindert API-Rate-Limit-Überschreitungen und lokale CPU-Lastspitzen |
+| **9. Zerstörungsfreie AppX-Behebung**| Microsoft-Store-Paketbehebung schützt persönliche Benutzerdaten | Begrenzte Eskalation: No-Admin-Bereinigung -> Admin-Vorschlag -> Store-Neuinstallationsseite | Automatische destruktive Resets oder Paket-Löschungen sind strikt untersagt |
+| **10. Strikte Verifikations-Parität** | 100% grüne Testsuite, saubere Linter und synchrone Metadatenverträge | Automatisierte CI-Matrix, Pytest-Suite (381 bestanden), Ruff und compileall | Jede Änderung erfordert vollständige fehlerfreie Verifikation vor Commit |
+
+## Geschwisterwerkzeuge & Partner-Ökosystem
+
+| Partner-Werkzeug | Organisation | Rolle & Funktion | Integration mit CareCenter |
+|---|---|---|---|
+| **[safe-start-for-codex](https://github.com/dev-bricks/safe-start-for-codex)** | dev-bricks | Start-Gating, Burst-Schutz und gezieltes Pausieren von Automatisierungen | Zentrale Abhängigkeit; koordiniert Start-Storms und Automationswiederanlauf |
+| **[MethodenAnalyser](https://github.com/dev-bricks/MethodenAnalyser)** | dev-bricks | Statische AST-Analyse, Klassen-/Methoden-Extraktion und Komplexitätsprüfung | Verifiziert Code-Gesundheit, Refactoring-Umfänge und Modulstrukturen |
+| **[companion-for-agy](https://github.com/ellmos-ai/companion-for-agy)** | ellmos-ai | Windows ConPTY-Bridge, Pseudoterminal-Daemon und Sitzungsüberwachung | Teilt Prozessisolations-Invarianten und schützt Agenten-Hintergrundläufe |
+| **[lock-master](https://github.com/dev-bricks/lock-master)** | dev-bricks | Multi-Agenten-Sperrmechanismen, Lock-Caches und Dateireservierung | Garantiert kollisionsfreien Dateizugriff über parallele autonome Agenten |
+| **[bach](https://github.com/ellmos-ai/bach)** | ellmos-ai | Brain Architecture Orchestrator und Aufgaben-Dekompositions-Engine | Koordiniert komplexe Multi-Agenten-Workflows und Flottenaufgaben |
+| **[usmc](https://github.com/ellmos-ai/usmc)** | ellmos-ai | Unified System Mission Control und Leitstellen-Dashboard | Aggregiert Systemzustände, Betriebsmetriken und Warnungen |
+| **[clutch](https://github.com/ellmos-ai/clutch)** | ellmos-ai | Tool-Hook-Manager, Git-Hooks und semantische Ausführungskontrolle | Verwaltet Entwickler-Hooks und Pre-Commit-Governance-Prüfungen |
+| **[open-compute](https://github.com/ellmos-ai/open-compute)** | ellmos-ai | Autonomer Computer-Use-Agent und plattformübergreifender OS-Executor | Baut auf sauberen Prozessumgebungen auf, die CareCenter sicherstellt |
+| **[system-auditor](https://github.com/ellmos-ai/system-auditor)** | ellmos-ai | Multi-Host Diagnose-Engine und Host-Zustands-Prüfer | Überwacht systemweite Umgebungen, Dateihygiene und Prozessgesundheit |
+| **[CloudLockFixer](https://github.com/file-bricks/CloudLockFixer)** | file-bricks | Cloud-Sync-Entsperrer und Konfliktkopien-Manager | Löst blockierte Cloud-Synchronisationen ohne Datenverlust |
+| **[SoftwareCenter](https://github.com/file-bricks/SoftwareCenter)** | file-bricks | Zentraler PySide6-Softwarekatalog und Desktop-Verwaltung | Führt und startet Desktop-Tools inklusive CareCenter und Safe Start |
+| **[DokuZen](https://github.com/doc-bricks/DokuZen)** | doc-bricks | Dokumentenverarbeitung, OCR, automatische Schwärzung und PDF-Hygiene | Ergänzt lokale Workflows um netzwerkfreie, datensparsame Dokumentensicherheit |
 
 ## Funktionen
 
@@ -113,7 +257,7 @@ $env:CARECENTER_SAFE_START_SOURCE = "C:\Pfad\zu\REL-PUB_safe-start-for-codex"
 build_exe.bat
 ```
 
-## CLI
+## CLI-Befehle
 
 ```powershell
 python -m codex_logdatenbank_wartung.cli doctor
@@ -173,7 +317,7 @@ Rollout-Fenster nicht unter 120 Sekunden absenken.
 Kleinere Werte werden auf diese konservative Initialisierungskarenz angehoben;
 größere Werte verlängern sie.
 
-## Sicherheitsmodell
+## Sicherheitsmodell & Invarianten
 
 - Die normale CareCenter-Laufzeit und die Standard-CLI-Befehle arbeiten nur
   lokal: Sie senden keine Telemetrie, laden keine Daten hoch, rufen keine
@@ -229,7 +373,9 @@ ordnet die Paketpfade unter `icons/` den Quellen des zentralen Builders unter
 
 Der Check baut die statischen GitHub-Pages-Dateien außerdem temporär und prüft `privacy/index.html`, `support/index.html`, `index.html` sowie den Build-Marker. Der aktive Workflow `.github/workflows/pages.yml` veröffentlicht die Routen `/privacy/` und `/support/` über GitHub Pages.
 
-## Entwicklung
+## Entwicklung & Lizenz
+
+### Entwicklung
 
 ```powershell
 $env:PYTHONPATH="src"
@@ -240,7 +386,7 @@ python -m compileall src tests
 
 Die Testsuite deckt Wartungssicherheit, Reparatur-Eskalation, Safe-Start-Integration, Automatisierungssteuerung, Store-Materialprüfung, Konfigurationsladen, i18n und persistente Tray-Sprachumschaltung ab.
 
-## Lizenz
+### Lizenz
 
 CareCenter for Codex steht unter der [MIT-Lizenz](LICENSE). PySide6 wird unter
 der LGPL verwendet; das Verzeichnis der direkten Abhängigkeiten und sein

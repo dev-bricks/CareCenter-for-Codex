@@ -31,7 +31,9 @@ Repository = "https://github.com/dev-bricks/CareCenter-for-Codex.git"
 Issues = "https://github.com/dev-bricks/CareCenter-for-Codex/issues"
 Changelog = "https://github.com/dev-bricks/CareCenter-for-Codex/blob/main/CHANGELOG.md"
 Security = "https://github.com/dev-bricks/CareCenter-for-Codex/blob/main/SECURITY.md"
+"Parent Organization" = "https://github.com/dev-bricks"
 Umbrella = "https://github.com/open-bricks"
+"Umbrella Ecosystem" = "https://github.com/open-bricks"
 
 [project.optional-dependencies]
 dev = [

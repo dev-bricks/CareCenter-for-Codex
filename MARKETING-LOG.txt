@@ -43,3 +43,17 @@ Repo: dev-bricks/CareCenter-for-Codex
 1. **Windows Store Release**: Keep Microsoft Store assets (`store_package/`, `STORE_LISTING.md`, `screenshots/store/`) updated for upcoming submission with version 0.8.0 / 0.8.1.
 2. **Ecosystem Cross-Linking**: Ensure siblings like `safe-start-for-codex` and `companion-for-agy` reference `CareCenter-for-Codex` in their respective tool tables.
 
+## Date: 2026-09-08
+Repo: dev-bricks/CareCenter-for-Codex
+
+### Automated Actions Applied:
+1. Updated `pyproject.toml` URLs with `Parent Organization` and `Umbrella Ecosystem`.
+2. Modernized `README.md` and `README.de.md` with bilingual Quick Navigation (14 anchors), expanded Shields.io badges (Version v0.8.0, PySide6, Local-First Zero-Egress, Non-Elevation Security, dev-bricks / open-bricks ecosystem, llms.txt), Dual Mermaid diagrams (Architecture Flowchart `flowchart TD` with 5 stylized subgraphs and Complete Lifecycle Sequence `sequenceDiagram` with 10 transactional stages), 10-row Key Capabilities & Safety Invariants matrix, and 12-partner Sibling Ecosystem matrix.
+3. Updated `llms.txt` verification timestamp to 2026-09-08.
+4. Updated `CHANGELOG.md` with Pfad B entry under `## Unreleased`.
+5. Expanded contract test suite `tests/test_metadata.py` to 11 tests covering metadata, CI guardrails, security policy, Quick Navigation anchors, Mermaid diagram syntax, governance invariants table parity, sibling ecosystem matrix parity, and UTF-8 umlaut integrity.
+
+### Non-Automated Marketing & Discoverability Recommendations:
+1. **Windows Package Manager (winget)**: Submit a winget manifest for `dev-bricks.CareCenter-for-Codex` once MSIX packaging passes Store preflight.
+2. **Developer Community Visibility**: Announce the offline SQLite vacuum and singleton-lock repair capabilities on developer forums focused on OpenAI Codex desktop stability.
+3. **Cross-Linking Parity**: Verify bidirectional links between `dev-bricks/safe-start-for-codex` and `dev-bricks/CareCenter-for-Codex`.
