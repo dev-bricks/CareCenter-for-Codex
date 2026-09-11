@@ -30,6 +30,10 @@ def test_pyproject_pep621_metadata_and_urls() -> None:
         "Umbrella",
         "Parent Organization",
         "Umbrella Ecosystem",
+        "LLM Ready",
+        "Marketing Log",
+        "Third-Party Licenses",
+        "Bug Tracker",
     ]
     for key in required_urls:
         assert key in urls, f"Missing project URL: {key}"
@@ -76,7 +80,7 @@ def test_llms_txt_and_docs_sync() -> None:
     assert llms_path.is_file()
 
     content = llms_path.read_text(encoding="utf-8")
-    assert "Last-checked: 2026-09-08" in content
+    assert "Last-checked: 2026-09-11" in content
     assert "https://github.com/dev-bricks/CareCenter-for-Codex" in content
     assert "carecenter-for-codex" in content
 
@@ -94,6 +98,9 @@ def test_readme_badges_consistency() -> None:
         assert "open--bricks" in readme
         assert "llms.txt" in readme
         assert "PySide6" in readme
+        assert ("Security%20SLA" in readme or "Sicherheits--SLA" in readme)
+        assert ("code%20style-ruff" in readme or "Code--Stil-ruff" in readme)
+        assert "Tests-391" in readme
 
 
 def test_quick_navigation_anchors_parity() -> None:
@@ -217,3 +224,71 @@ def test_german_umlauts_utf8_integrity() -> None:
 
     # No unescaped Unicode replacement characters
     assert "\ufffd" not in readme_de
+
+
+def test_gitignore_hygiene() -> None:
+    """Verify .gitignore includes multi-host sync conflict, lock, coverage, and temporary editor patterns."""
+    gitignore_path = ROOT / ".gitignore"
+    assert gitignore_path.is_file()
+
+    content = gitignore_path.read_text(encoding="utf-8")
+    required_patterns = [
+        "*-conflict-*",
+        "*.sync-conflict-*",
+        "*.conflict",
+        "*-CONFLIT-*",
+        "*.sync-temp-*",
+        "LOCK.*",
+        "*.lock",
+        "LOCK",
+        "LOCK*.txt",
+        ".coverage",
+        "coverage/",
+        "htmlcov/",
+        "wheelhouse/",
+        ".wheel-smoke/",
+        "*.tmp",
+        "*.bak",
+        "*.swp",
+        "*~",
+    ]
+    for pattern in required_patterns:
+        assert pattern in content, f"Missing required .gitignore pattern: {pattern}"
+
+
+def test_security_policy_triage_commitment() -> None:
+    """Verify SECURITY.md declares 48h response SLA, 5-business-day triage commitment, and official contacts."""
+    security_path = ROOT / "SECURITY.md"
+    assert security_path.is_file()
+
+    content = security_path.read_text(encoding="utf-8")
+    assert "48 Stunden" in content
+    assert "48 hours" in content
+    assert "5 Werktagen" in content or "5 Werktage" in content
+    assert "5 business days" in content
+    assert "security@open-bricks.org" in content
+    assert "security@dev-bricks.org" in content
+    assert "support@lukasgeiger.com" in content
+    assert "lukas@open-bricks.org" in content
+
+
+def test_ci_pip_cache_and_bytecode_gate() -> None:
+    """Verify CI workflow tests.yml includes pip caching, compileall bytecode gate, and timeout guardrail."""
+    ci_path = ROOT / ".github" / "workflows" / "tests.yml"
+    assert ci_path.is_file()
+
+    content = ci_path.read_text(encoding="utf-8")
+    assert "cache: 'pip'" in content
+    assert "python -m compileall -q src tests" in content
+    assert "timeout-minutes: 15" in content
+
+
+def test_changelog_pfad_a_hygiene_entry() -> None:
+    """Verify CHANGELOG.md contains the 2026-09-11 Pfad A technical hygiene entry under Unreleased."""
+    changelog_path = ROOT / "CHANGELOG.md"
+    assert changelog_path.is_file()
+
+    content = changelog_path.read_text(encoding="utf-8")
+    assert "## Unreleased" in content
+    assert "Technical Hygiene & Quality Hardening (2026-09-11)" in content
+    assert "Pfad A" in content

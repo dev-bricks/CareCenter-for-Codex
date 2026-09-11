@@ -30,23 +30,27 @@ Dieses Tool führt sicherheitsrelevante lokale Operationen aus:
   ab und liefert ein eigenes Warnungs-/Fehlerergebnis. Er wird nie vom Tray,
   Wächter, Wartungsloop oder den Standard-CLI-Befehlen aufgerufen.
 
-### Reaktionszeit
+### Reaktionszeit & Triage-SLA
 
-Bei kleineren Einzelprojekten können Reaktionszeiten variieren. Kritische
-Probleme werden priorisiert. Bitte geben Sie ausreichend Zeit, bevor Sie
-Details öffentlich machen.
+- **Eingangsbestätigung (Response SLA):** Wir bestätigen den Eingang von Sicherheitsmeldungen verbindlich innerhalb von **48 Stunden** (48 hours).
+- **Triage & Risikobewertung:** Eine erste technische Triage und Risikobewertung erfolgt innerhalb von **5 Werktagen** (5 business days).
+- **Veröffentlichung:** Kritische Probleme werden priorisiert. Bitte geben Sie ausreichend Zeit für die Fehlerbehebung, bevor Details öffentlich gemacht werden.
 
 ### Unterstützte Versionen
 
-| Version | Unterstützt |
-| ------- | ----------- |
-| 0.8.x   | :white_check_mark: |
-| < 0.8   | :x:         |
+| Version | Unterstützt | Sicherheits-Updates & SLA |
+| ------- | ----------- | -------------------------- |
+| 0.8.x   | :white_check_mark: Ja | Aktive Produktionsbasis; 48h-Antwort & 5-Werktage-Triage-SLA |
+| < 0.8   | :x: Nein    | Nicht unterstützt; Upgrade erforderlich |
 
-### Kontakt
+### Kontakt & Meldewege
 
-- E-Mail: `security@open-bricks.org` / `support@lukasgeiger.com`
-- GitHub Security Advisories: https://github.com/dev-bricks/CareCenter-for-Codex/security/advisories
+1. **GitHub Security Advisories (bevorzugt):** [GitHub Private Vulnerability Reporting](https://github.com/dev-bricks/CareCenter-for-Codex/security/advisories)
+2. **Direkter Sicherheitskontakt:**
+   - `security@open-bricks.org`
+   - `security@dev-bricks.org`
+   - `support@lukasgeiger.com`
+   - `lukas@open-bricks.org`
 
 ---
 
@@ -78,19 +82,24 @@ This tool performs security-relevant local operations:
   over HTTPS and returns its own warning/error result. It is never called by the
   tray, watcher, maintenance loop, or default CLI commands.
 
-### Response Time
+### Response Time & Triage SLA
 
-For smaller solo projects, response times may vary. Critical issues will be
-prioritized. Please allow reasonable time before public disclosure.
+- **Receipt Acknowledgment (Response SLA):** We commit to acknowledging receipt of security reports within **48 hours**.
+- **Triage & Assessment:** An initial technical triage and risk assessment will be provided within **5 business days** (5 Werktagen).
+- **Disclosure:** Critical issues are prioritized. Please allow reasonable time for remediation before public disclosure.
 
 ### Supported Versions
 
-| Version | Supported |
-| ------- | --------- |
-| 0.8.x   | :white_check_mark: |
-| < 0.8   | :x:         |
+| Version | Supported | Security Updates & SLA |
+| ------- | --------- | ---------------------- |
+| 0.8.x   | :white_check_mark: Yes | Active release; 48h response & 5-business-day triage SLA |
+| < 0.8   | :x: No    | Unsupported legacy release; upgrade required |
 
-### Contact
+### Contact & Reporting Channels
 
-- Email: `security@open-bricks.org` / `support@lukasgeiger.com`
-- GitHub Security Advisories: https://github.com/dev-bricks/CareCenter-for-Codex/security/advisories
+1. **GitHub Security Advisories (Preferred):** [GitHub Private Vulnerability Reporting](https://github.com/dev-bricks/CareCenter-for-Codex/security/advisories)
+2. **Direct Maintainer Contact:**
+   - `security@open-bricks.org`
+   - `security@dev-bricks.org`
+   - `support@lukasgeiger.com`
+   - `lukas@open-bricks.org`

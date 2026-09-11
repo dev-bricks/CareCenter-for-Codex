@@ -48,6 +48,29 @@ TASKPLAN*.md
 HANDOFF-CODEX-START.md
 CODEX-AUTO-DEBUG-DESIGN.md
 LOCK*.txt
+LOCK.*
+*.lock
+LOCK
+
+# --- Multi-Host Synchronization & Cloud Conflict Patterns ---
+*-conflict-*
+*.sync-conflict-*
+*.conflict
+*-CONFLIT-*
+*.sync-temp-*
+
+# --- Coverage, Test & Packaging Caches ---
+.coverage
+coverage/
+htmlcov/
+wheelhouse/
+.wheel-smoke/
+
+# --- Temporary & Editor Files ---
+*.tmp
+*.bak
+*.swp
+*~
 
 # --- Machine-specific README variants (merged into main READMEs) ---
 README-ASUS-GEI.md

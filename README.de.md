@@ -5,12 +5,14 @@
 > Inoffizielles lokales Windows-Tray- und CLI-Werkzeug, das die OpenAI-Codex-Desktop-App gesund hält — repariert fehlgeschlagene Starts, entfernt hängende Reste und wartet die SQLite-Logdatenbank sicher. Vollständig offline, keine Telemetrie.
 
 [![CareCenter Tests](https://github.com/dev-bricks/CareCenter-for-Codex/actions/workflows/tests.yml/badge.svg)](https://github.com/dev-bricks/CareCenter-for-Codex/actions/workflows/tests.yml)
-[![Pytest-Status](https://img.shields.io/badge/Tests-387%20bestanden-brightgreen.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
+[![Pytest-Status](https://img.shields.io/badge/Tests-391%20bestanden-brightgreen.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
 [![Version](https://img.shields.io/badge/Version-0.8.0-blue.svg)](https://github.com/dev-bricks/CareCenter-for-Codex/releases)
 [![Python](https://img.shields.io/badge/Python-3.12%20%7C%203.13-blue.svg)](https://www.python.org/)
 [![Plattform](https://img.shields.io/badge/Plattform-Windows%2010%20%7C%2011-lightgrey.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
 [![Lokal-Erstmals](https://img.shields.io/badge/100%25%20Lokal--Erstmals-Zero--Egress-success.svg)](SECURITY.md)
 [![Sicherheits-Richtlinie](https://img.shields.io/badge/Sicherheit-Richtlinie%20%7C%20Non--Elevation-informational.svg)](SECURITY.md)
+[![Sicherheits-SLA](https://img.shields.io/badge/Sicherheits--SLA-48h%20Antwort%20%7C%205d%20Triage-blue.svg)](SECURITY.md)
+[![Code-Stil: ruff](https://img.shields.io/badge/Code--Stil-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Lizenz](https://img.shields.io/badge/Lizenz-MIT-yellow.svg)](LICENSE)
 [![GUI Framework](https://img.shields.io/badge/GUI-PySide6-41CD52.svg)](https://pypi.org/project/PySide6/)
 [![Ökosystem dev-bricks](https://img.shields.io/badge/Ökosystem-dev--bricks-blue.svg)](https://github.com/dev-bricks)

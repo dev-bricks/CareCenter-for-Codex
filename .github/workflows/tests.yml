@@ -17,6 +17,7 @@ jobs:
   tests:
     name: Python ${{ matrix.python-version }}
     runs-on: windows-latest
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -30,6 +31,7 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
+          cache: 'pip'
 
       - name: Install package
         run: |
