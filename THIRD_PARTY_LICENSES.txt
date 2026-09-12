@@ -1,7 +1,11 @@
 # Third-Party Licenses
 
-Last checked: 2026-07-15 against the declared project metadata, PyPI metadata,
-and the pinned Safe Start GitHub revision.
+Last checked: 2026-09-12 against the declared project metadata, PyPI metadata,
+the pinned Safe Start GitHub revision, and system API boundaries.
+
+Comprehensive audit document: see `THIRD_PARTY_LICENSES.md` for full details,
+SPDX identifiers, LGPL-3.0 dynamic linking rules, and the 10 Governance & Runtime
+Safety Invariants (INV-LOCAL-01 through INV-SLA-10).
 
 Scope: direct dependencies declared in `pyproject.toml`. This is a direct
 dependency inventory, not a frozen transitive SBOM and not a replacement for

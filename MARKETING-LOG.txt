@@ -68,3 +68,26 @@ Repo: dev-bricks/CareCenter-for-Codex
 4. Enriched bilingual `SECURITY.md` with binding 48-hour response SLA, 5-business-day triage commitment, and official security contacts.
 5. Synced `llms.txt` and README test badges to 391 passed (392 collected, 1 skipped) and timestamp `2026-09-11`.
 6. Expanded contract test suite `tests/test_metadata.py` to 15 tests covering all repository hygiene standards.
+
+## Date: 2026-09-12
+Repo: dev-bricks/CareCenter-for-Codex
+
+### Automated Actions Applied (Pfad B Discoverability & Governance):
+1. Created comprehensive `THIRD_PARTY_LICENSES.md` audit document covering direct runtime dependencies (PySide6 LGPL-3.0, tomlkit MIT), build/packaging tools (safe-start-for-codex MIT, PyInstaller GPLv2+ with exception, hatchling MIT), test/lint tools (pytest, Ruff, mypy), Python 3.12/3.13 standard library (PSF 2.0), LGPL-3.0 dynamic linking rules, and the 10 Governance & Runtime Safety Invariants (`INV-LOCAL-01` through `INV-SLA-10`).
+2. Updated `pyproject.toml` pointing `Third-Party Licenses` to `THIRD_PARTY_LICENSES.md`.
+3. Updated `THIRD_PARTY_LICENSES.txt` with audit cross-references and refreshed check timestamp.
+4. Added Third-Party Audited Shields.io badge to both English and German documentation.
+5. Expanded Quick Navigation from 14 to 17 anchors matching all major document sections across both `README.md` and `README.de.md`.
+6. Enriched Section 4 (Key Capabilities & Safety Invariants) with formal canonical codes (`INV-LOCAL-01` to `INV-SLA-10`).
+7. Added bilingual Target Personas section defining 4 distinct user profiles (Solo Developers, DevOps Tooling Integrators, Local-First Privacy Advocates, IT Support Administrators) and high-intent keyword discovery matrices.
+8. Added comprehensive 10-dimension 5-way Comparative Matrix evaluating CareCenter against Windows Task Manager, ad-hoc Batch/PowerShell scripts, generic PC cleaners (CCleaner), and complete Codex reinstallation.
+9. Added Section 16 (Third-Party Licenses & Transparency) linking to license audit records.
+10. Synchronized byte-identical `README_de.md` for multi-convention compatibility.
+11. Refreshed `llms.txt` verification timestamp to 2026-09-12 with invariant definitions and documentation paths.
+12. Updated `CHANGELOG.md` with detailed Pfad B entry under `## Unreleased`.
+13. Expanded contract test suite `tests/test_metadata.py` to 21 tests with new verifications for 17-heading Quick Navigation parity, Target Personas, Comparative Matrix, Third-Party Licenses audit, Canonical Invariant Codes, and README_de parity.
+
+### Non-Automated Marketing & Discoverability Recommendations:
+1. **GitHub Social Preview**: Set a dedicated Open Graph / social preview image in repository settings matching `assets/banner.svg` styling.
+2. **PyPI / Winget Packaging**: Publish wheel to PyPI and submit winget manifest (`dev-bricks.CareCenter-for-Codex`) once Windows Store packaging is finalized.
+3. **Ecosystem Cross-Referencing**: Confirm reciprocal discovery mentions in sibling developer tools (`safe-start-for-codex`, `companion-for-agy`, `lock-master`, `MethodenAnalyser`).

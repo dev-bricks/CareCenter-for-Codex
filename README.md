@@ -5,7 +5,7 @@
 > Unofficial Windows tray & CLI utility that keeps the OpenAI Codex desktop app healthy — repairs failed starts, removes hung leftovers, and safely maintains the local SQLite log database. Fully offline, no telemetry.
 
 [![CareCenter tests](https://github.com/dev-bricks/CareCenter-for-Codex/actions/workflows/tests.yml/badge.svg)](https://github.com/dev-bricks/CareCenter-for-Codex/actions/workflows/tests.yml)
-[![Pytest Status](https://img.shields.io/badge/Tests-391%20passed-brightgreen.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
+[![Pytest Status](https://img.shields.io/badge/Tests-397%20passed-brightgreen.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
 [![Version](https://img.shields.io/badge/version-0.8.0-blue.svg)](https://github.com/dev-bricks/CareCenter-for-Codex/releases)
 [![Python](https://img.shields.io/badge/Python-3.12%20%7C%203.13-blue.svg)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-lightgrey.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
@@ -14,6 +14,7 @@
 [![Security SLA](https://img.shields.io/badge/Security%20SLA-48h%20Response%20%7C%205d%20Triage-blue.svg)](SECURITY.md)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Third-Party Audited](https://img.shields.io/badge/Third--Party%20Licenses-Audited-blue.svg)](THIRD_PARTY_LICENSES.md)
 [![GUI Framework](https://img.shields.io/badge/GUI-PySide6-41CD52.svg)](https://pypi.org/project/PySide6/)
 [![Ecosystem dev-bricks](https://img.shields.io/badge/ecosystem-dev--bricks-blue.svg)](https://github.com/dev-bricks)
 [![Umbrella open-bricks](https://img.shields.io/badge/Umbrella-open--bricks-blue.svg)](https://github.com/open-bricks)
@@ -37,16 +38,19 @@ Local audit notes such as `BEFUNDE.md` and temporary `TASKPLAN*.md` status files
 - [2. Architecture & System Flow](#architecture--system-flow)
 - [3. Complete Lifecycle Sequence](#complete-lifecycle-sequence)
 - [4. Key Capabilities & Safety Invariants](#key-capabilities--safety-invariants)
-- [5. Sibling Ecosystem & Partner Tools](#sibling-ecosystem--partner-tools)
-- [6. Features](#features)
-- [7. Screenshot](#screenshot)
-- [8. Requirements](#requirements)
-- [9. Install and Run](#install-and-run)
-- [10. CLI Usage](#cli-usage)
-- [11. Configuration](#configuration)
-- [12. Safety Model & Invariants](#safety-model--invariants)
-- [13. Windows Store Materials](#windows-store-materials)
-- [14. Development & License](#development--license)
+- [5. Target Personas & Discoverability](#target-personas--discoverability)
+- [6. Comparative Matrix & Alternatives](#comparative-matrix--alternatives)
+- [7. Sibling Ecosystem & Partner Tools](#sibling-ecosystem--partner-tools)
+- [8. Features](#features)
+- [9. Screenshot](#screenshot)
+- [10. Requirements](#requirements)
+- [11. Install and Run](#install-and-run)
+- [12. CLI Usage](#cli-usage)
+- [13. Configuration](#configuration)
+- [14. Safety Model & Invariants](#safety-model--invariants)
+- [15. Windows Store Materials](#windows-store-materials)
+- [16. Third-Party Licenses & Transparency](#third-party-licenses--transparency)
+- [17. Development & License](#development--license)
 
 ---
 
@@ -159,16 +163,48 @@ sequenceDiagram
 
 | Invariant / Capability | Architectural Guarantee | Enforcement Mechanism | Safety Boundary |
 |---|---|---|---|
-| **1. 100% Local-First** | Zero external telemetry, no background data transmission, no cloud sync reliance | Fully offline runtime loop; all paths reside on local filesystem | Network egress strictly prohibited; opt-in manual check (`--live-pages`) isolated |
-| **2. Unprivileged User-Mode** | Normal execution runs in user space without administrator elevation | Standard non-elevated user permissions for watcher, tray, and DB tasks | Elevated repair actions (Store AppX register/reset) require explicit user confirmation |
-| **3. Fail-Closed Process Protection** | Active processes and productive work are never terminated | Multi-point CPU delta sampling and parent-PID tree inspection | Any detected CPU advancement or missing criteria immediately aborts kill |
-| **4. CLI Session Immunity** | Node-based Codex CLI and detached `codex exec` sessions are protected | Explicit CLI filter and rollout timestamp checks | Active CLI execution acts as global mutation lock for thread store |
-| **5. Pre-Mutation DB Snapshot** | SQLite database is never mutated in-place without verified backup | Complete snapshot of database file plus WAL and SHM journal files | Any backup failure immediately halts maintenance before VACUUM |
-| **6. Cryptographic Integrity Gate** | Database corruption is detected before applying maintenance | Execution of `PRAGMA integrity_check` on the backup copy | Non-zero or corrupted check blocks all downstream write/checkpoint operations |
-| **7. Mandatory Safety Grace Windows** | New processes and empty threads are given time to complete initialization | 30-minute hard floor for runtime orphans; 300s floor for empty threads | Temporary initialization spikes are never mistaken for dead leftovers |
-| **8. Staggered Automation Unpausing** | Recovery does not flood Codex with simultaneous automation starts | Configurable stagger delay (default: 60s windows) via Safe Start coordinator | Avoids API rate-limit spikes and host CPU saturation |
-| **9. Non-Destructive AppX Resolution** | Microsoft Store package troubleshooting preserves user data | Bounded escalation: no-admin cleanup -> admin suggestion -> Store reinstall PDP | Automatic destructive resets or package purges are strictly forbidden |
-| **10. Strict Verification Parity** | 100% green test suite, clean linters, and synchronized contracts | Automated CI matrix, Pytest suite (381 passed), Ruff, and compileall | Code changes require complete verification before release deployment |
+| **1. INV-LOCAL-01 (100% Local-First)** | Zero external telemetry, no background data transmission, no cloud sync reliance | Fully offline runtime loop; all paths reside on local filesystem | Network egress strictly prohibited; opt-in manual check (`--live-pages`) isolated |
+| **2. INV-NOELEV-02 (Unprivileged User-Mode)** | Normal execution runs in user space without administrator elevation | Standard non-elevated user permissions for watcher, tray, and DB tasks | Elevated repair actions (Store AppX register/reset) require explicit user confirmation |
+| **3. INV-ISOLAT-03 (Fail-Closed Process Protection)** | Active processes and productive work are never terminated | Multi-point CPU delta sampling and parent-PID tree inspection | Any detected CPU advancement or missing criteria immediately aborts kill |
+| **4. INV-SESSIM-04 (CLI Session Immunity)** | Node-based Codex CLI and detached `codex exec` sessions are protected | Explicit CLI filter and rollout timestamp checks | Active CLI execution acts as global mutation lock for thread store |
+| **5. INV-ATOMIC-05 (Pre-Mutation DB Snapshot)** | SQLite database is never mutated in-place without verified backup | Complete snapshot of database file plus WAL and SHM journal files | Any backup failure immediately halts maintenance before VACUUM |
+| **6. INV-CRYPTO-06 (Cryptographic Integrity Gate)** | Database corruption is detected before applying maintenance | Execution of `PRAGMA integrity_check` on the backup copy | Non-zero or corrupted check blocks all downstream write/checkpoint operations |
+| **7. INV-GRACE-07 (Mandatory Safety Grace Windows)** | New processes and empty threads are given time to complete initialization | 30-minute hard floor for runtime orphans; 300s floor for empty threads | Temporary initialization spikes are never mistaken for dead leftovers |
+| **8. INV-STAGGER-08 (Staggered Automation Unpausing)** | Recovery does not flood Codex with simultaneous automation starts | Configurable stagger delay (default: 60s windows) via Safe Start coordinator | Avoids API rate-limit spikes and host CPU saturation |
+| **9. INV-NONDEST-09 (Non-Destructive AppX Resolution)** | Microsoft Store package troubleshooting preserves user data | Bounded escalation: no-admin cleanup -> admin suggestion -> Store reinstall PDP | Automatic destructive resets or package purges are strictly forbidden |
+| **10. INV-SLA-10 (Strict Verification Parity)** | 100% green test suite, clean linters, and synchronized contracts | Automated CI matrix, Pytest suite (391+ passed), Ruff, and compileall | Code changes require complete verification before release deployment |
+
+## Target Personas & Discoverability
+
+CareCenter for Codex is architected for four primary user groups across the Windows desktop development ecosystem:
+
+| Persona | Profile & Intent | Primary Pain Point | CareCenter Solution & High-Intent Workflows |
+|---|---|---|---|
+| **1. Solo Developers & AI Engineers** | Power users executing iterative coding turns via OpenAI Codex Desktop on Windows 10/11. | App fails to launch silently after window close due to dangling singleton socket locks or ghost background processes. | One-click tray repair, automatic ghost process cleanup (`Codex.exe` / `ChatGPT.exe`), and safe-start relaunch without losing workspace state. |
+| **2. DevOps & Workstation Tooling Integrators** | Engineers automating developer environments, CI runners, and workstation maintenance scripts. | Manual task killing disrupts active CLI sessions; administrative elevation prompts break automated background loops. | Unprivileged user-mode CLI (`codex-logwartung`), fail-closed CLI protection (`INV-SESSIM-04`), and headless loop daemon. |
+| **3. Local-First & Data Privacy Advocates** | Security-focused developers demanding complete data ownership and local execution boundaries. | Third-party PC cleaner utilities bundled with telemetry, invasive drivers, and opaque cloud sync dependencies. | Strict zero-egress architecture (`INV-LOCAL-01`), no network calls, fully transparent SQLite VACUUM and WAL checkpoints. |
+| **4. IT Support & System Administrators** | Enterprise IT staff supporting fleets of Windows engineering workstations running Store apps. | Corrupted Store AppX package states, bloated thread stores (`state_5.sqlite`), and unmanaged orphan processes. | Bounded Store repair escalation, pre-mutation database snapshots (`INV-ATOMIC-05`), and audit-ready startup receipts. |
+
+#### High-Intent Search & Discovery Keywords
+- **English:** `openai codex repair windows`, `codex desktop failed to start`, `codex singleton lock cleanup`, `kill hung codex process`, `codex sqlite vacuum maintenance`, `pyside6 tray developer tools`, `codex desktop background reaper`, `local-first zero-telemetry tray`
+- **German:** `OpenAI Codex Reparatur Windows`, `Codex Desktop startet nicht`, `Codex Singleton Lock bereinigen`, `hängende Codex Prozesse beenden`, `Codex SQLite Datenbank Wartung`, `PySide6 System Tray Werkzeug`, `Codex Hintergrundprozess Wächter`, `Lokal-Erstmals Desktop Werkzeug`
+
+## Comparative Matrix & Alternatives
+
+The following matrix compares CareCenter for Codex against alternative operational patterns across 10 architectural and functional dimensions:
+
+| Capability & Dimension | CareCenter for Codex | Windows Task Manager | Ad-Hoc Scripts (Batch/PS) | Generic Cleaners (CCleaner) | Codex Reinstallation |
+|---|---|---|---|---|---|
+| **1. 100% Local-First & Zero Egress** | **Full Guarantee** (`INV-LOCAL-01`, no telemetry) | Offline tool, no network | Script dependent, usually local | ❌ Bundled telemetry & cloud calls | Cloud download required |
+| **2. Non-Elevation (`RunAsInvoker`)** | **User Space Only** (`INV-NOELEV-02`, no UAC) | ⚠️ Often requires admin for Store apps | ⚠️ Requires UAC for elevated kills | ❌ Requires full Administrator/UAC | ❌ Requires admin / Store privileges |
+| **3. Inactive Ghost & Zombie Reaping** | **Selective & Protected** (`INV-ISOLAT-03`) | ❌ Indiscriminate manual termination | ❌ Blind `taskkill /F` kills active work | ❌ Ignores process lock states | ❌ Process must terminate first |
+| **4. CLI & Agent Session Immunity** | **Guaranteed** (`INV-SESSIM-04`, CLI shielded) | ❌ Kills child processes blindly | ❌ Kills all matching process names | ❌ Unaware of CLI/node child trees | ❌ Interrupts all active runs |
+| **5. Atomic SQLite DB Maintenance** | **Full Backup + WAL Integrity** (`INV-ATOMIC-05`) | ❌ No database awareness | ❌ Complex / error-prone scripting | ❌ Blind file deletion (data loss) | ❌ Deletes or resets state database |
+| **6. Cryptographic Integrity Gate** | **PRAGMA integrity_check** (`INV-CRYPTO-06`) | ❌ None | ❌ None | ❌ None | ❌ None |
+| **7. Safe-Start Fallback & Launch Gating** | **Integrated** (`safe-start-for-codex`) | ❌ None | ❌ None | ❌ None | ❌ None |
+| **8. Asynchronous PySide6 Tray UI** | **Responsive QThread Architecture** | Basic Task Manager UI | ❌ Headless / CLI only | Heavy proprietary UI | Windows Store UI |
+| **9. MS Store AppX Resolution Path** | **Bounded Escalation & Diagnostics** | Terminate / Reset only | Manual PowerShell AppX commands | ❌ Unsupported | Full manual Store reinstall |
+| **10. Security SLA & Contract Tests** | **48h SLA & 391+ Pytest Suite** | N/A | ❌ No test harness | ❌ Proprietary closed-source | Closed-source binary |
 
 ## Sibling Ecosystem & Partner Tools
 
@@ -401,6 +437,16 @@ python scripts\build_store_pages.py --output _site
 ```
 
 The active workflow `.github/workflows/pages.yml` publishes the generated `/privacy/` and `/support/` routes through GitHub Pages.
+
+## Third-Party Licenses & Transparency
+
+CareCenter for Codex maintains strict license transparency and distribution compliance:
+
+- **Core Application:** Licensed under the permissive [MIT License](LICENSE).
+- **GUI Subsystem:** Powered by **PySide6** (`>=6.7`), dynamically linked in full compliance with the **GNU Lesser General Public License v3 (LGPL-3.0-only)**. No Qt6/PySide6 source code is modified or redistributed in proprietary form. Users retain the freedom to relink or replace the installed PySide6 runtime wheels.
+- **Configuration Engine:** Built on **tomlkit** under the **MIT License**.
+- **Build & Integration Tooling:** Safe Start integration (`safe-start-for-codex`, MIT), PyInstaller packaging (GPLv2 with PyInstaller Exception), and Hatchling (MIT).
+- **Audit & Invariants Document:** A comprehensive audit of all runtime, development, standard library dependencies, and the 10 Governance & Runtime Safety Invariants is maintained in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md). Legacy text format is preserved in [THIRD_PARTY_LICENSES.txt](THIRD_PARTY_LICENSES.txt).
 
 ## Development & License
 
