@@ -44,6 +44,7 @@ dev = [
     "pytest>=8.0",
     "ruff>=0.5",
     "mypy>=1.10",
+    "jsonschema[format]>=4.23",
 ]
 build = [
     "safe-start-for-codex @ git+https://github.com/dev-bricks/safe-start-for-codex.git@dcb369a64f403f6551bcb3bac16565c56ec79474",

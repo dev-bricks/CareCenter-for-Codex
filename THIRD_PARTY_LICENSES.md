@@ -71,6 +71,7 @@ SOFTWARE.
 | **pytest** | `>=8.0` | `9.1.1` | MIT License | `MIT` | [PyPI](https://pypi.org/project/pytest/) | Automated test execution and contract verification (391+ tests) |
 | **Ruff** | `>=0.5` | `0.15.21` | MIT / Apache-2.0 | `MIT OR Apache-2.0` | [PyPI](https://pypi.org/project/ruff/) | Static analysis, code formatting, and linting |
 | **mypy** | `>=1.10` | `2.3.0` | MIT License | `MIT` | [PyPI](https://pypi.org/project/mypy/) | Strict static type checking |
+| **jsonschema[format]** | `>=4.23` | `4.26.0` | MIT License | `MIT` | [PyPI](https://pypi.org/project/jsonschema/) | Draft 2020-12 schema validation with RFC 3339 format assertions for exchange-contract tests |
 
 ---
 

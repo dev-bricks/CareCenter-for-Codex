@@ -5,7 +5,7 @@
 > Inoffizielles lokales Windows-Tray- und CLI-Werkzeug, das die OpenAI-Codex-Desktop-App gesund hält — repariert fehlgeschlagene Starts, entfernt hängende Reste und wartet die SQLite-Logdatenbank sicher. Vollständig offline, keine Telemetrie.
 
 [![CareCenter Tests](https://github.com/dev-bricks/CareCenter-for-Codex/actions/workflows/tests.yml/badge.svg)](https://github.com/dev-bricks/CareCenter-for-Codex/actions/workflows/tests.yml)
-[![Pytest Status](https://img.shields.io/badge/Tests-397%20bestanden-brightgreen.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
+[![Pytest Status](https://img.shields.io/badge/Tests-404%20bestanden-brightgreen.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
 [![Version](https://img.shields.io/badge/Version-0.8.0-blue.svg)](https://github.com/dev-bricks/CareCenter-for-Codex/releases)
 [![Python](https://img.shields.io/badge/Python-3.12%20%7C%203.13-blue.svg)](https://www.python.org/)
 [![Plattform](https://img.shields.io/badge/Plattform-Windows%2010%20%7C%2011-lightgrey.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
@@ -369,6 +369,10 @@ größere Werte verlängern sie.
 - Die Runtime-Waisenbereinigung verlangt einen toten Parent sowie Alters- und CPU-Leerlaufbelege. Ein abgelöster `codex exec` bleibt zusätzlich ausgeschlossen, solange ein CPU-, Rollout- oder ausstehendes Output-Lebenszeichen vorliegt; ohne `--output-last-message`-Vertrag wird er fail-closed ausgeschlossen. Inaktive `language_server*`-Prozesse mit totem Parent bleiben Bereinigungsziele.
 - Der Codex-Desktop-App-Server, fremde Kindprozesse, aktive Codex-CLI-Arbeit und aktive Desktop-Arbeit sind von Prozessbeendigungen ausgeschlossen. Der breite read-only Detektor behandelt Desktop- und npm-CLI-Aktivität dennoch als Blocker für Thread-Store-Mutationen.
 - Destruktive Pfade wie Store-Reset, Admin-Reparatur, Neuinstallation und Reboot sind Vorschläge oder ausdrückliche Nutzeraktionen, keine automatischen Überraschungen.
+- Der [CareCenter-Gesundheitsaustauschvertrag v1](CARE_CENTER_EXCHANGE_CONTRACT.md)
+  definiert einen datensparsamen, ausschließlich lesenden Schnappschuss für
+  BACH/OCEAN. Er aktiviert weder Laufzeittransport noch eingehende Befehle,
+  Telemetrie oder ferngesteuerte Wartungsbefugnisse.
 
 ## Windows-Store-Materialien
 
