@@ -1,0 +1,303 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/dev-bricks/CareCenter-for-Codex/blob/main/docs/contracts/carecenter-health-exchange-v1.schema.json",
+  "title": "CareCenter Health Exchange v1",
+  "description": "Privacy-minimized, read-only health snapshot from CareCenter to BACH/OCEAN.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "contract_version",
+    "publisher_component",
+    "publisher_instance",
+    "publisher_epoch",
+    "generated_at",
+    "source_checkpoint",
+    "overall_status",
+    "issues"
+  ],
+  "properties": {
+    "schema": {
+      "const": "carecenter-health-exchange-v1"
+    },
+    "contract_version": {
+      "const": "1.0.0"
+    },
+    "publisher_component": {
+      "const": "carecenter-for-codex"
+    },
+    "publisher_instance": {
+      "description": "Persistent, CSPRNG-generated UUIDv4. Never derived from a host, user, path, or device identifier.",
+      "$ref": "#/$defs/uuid_v4"
+    },
+    "publisher_epoch": {
+      "description": "CSPRNG-generated UUIDv4 bound to the durable checkpoint state.",
+      "$ref": "#/$defs/uuid_v4"
+    },
+    "generated_at": {
+      "description": "Strict RFC 3339 UTC time at which the adapter closed the snapshot. Format assertion is mandatory for consumers.",
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|02-(?:0[1-9]|1[0-9]|2[0-9]))T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]+)?Z$"
+    },
+    "source_checkpoint": {
+      "description": "Monotonically increasing checkpoint scoped to publisher_instance and publisher_epoch.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "overall_status": {
+      "type": "string",
+      "enum": [
+        "ok",
+        "warn",
+        "critical",
+        "unknown"
+      ]
+    },
+    "issues": {
+      "$ref": "#/$defs/issues"
+    }
+  },
+  "oneOf": [
+    {
+      "title": "Healthy complete snapshot",
+      "properties": {
+        "overall_status": {
+          "const": "ok"
+        },
+        "issues": {
+          "maxProperties": 0
+        }
+      }
+    },
+    {
+      "title": "Warning complete snapshot",
+      "properties": {
+        "overall_status": {
+          "const": "warn"
+        },
+        "issues": {
+          "minProperties": 1,
+          "propertyNames": {
+            "enum": [
+              "database_missing",
+              "database_wal_large",
+              "database_large",
+              "disk_space_low",
+              "database_badstate_present",
+              "update_leftovers_present",
+              "automation_nesting_detected",
+              "automation_id_duplicate"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Critical complete snapshot",
+      "properties": {
+        "overall_status": {
+          "const": "critical"
+        },
+        "issues": {
+          "minProperties": 1,
+          "propertyNames": {
+            "enum": [
+              "codex_start_blocked",
+              "database_missing",
+              "database_wal_large",
+              "database_large",
+              "disk_space_low",
+              "database_badstate_present",
+              "codex_install_missing",
+              "update_leftovers_present",
+              "automation_nesting_detected",
+              "automation_id_duplicate"
+            ]
+          },
+          "anyOf": [
+            {
+              "required": [
+                "codex_start_blocked"
+              ]
+            },
+            {
+              "required": [
+                "codex_install_missing"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "title": "Unavailable diagnostic snapshot",
+      "properties": {
+        "overall_status": {
+          "const": "unknown"
+        },
+        "issues": {
+          "required": [
+            "diagnostic_unavailable"
+          ],
+          "maxProperties": 1
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "uuid_v4": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "warning_issue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "severity",
+        "fixable"
+      ],
+      "properties": {
+        "severity": {
+          "const": "warn"
+        },
+        "fixable": {
+          "const": false
+        }
+      }
+    },
+    "critical_fixable_issue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "severity",
+        "fixable"
+      ],
+      "properties": {
+        "severity": {
+          "const": "critical"
+        },
+        "fixable": {
+          "const": true
+        }
+      }
+    },
+    "critical_nonfixable_issue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "severity",
+        "fixable"
+      ],
+      "properties": {
+        "severity": {
+          "const": "critical"
+        },
+        "fixable": {
+          "const": false
+        }
+      }
+    },
+    "issues": {
+      "description": "Current public findings keyed by neutral code. Object keys make duplicate codes impossible.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "codex_start_blocked": {
+          "$ref": "#/$defs/critical_fixable_issue"
+        },
+        "database_missing": {
+          "$ref": "#/$defs/warning_issue"
+        },
+        "database_wal_large": {
+          "$ref": "#/$defs/warning_issue"
+        },
+        "database_large": {
+          "$ref": "#/$defs/warning_issue"
+        },
+        "disk_space_low": {
+          "$ref": "#/$defs/warning_issue"
+        },
+        "database_badstate_present": {
+          "$ref": "#/$defs/warning_issue"
+        },
+        "codex_install_missing": {
+          "$ref": "#/$defs/critical_nonfixable_issue"
+        },
+        "update_leftovers_present": {
+          "$ref": "#/$defs/warning_issue"
+        },
+        "automation_nesting_detected": {
+          "$ref": "#/$defs/warning_issue"
+        },
+        "automation_id_duplicate": {
+          "$ref": "#/$defs/warning_issue"
+        },
+        "diagnostic_unavailable": {
+          "$ref": "#/$defs/critical_nonfixable_issue"
+        }
+      }
+    }
+  },
+  "x-source-code-map": {
+    "zombie-prozess": {
+      "public_code": "codex_start_blocked",
+      "severity": "critical",
+      "fixable": true
+    },
+    "verwaistes-lockfile": {
+      "public_code": "codex_start_blocked",
+      "severity": "critical",
+      "fixable": true
+    },
+    "db-fehlt": {
+      "public_code": "database_missing",
+      "severity": "warn",
+      "fixable": false
+    },
+    "wal-aufblaehung": {
+      "public_code": "database_wal_large",
+      "severity": "warn",
+      "fixable": false
+    },
+    "db-aufblaehung": {
+      "public_code": "database_large",
+      "severity": "warn",
+      "fixable": false
+    },
+    "wenig-speicher": {
+      "public_code": "disk_space_low",
+      "severity": "warn",
+      "fixable": false
+    },
+    "badstate": {
+      "public_code": "database_badstate_present",
+      "severity": "warn",
+      "fixable": false
+    },
+    "codex-exe-fehlt": {
+      "public_code": "codex_install_missing",
+      "severity": "critical",
+      "fixable": false
+    },
+    "update-reste": {
+      "public_code": "update_leftovers_present",
+      "severity": "warn",
+      "fixable": false
+    },
+    "verschachtelte-automation": {
+      "public_code": "automation_nesting_detected",
+      "severity": "warn",
+      "fixable": false
+    },
+    "automation-id-duplikat": {
+      "public_code": "automation_id_duplicate",
+      "severity": "warn",
+      "fixable": false
+    }
+  },
+  "x-freshness-policy": {
+    "max_age_seconds": 900,
+    "max_future_skew_seconds": 300
+  }
+}

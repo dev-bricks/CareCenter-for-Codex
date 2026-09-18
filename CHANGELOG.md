@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+- Contract (2026-09-16): Defined `carecenter-health-exchange-v1`, a closed,
+  privacy-minimized full health snapshot from CareCenter to BACH/OCEAN. The
+  contract exposes only neutral issue codes, severity, fixability, UTC closure
+  time, random publisher/epoch UUIDs, and a monotonic source checkpoint. Status,
+  issue severity, uniqueness, strict time parsing, bounded freshness, and
+  checkpoint-reset behavior are normative. The contract excludes paths, process
+  and automation identifiers, raw messages, sizes, content, configuration, and
+  secrets; grants no inbound command or maintenance authority; and adds no
+  runtime transport. Added a synthetic fixture and contract tests that bind all
+  current `health.py` issue codes, severities, and fixability to explicit public
+  mappings. Added the development-only `jsonschema[format]` dependency and
+  license-inventory entry so CI executes the real Draft 2020-12 validator with
+  RFC 3339 format assertions instead of testing a hand-written approximation.
+- Verification (2026-09-16): 405 collected, 404 passed, 1 skipped; focused
+  exchange-contract tests, Ruff, compileall, JSON parsing, README parity, and
+  diff-check clean.
 - Discoverability, Governance & License Audit Refresh (2026-09-12) [Pfad B]: Completed comprehensive Pfad B discoverability and visual design refresh. Created `THIRD_PARTY_LICENSES.md` detailing direct runtime dependencies (`PySide6` LGPL-3.0, `tomlkit` MIT), build/integration dependencies (`safe-start-for-codex` MIT, `PyInstaller` GPLv2+ with exception, `hatchling` MIT), test/lint tools (`pytest`, `Ruff`, `mypy`), standard library baseline (PSF 2.0), LGPL-3.0 dynamic linking rules, and the 10 Governance & Runtime Safety Invariants (`INV-LOCAL-01` through `INV-SLA-10`). Updated `THIRD_PARTY_LICENSES.txt` with cross-references. Added Third-Party Audited Shields.io badge to documentation. Expanded Quick Navigation from 14 to 17 anchors in both `README.md` and `README.de.md`. Added bilingual Target Personas section defining 4 user profiles (Solo Developers, DevOps Tooling Integrators, Local-First Privacy Advocates, IT Support Administrators) and high-intent search keywords. Added comprehensive 10-dimension 5-way Comparative Matrix evaluating CareCenter against Windows Task Manager, ad-hoc Batch/PowerShell scripts, generic PC cleaners (CCleaner), and complete Codex reinstallation. Added Section 16 Third-Party Licenses & Transparency linking to audit records. Synchronized byte-identical `README_de.md` for multi-convention compatibility. Refreshed `llms.txt` and local `MARKETING-LOG.txt`. Expanded contract test suite `tests/test_metadata.py` to cover all 17 navigation headings, canonical invariant codes, bilingual personas, comparative matrix, and README_de parity.
 - Verification (2026-09-12): Pytest test suite green (391+ passed, 1 skipped), Ruff check clean (0 errors), compileall clean (0 errors), git diff --check clean.
 - Technical Hygiene & Quality Hardening (2026-09-11): Completed Pfad A technical hygiene and quality hardening run. Hardened `.gitignore` against multi-host synchronization conflicts (`*-conflict-*`, `*.sync-conflict-*`, `*.conflict`, `*-CONFLIT-*`, `*.sync-temp-*`), multi-agent locks (`LOCK.*`, `*.lock`, `LOCK`, `LOCK*.txt`), test/coverage/packaging caches (`.coverage`, `coverage/`, `htmlcov/`, `wheelhouse/`, `.wheel-smoke/`), and temporary editor artifacts (`*.tmp`, `*.bak`, `*.swp`, `*~`). Hardened `.github/workflows/tests.yml` with timeout guardrail (`timeout-minutes: 15`) and pip dependency caching (`cache: 'pip'`) in `setup-python`. Enriched bilingual `SECURITY.md` with binding 48-hour response SLA (`48 business hours` / `48 Stunden`), 5-business-day triage commitment (`5 business days` / `5 Werktagen`), and umbrella/maintainer reporting contacts (`security@open-bricks.org`, `security@dev-bricks.org`, `support@lukasgeiger.com`, `lukas@open-bricks.org`). Standardized PEP 621 metadata in `pyproject.toml` with complete ecosystem URLs (LLM Ready, Marketing Log, Third-Party Licenses, Bug Tracker). Added Security SLA and Ruff code style Shields.io badges to both English (`README.md`) and German (`README.de.md`) documentation. Synchronized `llms.txt` and README test badges to 391 passed (392 collected, 1 skipped). Expanded automated contract test suite in `tests/test_metadata.py` to 15 tests with new contract tests for `.gitignore` hygiene patterns, security policy triage SLA & contact channels, CI workflow pip caching & timeout, and Shields.io badge parity.

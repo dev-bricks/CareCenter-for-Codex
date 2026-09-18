@@ -5,7 +5,7 @@
 > Unofficial Windows tray & CLI utility that keeps the OpenAI Codex desktop app healthy — repairs failed starts, removes hung leftovers, and safely maintains the local SQLite log database. Fully offline, no telemetry.
 
 [![CareCenter tests](https://github.com/dev-bricks/CareCenter-for-Codex/actions/workflows/tests.yml/badge.svg)](https://github.com/dev-bricks/CareCenter-for-Codex/actions/workflows/tests.yml)
-[![Pytest Status](https://img.shields.io/badge/Tests-397%20passed-brightgreen.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
+[![Pytest Status](https://img.shields.io/badge/Tests-404%20passed-brightgreen.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
 [![Version](https://img.shields.io/badge/version-0.8.0-blue.svg)](https://github.com/dev-bricks/CareCenter-for-Codex/releases)
 [![Python](https://img.shields.io/badge/Python-3.12%20%7C%203.13-blue.svg)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-lightgrey.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
@@ -390,6 +390,9 @@ When set, `config.json`, `logs\`, and `backups\` are placed under that path inst
 - Runtime-orphan cleanup requires a dead parent plus age and CPU-idle evidence. A detached `codex exec` is additionally excluded while any CPU, recent rollout, or pending-output signal remains; a run without an `--output-last-message` contract is excluded fail-closed. Idle dead-parent `language_server*` processes remain cleanup targets.
 - The Codex desktop app-server, unrelated child processes, active Codex CLI work, and active desktop work are excluded from process termination. The broad read-only detector still treats Desktop and npm CLI activity as a blocker for thread-store mutation.
 - Destructive paths such as Store reset, admin repair, reinstall, and reboot are suggestions or explicit user actions, not automatic surprises.
+- The [CareCenter Health Exchange Contract v1](CARE_CENTER_EXCHANGE_CONTRACT.md)
+  defines a privacy-minimized, read-only snapshot for BACH/OCEAN. It adds no
+  runtime transport, inbound command, telemetry, or remote maintenance authority.
 
 ## Windows Store Materials
 

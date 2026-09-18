@@ -80,7 +80,7 @@ def test_llms_txt_and_docs_sync() -> None:
     assert llms_path.is_file()
 
     content = llms_path.read_text(encoding="utf-8")
-    assert "Last-checked: 2026-09-12" in content
+    assert "Last-checked: 2026-09-16" in content
     assert "https://github.com/dev-bricks/CareCenter-for-Codex" in content
     assert "carecenter-for-codex" in content
 
@@ -101,7 +101,7 @@ def test_readme_badges_consistency() -> None:
         assert ("Security%20SLA" in readme or "Sicherheits--SLA" in readme)
         assert ("code%20style-ruff" in readme or "Code--Stil-ruff" in readme)
         assert ("Third--Party%20Licenses-Audited" in readme or "Drittanbieter--Lizenzen-Gepr" in readme)
-        assert "Tests-397" in readme
+        assert "Tests-404" in readme
 
 
 def test_quick_navigation_anchors_parity() -> None:
@@ -365,6 +365,7 @@ def test_third_party_licenses_audit_and_transparency() -> None:
     assert "pytest" in content
     assert "Ruff" in content
     assert "mypy" in content
+    assert "jsonschema[format]" in content
     assert "Python Software Foundation (PSF) License Agreement 2.0" in content
 
 

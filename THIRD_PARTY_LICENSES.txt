@@ -37,6 +37,7 @@ CareCenter for Codex is licensed under the MIT License. See `LICENSE`.
 | pytest | `>=8.0` | 9.1.1 | MIT | https://pypi.org/project/pytest/ |
 | Ruff | `>=0.5` | 0.15.21 | MIT | https://pypi.org/project/ruff/ |
 | mypy | `>=1.10` | 2.3.0 | MIT | https://pypi.org/project/mypy/ |
+| jsonschema[format] | `>=4.23` | 4.26.0 | MIT | https://pypi.org/project/jsonschema/ |
 
 ## Distribution Notes
 

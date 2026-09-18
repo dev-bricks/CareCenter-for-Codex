@@ -1,0 +1,20 @@
+{
+  "schema": "carecenter-health-exchange-v1",
+  "contract_version": "1.0.0",
+  "publisher_component": "carecenter-for-codex",
+  "publisher_instance": "ee2f4710-8f46-4f6c-96cb-1ab7a46a1ce2",
+  "publisher_epoch": "89f21445-9778-40ec-932f-b34396251243",
+  "generated_at": "2026-09-16T08:45:00Z",
+  "source_checkpoint": 12,
+  "overall_status": "warn",
+  "issues": {
+    "database_wal_large": {
+      "severity": "warn",
+      "fixable": false
+    },
+    "update_leftovers_present": {
+      "severity": "warn",
+      "fixable": false
+    }
+  }
+}
