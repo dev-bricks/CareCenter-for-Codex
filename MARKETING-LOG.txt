@@ -91,3 +91,19 @@ Repo: dev-bricks/CareCenter-for-Codex
 1. **GitHub Social Preview**: Set a dedicated Open Graph / social preview image in repository settings matching `assets/banner.svg` styling.
 2. **PyPI / Winget Packaging**: Publish wheel to PyPI and submit winget manifest (`dev-bricks.CareCenter-for-Codex`) once Windows Store packaging is finalized.
 3. **Ecosystem Cross-Referencing**: Confirm reciprocal discovery mentions in sibling developer tools (`safe-start-for-codex`, `companion-for-agy`, `lock-master`, `MethodenAnalyser`).
+
+## Date: 2026-09-20
+Repo: dev-bricks/CareCenter-for-Codex
+
+### Automated Actions Applied (Pfad A Technical Hygiene & Quality Hardening):
+1. Deployed standard GitHub Actions lifecycle workflows `.github/workflows/stale.yml` (automated triage via `actions/stale@v9`, daily 01:30 UTC cron schedule, 10m timeout, least-privilege `issues: write` and `pull-requests: write`) and `.github/workflows/welcome.yml` (contributor onboarding via `actions/first-interaction@v3`, 5m timeout, `cancel-in-progress: true`).
+2. Hardened `.gitignore` against multi-host synchronization and cloud-conflict patterns (`*conflicted copy*`, `* (Kopie)*`, `* (Copy)*`, `*-WORKSTATION*`, `*-WORKSTATION-LG*`, `*-LAPTOP*`, `*-ASUS*`, `*-ASUS-GEI*`, `*-Mac Studio*`, `*-MacBook*`), canonical lock defense (`LOCK.user.*`, `LOCK.until.*`, `LOCK.condition.*`, `LOCK.permissions.json`, `.automation-lock`, `!package-lock.json`), and test/compiler artifacts (`.hypothesis/`, `.turbo/`, `.nyc_output/`, `*.orig`, `*.rej`).
+3. Standardized PEP 621 packaging metadata in `pyproject.toml` with `license-files = ["LICENSE", "THIRD_PARTY_LICENSES.md"]`, Pytest test directory protection (`norecursedirs`), and explicit JSON Schema RFC 3339 format validation dev dependencies (`rfc3339-validator`, `isoduration`).
+4. Refreshed Level 1 SBOM third-party license audit recency in `THIRD_PARTY_LICENSES.md` and `THIRD_PARTY_LICENSES.txt` to 2026-09-20, documenting RunAsInvoker unprivileged execution and zero-egress invariants.
+5. Synchronized AI context file `llms.txt` and documentation Shields.io badges to 409 passed tests (410 collected, 1 skipped) and verification timestamp 2026-09-20.
+6. Expanded contract test suite `tests/test_metadata.py` to 27 tests validating lifecycle workflows, multi-host lock defense, PEP 621 license files, pytest isolation, third-party audit recency, and changelog/marketing parity.
+
+### Non-Automated Marketing & Discoverability Recommendations:
+1. **GitHub Issues Template**: Consider adding issue form templates under `.github/ISSUE_TEMPLATE/` (bug report, feature request) to guide community issue creation alongside `welcome.yml`.
+2. **Release Announcement**: Tag and publish GitHub Release for v0.8.0 / v0.8.1 with link to `THIRD_PARTY_LICENSES.md` and `CARE_CENTER_EXCHANGE_CONTRACT.md`.
+3. **Ecosystem Cross-Referencing**: Ensure reciprocal discovery mentions in sibling developer tools (`safe-start-for-codex`, `companion-for-agy`).

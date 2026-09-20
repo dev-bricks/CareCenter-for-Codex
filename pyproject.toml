@@ -3,6 +3,7 @@ name = "carecenter-for-codex"
 version = "0.8.0"
 description = "Unofficial local Windows tray + CLI to repair, clean up and maintain the OpenAI Codex desktop app"
 readme = "README.md"
+license-files = ["LICENSE", "THIRD_PARTY_LICENSES.md"]
 requires-python = ">=3.12"
 license = { text = "MIT" }
 authors = [
@@ -45,6 +46,8 @@ dev = [
     "ruff>=0.5",
     "mypy>=1.10",
     "jsonschema[format]>=4.23",
+    "rfc3339-validator>=0.1.4",
+    "isoduration>=20.11.0",
 ]
 build = [
     "safe-start-for-codex @ git+https://github.com/dev-bricks/safe-start-for-codex.git@dcb369a64f403f6551bcb3bac16565c56ec79474",
@@ -85,3 +88,4 @@ minversion = "8.0"
 addopts = "-v"
 testpaths = ["tests"]
 pythonpath = ["src"]
+norecursedirs = [".git", ".pytest_cache", "__pycache__", "build", "dist", ".venv", "backups", "logs", "store_package"]

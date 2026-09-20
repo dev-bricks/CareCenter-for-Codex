@@ -1,7 +1,7 @@
 # CareCenter for Codex
 
-> Last-checked: 2026-09-16
-> Test suite: 405 collected tests (404 passed, 1 skipped, verified 2026-09-16)
+> Last-checked: 2026-09-20
+> Test suite: 410 collected tests (409 passed, 1 skipped, verified 2026-09-20)
 
 CareCenter for Codex is an unofficial local Windows tray and CLI utility for
 maintaining the OpenAI Codex desktop app installation. It repairs failed
@@ -32,7 +32,7 @@ Important boundaries & Invariants (INV-LOCAL-01 through INV-SLA-10):
 - INV-GRACE-07: Mandatory grace windows (30m orphan grace, 300s empty thread floor).
 - INV-STAGGER-08: Staggered automation unpausing via Safe Start (60s default).
 - INV-NONDEST-09: Non-destructive Microsoft Store package repair escalation.
-- INV-SLA-10: Strict test parity (391+ tests) & 48-hour security response SLA.
+- INV-SLA-10: Strict test parity (409+ tests) & 48-hour security response SLA.
 - `CARE_CENTER_EXCHANGE_CONTRACT.md` defines the versioned, privacy-minimized,
   one-way CareCenter -> BACH/OCEAN health snapshot. It is a schema boundary, not
   a runtime transport, inbound command channel, or grant of repair authority.

@@ -5,7 +5,7 @@
 > Inoffizielles lokales Windows-Tray- und CLI-Werkzeug, das die OpenAI-Codex-Desktop-App gesund hält — repariert fehlgeschlagene Starts, entfernt hängende Reste und wartet die SQLite-Logdatenbank sicher. Vollständig offline, keine Telemetrie.
 
 [![CareCenter Tests](https://github.com/dev-bricks/CareCenter-for-Codex/actions/workflows/tests.yml/badge.svg)](https://github.com/dev-bricks/CareCenter-for-Codex/actions/workflows/tests.yml)
-[![Pytest Status](https://img.shields.io/badge/Tests-404%20bestanden-brightgreen.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
+[![Pytest Status](https://img.shields.io/badge/Tests-409%20bestanden-brightgreen.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
 [![Version](https://img.shields.io/badge/Version-0.8.0-blue.svg)](https://github.com/dev-bricks/CareCenter-for-Codex/releases)
 [![Python](https://img.shields.io/badge/Python-3.12%20%7C%203.13-blue.svg)](https://www.python.org/)
 [![Plattform](https://img.shields.io/badge/Plattform-Windows%2010%20%7C%2011-lightgrey.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)

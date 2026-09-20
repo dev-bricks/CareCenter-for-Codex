@@ -80,7 +80,7 @@ def test_llms_txt_and_docs_sync() -> None:
     assert llms_path.is_file()
 
     content = llms_path.read_text(encoding="utf-8")
-    assert "Last-checked: 2026-09-16" in content
+    assert "Last-checked: 2026-09-20" in content
     assert "https://github.com/dev-bricks/CareCenter-for-Codex" in content
     assert "carecenter-for-codex" in content
 
@@ -101,7 +101,7 @@ def test_readme_badges_consistency() -> None:
         assert ("Security%20SLA" in readme or "Sicherheits--SLA" in readme)
         assert ("code%20style-ruff" in readme or "Code--Stil-ruff" in readme)
         assert ("Third--Party%20Licenses-Audited" in readme or "Drittanbieter--Lizenzen-Gepr" in readme)
-        assert "Tests-404" in readme
+        assert "Tests-409" in readme
 
 
 def test_quick_navigation_anchors_parity() -> None:
@@ -408,3 +408,105 @@ def test_readme_de_files_parity() -> None:
     content_underscore = de_underscore.read_text(encoding="utf-8")
 
     assert content_dot == content_underscore, "README.de.md and README_de.md diverged"
+
+
+def test_lifecycle_workflows_present() -> None:
+    """Verify stale.yml and welcome.yml workflows are deployed with bounded timeouts and permissions."""
+    stale_path = ROOT / ".github" / "workflows" / "stale.yml"
+    welcome_path = ROOT / ".github" / "workflows" / "welcome.yml"
+
+    assert stale_path.is_file(), "Missing .github/workflows/stale.yml"
+    assert welcome_path.is_file(), "Missing .github/workflows/welcome.yml"
+
+    stale_text = stale_path.read_text(encoding="utf-8")
+    assert "actions/stale@v9" in stale_text
+    assert "30 1 * * *" in stale_text
+    assert "timeout-minutes: 10" in stale_text
+    assert "issues: write" in stale_text
+    assert "pull-requests: write" in stale_text
+
+    welcome_text = welcome_path.read_text(encoding="utf-8")
+    assert "actions/first-interaction@v3" in welcome_text
+    assert "timeout-minutes: 5" in welcome_text
+    assert "cancel-in-progress: true" in welcome_text
+    assert "issues: write" in welcome_text
+    assert "pull-requests: write" in welcome_text
+
+
+def test_multihost_cloud_sync_and_canonical_lock_defense() -> None:
+    """Verify .gitignore contains full multi-host conflict and canonical lock patterns."""
+    gitignore_path = ROOT / ".gitignore"
+    assert gitignore_path.is_file()
+
+    content = gitignore_path.read_text(encoding="utf-8")
+    lock_patterns = [
+        "LOCK",
+        "LOCK.*",
+        "LOCK*.txt",
+        "LOCK.user.*",
+        "LOCK.until.*",
+        "LOCK.condition.*",
+        "LOCK.permissions.json",
+        ".automation-lock",
+        "!package-lock.json",
+    ]
+    for pattern in lock_patterns:
+        assert pattern in content, f"Missing lock pattern '{pattern}' in .gitignore"
+
+    sync_patterns = [
+        "*conflicted copy*",
+        "* (Kopie)*",
+        "* (Copy)*",
+        "*-WORKSTATION*",
+        "*-WORKSTATION-LG*",
+        "*-LAPTOP*",
+        "*-ASUS*",
+        "*-ASUS-GEI*",
+        "*-Mac Studio*",
+        "*-MacBook*",
+    ]
+    for pattern in sync_patterns:
+        assert pattern in content, f"Missing sync pattern '{pattern}' in .gitignore"
+
+
+def test_pep621_license_files_and_pytest_norecursedirs() -> None:
+    """Verify pyproject.toml declares license-files, format dev deps, and pytest norecursedirs."""
+    pyproject_path = ROOT / "pyproject.toml"
+    assert pyproject_path.is_file()
+
+    content = pyproject_path.read_text(encoding="utf-8")
+    assert 'license-files = ["LICENSE", "THIRD_PARTY_LICENSES.md"]' in content
+    assert "rfc3339-validator>=0.1.4" in content
+    assert "isoduration>=20.11.0" in content
+    assert "norecursedirs =" in content
+    assert ".pytest_cache" in content
+    assert "store_package" in content
+
+
+def test_third_party_licenses_audit_recency_and_format_deps() -> None:
+    """Verify THIRD_PARTY_LICENSES.md and .txt reflect audit recency and format dependencies."""
+    md_path = ROOT / "THIRD_PARTY_LICENSES.md"
+    txt_path = ROOT / "THIRD_PARTY_LICENSES.txt"
+
+    assert md_path.is_file()
+    assert txt_path.is_file()
+
+    md_text = md_path.read_text(encoding="utf-8")
+    txt_text = txt_path.read_text(encoding="utf-8")
+
+    assert "Audit Date:** 2026-09-20" in md_text
+    assert "Last checked: 2026-09-20" in txt_text
+    assert "rfc3339-validator" in md_text
+    assert "rfc3339-validator" in txt_text
+    assert "isoduration" in md_text
+    assert "isoduration" in txt_text
+
+
+def test_changelog_and_marketing_log_recent_pfad_a_entry() -> None:
+    """Verify CHANGELOG.md and MARKETING-LOG.txt contain 2026-09-20 entries."""
+    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    marketing = (ROOT / "MARKETING-LOG.txt").read_text(encoding="utf-8")
+
+    assert "Technical Hygiene & Quality Hardening (2026-09-20) [Pfad A]" in changelog
+    assert "## Date: 2026-09-20" in marketing
+    assert "dev-bricks/CareCenter-for-Codex" in marketing

@@ -3,7 +3,7 @@
 > **Project:** CareCenter for Codex (`dev-bricks/CareCenter-for-Codex`)  
 > **Package:** `carecenter-for-codex` (CLI: `codex-logwartung`)  
 > **Repository:** [https://github.com/dev-bricks/CareCenter-for-Codex](https://github.com/dev-bricks/CareCenter-for-Codex)  
-> **Audit Date:** 2026-09-12  
+> **Audit Date:** 2026-09-20
 > **Scope:** Direct runtime dependencies, build/packaging tooling, system API boundaries, and runtime safety invariants.
 
 ---
@@ -68,10 +68,12 @@ SOFTWARE.
 
 | Tool | Constraint | Audited Version | License | SPDX Identifier | Source / Upstream | Purpose |
 |---|---|---|---|---|---|---|
-| **pytest** | `>=8.0` | `9.1.1` | MIT License | `MIT` | [PyPI](https://pypi.org/project/pytest/) | Automated test execution and contract verification (391+ tests) |
+| **pytest** | `>=8.0` | `9.1.1` | MIT License | `MIT` | [PyPI](https://pypi.org/project/pytest/) | Automated test execution and contract verification (409+ tests) |
 | **Ruff** | `>=0.5` | `0.15.21` | MIT / Apache-2.0 | `MIT OR Apache-2.0` | [PyPI](https://pypi.org/project/ruff/) | Static analysis, code formatting, and linting |
 | **mypy** | `>=1.10` | `2.3.0` | MIT License | `MIT` | [PyPI](https://pypi.org/project/mypy/) | Strict static type checking |
 | **jsonschema[format]** | `>=4.23` | `4.26.0` | MIT License | `MIT` | [PyPI](https://pypi.org/project/jsonschema/) | Draft 2020-12 schema validation with RFC 3339 format assertions for exchange-contract tests |
+| **rfc3339-validator** | `>=0.1.4` | `0.1.4` | MIT License | `MIT` | [PyPI](https://pypi.org/project/rfc3339-validator/) | RFC 3339 date-time format assertion for JSON Schema Draft 2020-12 validation |
+| **isoduration** | `>=20.11.0` | `20.11.0` | ISC License | `ISC` | [PyPI](https://pypi.org/project/isoduration/) | ISO 8601 duration parsing and validation for JSON Schema |
 
 ---
 
@@ -107,7 +109,7 @@ CareCenter enforces 10 strict runtime invariants across all CLI and Tray workflo
 | **INV-GRACE-07** | Stability Timing | **Mandatory Safety Grace Windows** | Hard 30-minute grace window for runtime orphans and 300-second floor for empty threads ensure initialization spikes are never mistaken for dead leftovers. |
 | **INV-STAGGER-08** | Load Balancing | **Staggered Automation Unpausing** | Recovery avoids flooding the OpenAI Codex host by unpausing automations in configurable intervals (default: 60s windows) via the Safe Start coordinator. |
 | **INV-NONDEST-09** | OS Repair | **Non-Destructive AppX Resolution** | Microsoft Store package troubleshooting applies bounded escalation: no-admin cleanup -> admin suggestion -> Store reinstall PDP link. Destructive resets are strictly forbidden. |
-| **INV-SLA-10** | Quality Assurance | **Strict Verification Parity & Security SLA** | 100% green test suite (391+ tests), clean linters, 48-hour response SLA, and 5-business-day triage commitment for security disclosures. |
+| **INV-SLA-10** | Quality Assurance | **Strict Verification Parity & Security SLA** | 100% green test suite (409+ tests), clean linters, 48-hour response SLA, and 5-business-day triage commitment for security disclosures. |
 
 ---
 

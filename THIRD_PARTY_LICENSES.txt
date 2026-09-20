@@ -1,6 +1,6 @@
 # Third-Party Licenses
 
-Last checked: 2026-09-12 against the declared project metadata, PyPI metadata,
+Last checked: 2026-09-20 against the declared project metadata, PyPI metadata,
 the pinned Safe Start GitHub revision, and system API boundaries.
 
 Comprehensive audit document: see `THIRD_PARTY_LICENSES.md` for full details,
@@ -38,6 +38,8 @@ CareCenter for Codex is licensed under the MIT License. See `LICENSE`.
 | Ruff | `>=0.5` | 0.15.21 | MIT | https://pypi.org/project/ruff/ |
 | mypy | `>=1.10` | 2.3.0 | MIT | https://pypi.org/project/mypy/ |
 | jsonschema[format] | `>=4.23` | 4.26.0 | MIT | https://pypi.org/project/jsonschema/ |
+| rfc3339-validator | `>=0.1.4` | 0.1.4 | MIT | https://pypi.org/project/rfc3339-validator/ |
+| isoduration | `>=20.11.0` | 20.11.0 | ISC | https://pypi.org/project/isoduration/ |
 
 ## Distribution Notes
 

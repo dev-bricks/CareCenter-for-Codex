@@ -47,12 +47,29 @@ DECISIONS.md
 TASKPLAN*.md
 HANDOFF-CODEX-START.md
 CODEX-AUTO-DEBUG-DESIGN.md
-LOCK*.txt
-LOCK.*
-*.lock
+# --- Canonical Lock-System & Multi-Agent Defense ---
 LOCK
+LOCK.*
+LOCK*.txt
+LOCK.user.*
+LOCK.until.*
+LOCK.condition.*
+LOCK.permissions.json
+*.lock
+.automation-lock
+!package-lock.json
 
 # --- Multi-Host Synchronization & Cloud Conflict Patterns ---
+*conflicted copy*
+* (Kopie)*
+* (Copy)*
+*-WORKSTATION*
+*-WORKSTATION-LG*
+*-LAPTOP*
+*-ASUS*
+*-ASUS-GEI*
+*-Mac Studio*
+*-MacBook*
 *-conflict-*
 *.sync-conflict-*
 *.conflict
@@ -65,12 +82,17 @@ coverage/
 htmlcov/
 wheelhouse/
 .wheel-smoke/
+.hypothesis/
+.turbo/
+.nyc_output/
 
 # --- Temporary & Editor Files ---
 *.tmp
 *.bak
 *.swp
 *~
+*.orig
+*.rej
 
 # --- Machine-specific README variants (merged into main READMEs) ---
 README-ASUS-GEI.md
