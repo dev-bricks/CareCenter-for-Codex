@@ -236,7 +236,7 @@ Die folgende Matrix vergleicht CareCenter for Codex mit alternativen Betriebsans
 <a id="sec-08"></a><a id="features"></a><a id="funktionen"></a>
 ## Funktionen
 
-- Hintergrund-Wächter: prüft alle 60 Sekunden auf alte Startblocker, abgelöste Runtime-Waisen und doppelte Runtime-MCP-Prozessgenerationen. Die Waisenbereinigung verlangt einen toten Parent, eine feste Karenzzeit von 30 Minuten und zwei CPU-Messpunkte. Abgelöste `codex exec`-Läufe bleiben geschützt, solange CPU-Zeit wächst, ein Session-Rollout jünger als zwei Minuten ist oder ihr `--output-last-message`-Ziel noch fehlt; inaktive `language_server*`-Waisen bleiben bereinigungsfähig. Jeder erfolgreiche Waisen-Kill schreibt PID, Commandline und Kriterium in `app.log`. Die Runtime-MCP-Bereinigung erfasst weiterhin nur inaktive Launcher-Bäume unter demselben Store-Desktop-App-Server und behält immer den neuesten Start-Cohort.
+- Hintergrund-Wächter: prüft alle 60 Sekunden auf alte Startblocker, abgelöste Runtime-Waisen und doppelte Runtime-MCP-Prozessgenerationen. Die Waisenbereinigung verlangt einen toten Parent, eine feste Karenzzeit von 30 Minuten und zwei CPU-Messpunkte. Allowlist-basierte MCP-Nodes und gängige Language-Server werden erfasst. Abgelöste `codex exec`-Läufe bleiben geschützt, solange CPU-Zeit wächst, ein Session-Rollout jünger als zwei Minuten ist oder ihr `--output-last-message`-Ziel noch fehlt. Jeder erfolgreiche Kill beendet den vollständigen Prozessbaum (`taskkill /T`) und schreibt Kind, letzte bekannte Parent-Identität und Kriterium in `app.log`. Eine lebende Parent-Beziehung bedeutet aktive Cohort und ist immer ein Nicht-Kill.
 - Spracheinstellung im Tray: Im Bereich Einstellungen kann zwischen Deutsch und Englisch gewechselt werden. Die Auswahl wird in `config.json` gespeichert und die sichtbare Tray-Oberfläche wird sofort neu beschriftet.
 - Automatisierungssteuerung im Tray: alle aktuell aktiven Codex-Automatisierungen ausschalten, nur von CCC ausgeschaltete Automatisierungen wieder aktivieren oder Automatisierungen sofort beziehungsweise gestaffelt nacheinander einschalten. Der Abstand ist über `automation_stagger_delay_seconds` konfigurierbar (Standard: 60 Sekunden).
 - Thread-Postfachpflege: alle als gelesen markieren, ungelesene Threads älter als X Tage markieren und Threads nach einem getrennt einstellbaren Alter automatisch archivieren. Der Empty-Thread-Autofix wartet mindestens 300 Sekunden, damit neue CLI-/Desktop-Threads ihren ersten Schreibvorgang abschließen können. Änderungen werden bei Desktop- oder npm-Codex-CLI-Aktivität blockiert, unmittelbar vor Backup/Move erneut geprüft und nur mit Backups, atomarem State-Schreiben und transaktionaler Archivierung ausgeführt.
@@ -358,12 +358,13 @@ database: %USERPROFILE%\.codex\logs_2.sqlite
 
 Codex-Pfade werden aus `%LOCALAPPDATA%`, `%APPDATA%` und `CODEX_HOME` erkannt. Neue Installationen legen auch die CareCenter-Daten standardmäßig unter `%LOCALAPPDATA%\CareCenterForCodex` ab. Bestehende lokale Setups unter `C:\_Local_DEV\codex-maintenance\` werden als Legacy-Fallback automatisch weiterverwendet. Alle Pfade lassen sich in `config.json` überschreiben.
 
-Die Runtime-MCP-Bereinigung ist über `reap_runtime_mcp_duplicates` standardmäßig
-aktiv. Ihre konservativen Vorgaben sind ein konfigurierbares Mindestalter von 3600 Sekunden
-(einer Stunde) für jeden Kandidaten-Root, 90 Sekunden Start-Cohort-Abstand, ein
-30-Sekunden-Launcherfenster, mindestens zwei verschiedene
-wiederholte MCP-Signierung und eine Sekunde CPU-Aktivitätsmessung. Alle Schwellen
-lassen sich in `config.json` anpassen.
+Die Runtime-MCP-Kandidatenerkennung ist über `reap_runtime_mcp_duplicates`
+standardmäßig aktiv. Ihre konservativen Vorgaben sind ein konfigurierbares
+Mindestalter von 3600 Sekunden (einer Stunde) für jeden Kandidaten-Root, 90
+Sekunden Start-Cohort-Abstand, ein 30-Sekunden-Launcherfenster, mindestens zwei
+verschiedene wiederholte MCP-Signaturen und eine Sekunde CPU-Aktivitätsmessung.
+Für einen Kill muss zusätzlich der Parent tot sein; eine aktive Store-App-Server-
+Cohort wird nie beendet. Alle Schwellen lassen sich in `config.json` anpassen.
 
 Die Runtime-Waisenbereinigung behält aus Kompatibilitätsgründen das Präfix
 `reap_companion_orphans`. Für `companion_orphan_min_age_seconds` gilt eine feste
@@ -387,9 +388,9 @@ größere Werte verlängern sie.
 - Safe Auto-Maintain schließt Codex erst, wenn der gesamte Prozessbaum im Leerlauf ist.
 - Der Safe-Abbruch stoppt nur das Warten vor dem Schließen von Codex; laufende Datenbankoperationen werden nicht hart unterbrochen.
 - Der Wächter beendet inaktive Ghosts ohne Renderer nur nach der konfigurierten Altersschwelle.
-- Die Runtime-MCP-Bereinigung behält immer den neuesten Start-Cohort und überspringt Kandidaten, deren CPU-Zähler noch steigen.
-- Die Runtime-Waisenbereinigung verlangt einen toten Parent sowie Alters- und CPU-Leerlaufbelege. Ein abgelöster `codex exec` bleibt zusätzlich ausgeschlossen, solange ein CPU-, Rollout- oder ausstehendes Output-Lebenszeichen vorliegt; ohne `--output-last-message`-Vertrag wird er fail-closed ausgeschlossen. Inaktive `language_server*`-Prozesse mit totem Parent bleiben Bereinigungsziele.
-- Der Codex-Desktop-App-Server, fremde Kindprozesse, aktive Codex-CLI-Arbeit und aktive Desktop-Arbeit sind von Prozessbeendigungen ausgeschlossen. Der breite read-only Detektor behandelt Desktop- und npm-CLI-Arbeit dennoch als Blocker für Thread-Store-Mutationen.
+- Die Runtime-MCP-Kandidatenerkennung behält immer den neuesten Start-Cohort und überspringt Kandidaten, deren CPU-Zähler noch steigen; ein lebender Parent ist ein unbedingtes Nicht-Kill-Kriterium.
+- Die Runtime-Waisenbereinigung verlangt einen toten Parent sowie Alters- und CPU-Leerlaufbelege. Ein abgelöster `codex exec` bleibt zusätzlich ausgeschlossen, solange ein CPU-, Rollout- oder ausstehendes Output-Lebenszeichen vorliegt; ohne `--output-last-message`-Vertrag wird er fail-closed ausgeschlossen. Inaktive MCP-Nodes und gängige Language-Server mit totem Parent bleiben Bereinigungsziele; die letzte bekannte Parent-Identität landet im Audit-Log.
+- Der Codex-Desktop-App-Server, fremde Kindprozesse, aktive Codex-CLI-Arbeit und aktive Desktop-Arbeit sind von Prozessbeendigungen ausgeschlossen. Der breite read-only Detektor behandelt Desktop- und npm-CLI-Aktivität dennoch als Blocker für Thread-Store-Mutationen.
 - Destruktive Pfade wie Store-Reset, Admin-Reparatur, Neuinstallation und Reboot sind Vorschläge oder ausdrückliche Nutzeraktionen, keine automatischen Überraschungen.
 - Der [CareCenter-Gesundheitsaustauschvertrag v1](CARE_CENTER_EXCHANGE_CONTRACT.md)
   definiert einen datensparsamen, ausschließlich lesenden Schnappschuss für
