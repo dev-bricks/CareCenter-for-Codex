@@ -3,11 +3,33 @@ name = "carecenter-for-codex"
 version = "0.8.0"
 description = "Unofficial local Windows tray + CLI to repair, clean up and maintain the OpenAI Codex desktop app"
 readme = "README.md"
-license-files = ["LICENSE", "THIRD_PARTY_LICENSES.md"]
+license-files = ["LICENSE", "NOTICE", "THIRD_PARTY_LICENSES.md"]
 requires-python = ">=3.12"
 license = { text = "MIT" }
 authors = [
     { name = "Lukas Geiger" }
+]
+keywords = [
+    "carecenter",
+    "codex",
+    "codex-cli",
+    "developer-tools",
+    "maintenance",
+    "openai-codex",
+    "pyside6",
+    "sqlite",
+    "system-tray",
+    "windows",
+    "desktop-app",
+    "dev-bricks",
+    "health-check",
+    "local-first",
+    "mcp",
+    "offline-first",
+    "open-bricks",
+    "process-hygiene",
+    "python",
+    "zero-egress",
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -32,6 +54,7 @@ Repository = "https://github.com/dev-bricks/CareCenter-for-Codex.git"
 Issues = "https://github.com/dev-bricks/CareCenter-for-Codex/issues"
 Changelog = "https://github.com/dev-bricks/CareCenter-for-Codex/blob/main/CHANGELOG.md"
 Security = "https://github.com/dev-bricks/CareCenter-for-Codex/blob/main/SECURITY.md"
+Notice = "https://github.com/dev-bricks/CareCenter-for-Codex/blob/main/NOTICE"
 "Parent Organization" = "https://github.com/dev-bricks"
 Umbrella = "https://github.com/open-bricks"
 "Umbrella Ecosystem" = "https://github.com/open-bricks"

@@ -3,14 +3,14 @@
 > **Project:** CareCenter for Codex (`dev-bricks/CareCenter-for-Codex`)  
 > **Package:** `carecenter-for-codex` (CLI: `codex-logwartung`)  
 > **Repository:** [https://github.com/dev-bricks/CareCenter-for-Codex](https://github.com/dev-bricks/CareCenter-for-Codex)  
-> **Audit Date:** 2026-09-20
-> **Scope:** Direct runtime dependencies, build/packaging tooling, system API boundaries, and runtime safety invariants.
+> **Audit Date:** 2026-09-21
+> **Scope:** Direct runtime dependencies, build/packaging tooling, system API boundaries, Level 1 SBOM, and runtime safety invariants.
 
 ---
 
-## 1. Project License
+## 1. Project License & Root Notice
 
-CareCenter for Codex is open-source software licensed under the **MIT License**.
+CareCenter for Codex is open-source software authored by Lukas Geiger and licensed under the permissive **MIT License**. Formal copyright attribution, maintainer roles, and umbrella affiliation are documented in the root [`NOTICE`](NOTICE) file.
 
 ```text
 MIT License

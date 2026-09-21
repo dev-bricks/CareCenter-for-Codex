@@ -5,7 +5,7 @@
 > Inoffizielles lokales Windows-Tray- und CLI-Werkzeug, das die OpenAI-Codex-Desktop-App gesund hält — repariert fehlgeschlagene Starts, entfernt hängende Reste und wartet die SQLite-Logdatenbank sicher. Vollständig offline, keine Telemetrie.
 
 [![CareCenter Tests](https://github.com/dev-bricks/CareCenter-for-Codex/actions/workflows/tests.yml/badge.svg)](https://github.com/dev-bricks/CareCenter-for-Codex/actions/workflows/tests.yml)
-[![Pytest Status](https://img.shields.io/badge/Tests-409%20bestanden-brightgreen.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
+[![Pytest Status](https://img.shields.io/badge/Tests-413%20bestanden-brightgreen.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
 [![Version](https://img.shields.io/badge/Version-0.8.0-blue.svg)](https://github.com/dev-bricks/CareCenter-for-Codex/releases)
 [![Python](https://img.shields.io/badge/Python-3.12%20%7C%203.13-blue.svg)](https://www.python.org/)
 [![Plattform](https://img.shields.io/badge/Plattform-Windows%2010%20%7C%2011-lightgrey.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
@@ -14,11 +14,13 @@
 [![Sicherheits-SLA](https://img.shields.io/badge/Sicherheits--SLA-48h%20Antwort%20%7C%205d%20Triage-blue.svg)](SECURITY.md)
 [![Code-Stil: ruff](https://img.shields.io/badge/Code--Stil-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Lizenz](https://img.shields.io/badge/Lizenz-MIT-yellow.svg)](LICENSE)
+[![Attribution](https://img.shields.io/badge/Attribution-NOTICE-blue.svg)](NOTICE)
 [![Drittanbieter-Audit](https://img.shields.io/badge/Drittanbieter--Lizenzen-Gepr%C3%BCft-blue.svg)](THIRD_PARTY_LICENSES.md)
 [![GUI Framework](https://img.shields.io/badge/GUI-PySide6-41CD52.svg)](https://pypi.org/project/PySide6/)
 [![Ökosystem dev-bricks](https://img.shields.io/badge/Ökosystem-dev--bricks-blue.svg)](https://github.com/dev-bricks)
 [![Dachorganisation open-bricks](https://img.shields.io/badge/Dach-open--bricks-blue.svg)](https://github.com/open-bricks)
 [![KI-Indexierung](https://img.shields.io/badge/LLM--Bereit-llms.txt-blueviolet.svg)](llms.txt)
+[![Audit](https://img.shields.io/badge/Gepr%C3%BCft-2026--09--21-informational.svg)](CHANGELOG.md)
 
 [English](README.md) · [Deutsch](README.de.md)
 
@@ -51,13 +53,16 @@ Lokale Audit-Notizen wie `BEFUNDE.md` und temporäre `TASKPLAN*.md`-Statusdateie
 - [15. Windows-Store-Materialien](#windows-store-materialien)
 - [16. Drittanbieter-Lizenzen & Transparenz](#drittanbieter-lizenzen--transparenz)
 - [17. Entwicklung & Lizenz](#entwicklung--lizenz)
+- [18. Gesetzlicher Hinweis (§ 521 BGB) & Haftungsausschluss](#gesetzlicher-hinweis--521-bgb--haftungsausschluss)
 
 ---
 
+<a id="sec-01"></a><a id="why--problem-statement"></a><a id="warum--problemstellung"></a>
 ## Warum & Problemstellung
 
 Unter Windows kann nach dem Schließen des Codex-Desktopfensters ein hängender Hauptprozess übrig bleiben. Dieser Restprozess kann den Singleton-Lock der App halten, sodass der nächste Start scheinbar nichts tut. CareCenter entfernt genau diesen ersten Blocker sicher: Es greift nur bei inaktiven Ghost-Prozessen, verwaisten Lockfiles und ausdrücklich gestarteten Wartungspfaden ein.
 
+<a id="sec-02"></a><a id="architecture--system-flow"></a><a id="architektur--systemfluss"></a>
 ## Architektur & Systemfluss
 
 ```mermaid
@@ -110,6 +115,7 @@ flowchart TD
     CLI --> APPX
 ```
 
+<a id="sec-03"></a><a id="complete-lifecycle-sequence"></a><a id="vollstaendiger-lebenszyklus-ablauf"></a><a id="vollständiger-lebenszyklus-ablauf"></a>
 ## Vollständiger Lebenszyklus-Ablauf
 
 ```mermaid
@@ -159,6 +165,7 @@ sequenceDiagram
     Tray-->>User: Wartungszyklus abgeschlossen (Fortschritt & Log aktualisiert)
 ```
 
+<a id="sec-04"></a><a id="key-capabilities--safety-invariants"></a><a id="kernfaehigkeiten--sicherheitsinvarianten"></a><a id="kernfähigkeiten--sicherheitsinvarianten"></a>
 ## Kernfähigkeiten & Sicherheitsinvarianten
 
 | Invariante / Kernfähigkeit | Architektonische Garantie | Durchsetzungs-Mechanismus | Sicherheits-Grenze |
@@ -174,6 +181,7 @@ sequenceDiagram
 | **9. INV-NONDEST-09 (Zerstörungsfreie AppX-Behebung)**| Microsoft-Store-Paketbehebung schützt persönliche Benutzerdaten | Begrenzte Eskalation: No-Admin-Bereinigung -> Admin-Vorschlag -> Store-Neuinstallationsseite | Automatische destruktive Resets oder Paket-Löschungen sind strikt untersagt |
 | **10. INV-SLA-10 (Strikte Verifikations-Parität)** | 100% grüne Testsuite, saubere Linter und synchrone Metadatenverträge | Automatisierte CI-Matrix, Pytest-Suite (391+ bestanden), Ruff und compileall | Jede Änderung erfordert vollständige fehlerfreie Verifikation vor Commit |
 
+<a id="sec-05"></a><a id="target-personas--discoverability"></a><a id="zielgruppen--auffindbarkeit"></a>
 ## Zielgruppen & Auffindbarkeit
 
 CareCenter for Codex ist für vier primäre Nutzergruppen im Windows-Desktop-Entwicklungsökosystem konzipiert:
@@ -189,6 +197,7 @@ CareCenter for Codex ist für vier primäre Nutzergruppen im Windows-Desktop-Ent
 - **Deutsch:** `OpenAI Codex Reparatur Windows`, `Codex Desktop startet nicht`, `Codex Singleton Lock bereinigen`, `hängende Codex Prozesse beenden`, `Codex SQLite Datenbank Wartung`, `PySide6 System Tray Werkzeug`, `Codex Hintergrundprozess Wächter`, `Lokal-Erstmals Desktop Werkzeug`
 - **Englisch:** `openai codex repair windows`, `codex desktop failed to start`, `codex singleton lock cleanup`, `kill hung codex process`, `codex sqlite vacuum maintenance`, `pyside6 tray developer tools`, `codex desktop background reaper`, `local-first zero-telemetry tray`
 
+<a id="sec-06"></a><a id="comparative-matrix--alternatives"></a><a id="vergleichsmatrix--alternativen"></a>
 ## Vergleichsmatrix & Alternativen
 
 Die folgende Matrix vergleicht CareCenter for Codex mit alternativen Betriebsansätzen anhand von 10 architektonischen und funktionalen Dimensionen:
@@ -206,6 +215,7 @@ Die folgende Matrix vergleicht CareCenter for Codex mit alternativen Betriebsans
 | **9. MS Store AppX-Reparaturpfad** | **Begrenzte Eskalation & Diagnose** | Nur Beenden / Zurücksetzen | Manuelle PowerShell AppX-Befehle | ❌ Nicht unterstützt | Vollständige Store-Neuinstallation |
 | **10. Sicherheits-SLA & Vertragstests** | **48h SLA & 391+ Pytest-Suite** | Nicht zutreffend | ❌ Kein Test-Harnisch | ❌ Proprietärer Closed-Source | Closed-Source Binärdatei |
 
+<a id="sec-07"></a><a id="sibling-ecosystem--partner-tools"></a><a id="geschwisterwerkzeuge--partner-oekosystem"></a><a id="geschwisterwerkzeuge--partner-ökosystem"></a>
 ## Geschwisterwerkzeuge & Partner-Ökosystem
 
 | Partner-Werkzeug | Organisation | Rolle & Funktion | Integration mit CareCenter |
@@ -223,6 +233,7 @@ Die folgende Matrix vergleicht CareCenter for Codex mit alternativen Betriebsans
 | **[SoftwareCenter](https://github.com/file-bricks/SoftwareCenter)** | file-bricks | Zentraler PySide6-Softwarekatalog und Desktop-Verwaltung | Führt und startet Desktop-Tools inklusive CareCenter und Safe Start |
 | **[DokuZen](https://github.com/doc-bricks/DokuZen)** | doc-bricks | Dokumentenverarbeitung, OCR, automatische Schwärzung und PDF-Hygiene | Ergänzt lokale Workflows um netzwerkfreie, datensparsame Dokumentensicherheit |
 
+<a id="sec-08"></a><a id="features"></a><a id="funktionen"></a>
 ## Funktionen
 
 - Hintergrund-Wächter: prüft alle 60 Sekunden auf alte Startblocker, abgelöste Runtime-Waisen und doppelte Runtime-MCP-Prozessgenerationen. Die Waisenbereinigung verlangt einen toten Parent, eine feste Karenzzeit von 30 Minuten und zwei CPU-Messpunkte. Abgelöste `codex exec`-Läufe bleiben geschützt, solange CPU-Zeit wächst, ein Session-Rollout jünger als zwei Minuten ist oder ihr `--output-last-message`-Ziel noch fehlt; inaktive `language_server*`-Waisen bleiben bereinigungsfähig. Jeder erfolgreiche Waisen-Kill schreibt PID, Commandline und Kriterium in `app.log`. Die Runtime-MCP-Bereinigung erfasst weiterhin nur inaktive Launcher-Bäume unter demselben Store-Desktop-App-Server und behält immer den neuesten Start-Cohort.
@@ -242,6 +253,7 @@ Die folgende Matrix vergleicht CareCenter for Codex mit alternativen Betriebsans
 - Statusfenster mit Fortschrittsbalken, Live-Tray-Tooltip und dauerhaften Audit-Logs.
 - Safe Start for Codex wird als Abhängigkeit mitgeliefert und kann im CareCenter-Fenster, aus dem Tray oder per CLI installiert beziehungsweise aktualisiert werden. CareCenter nutzt es für Release-Bursts, Start-Storms und Catch-up-Hinweise.
 
+<a id="sec-09"></a><a id="screenshot"></a><a id="bildschirmfoto"></a>
 ## Screenshot
 
 Das Tray-Statusfenster zeigt aktuellen Zustand, Zähler für entfernte Reste, Fortschritt, Wartungsaktionen mit Safe-Abbruch, Loop-Modus, Store-Aktionen, Safe-Start-Aktionen, Automatisierungssteuerung und Einstellungen.
@@ -255,14 +267,16 @@ $env:PYTHONPATH="src"
 python -m codex_logdatenbank_wartung.cli store-screenshot
 ```
 
+<a id="sec-10"></a><a id="requirements"></a><a id="voraussetzungen"></a>
 ## Voraussetzungen
 
 - Windows 10 oder Windows 11
 - Python 3.12+ beim Start aus dem Quellcode
 - [PySide6](https://pypi.org/project/PySide6/) für die Tray-Oberfläche
 
-Gebaute EXE-Versionen benötigen keine separate Python-Installation.
+Gebaut EXE-Versionen benötigen keine separate Python-Installation.
 
+<a id="sec-11"></a><a id="install-and-run"></a><a id="installation-und-start"></a>
 ## Installation und Start
 
 Aus dem Quellcode:
@@ -288,13 +302,14 @@ build_exe.bat
 Standardmäßig nutzt der Build die öffentliche Safe-Start-GitHub-Quelle, die in
 `pyproject.toml` auf einen exakten Commit festgelegt ist. So bleibt der Build
 reproduzierbar, ohne unbemerkt einen dirty lokalen Schwester-Checkout einzubetten.
-Eine lokale Safe-Start-Quelle nur bewusst per Override verwenden:
+Nutzen Sie eine lokale Safe-Start-Quelle nur ganz bewusst:
 
 ```powershell
 $env:CARECENTER_SAFE_START_SOURCE = "C:\Pfad\zu\REL-PUB_safe-start-for-codex"
 build_exe.bat
 ```
 
+<a id="sec-12"></a><a id="cli-usage"></a><a id="cli-befehle"></a>
 ## CLI-Befehle
 
 ```powershell
@@ -324,6 +339,7 @@ und SHA-256-Werte, aber keine Promptinhalte. Externe
 `--boot-file LABEL=PATH`-Quellen erscheinen nur als Snapshots mit
 `injection_claim=false`, niemals als behaupteter Injektionsnachweis.
 
+<a id="sec-13"></a><a id="configuration"></a><a id="konfiguration"></a>
 ## Konfiguration
 
 Konfiguration, Logs und Backups liegen standardmäßig außerhalb von Cloud-Sync-Ordnern:
@@ -341,7 +357,7 @@ Die Runtime-MCP-Bereinigung ist über `reap_runtime_mcp_duplicates` standardmä�
 aktiv. Ihre konservativen Vorgaben sind ein konfigurierbares Mindestalter von 3600 Sekunden
 (einer Stunde) für jeden Kandidaten-Root, 90 Sekunden Start-Cohort-Abstand, ein
 30-Sekunden-Launcherfenster, mindestens zwei verschiedene
-wiederholte MCP-Signaturen und eine Sekunde CPU-Aktivitätsmessung. Alle Schwellen
+wiederholte MCP-Signierung und eine Sekunde CPU-Aktivitätsmessung. Alle Schwellen
 lassen sich in `config.json` anpassen.
 
 Die Runtime-Waisenbereinigung behält aus Kompatibilitätsgründen das Präfix
@@ -355,6 +371,7 @@ Rollout-Fenster nicht unter 120 Sekunden absenken.
 Kleinere Werte werden auf diese konservative Initialisierungskarenz angehoben;
 größere Werte verlängern sie.
 
+<a id="sec-14"></a><a id="safety-model--invariants"></a><a id="sicherheitsmodell--invarianten"></a>
 ## Sicherheitsmodell & Invarianten
 
 - Die normale CareCenter-Laufzeit und die Standard-CLI-Befehle arbeiten nur
@@ -367,13 +384,14 @@ größere Werte verlängern sie.
 - Der Wächter beendet inaktive Ghosts ohne Renderer nur nach der konfigurierten Altersschwelle.
 - Die Runtime-MCP-Bereinigung behält immer den neuesten Start-Cohort und überspringt Kandidaten, deren CPU-Zähler noch steigen.
 - Die Runtime-Waisenbereinigung verlangt einen toten Parent sowie Alters- und CPU-Leerlaufbelege. Ein abgelöster `codex exec` bleibt zusätzlich ausgeschlossen, solange ein CPU-, Rollout- oder ausstehendes Output-Lebenszeichen vorliegt; ohne `--output-last-message`-Vertrag wird er fail-closed ausgeschlossen. Inaktive `language_server*`-Prozesse mit totem Parent bleiben Bereinigungsziele.
-- Der Codex-Desktop-App-Server, fremde Kindprozesse, aktive Codex-CLI-Arbeit und aktive Desktop-Arbeit sind von Prozessbeendigungen ausgeschlossen. Der breite read-only Detektor behandelt Desktop- und npm-CLI-Aktivität dennoch als Blocker für Thread-Store-Mutationen.
+- Der Codex-Desktop-App-Server, fremde Kindprozesse, aktive Codex-CLI-Arbeit und aktive Desktop-Arbeit sind von Prozessbeendigungen ausgeschlossen. Der breite read-only Detektor behandelt Desktop- und npm-CLI-Arbeit dennoch als Blocker für Thread-Store-Mutationen.
 - Destruktive Pfade wie Store-Reset, Admin-Reparatur, Neuinstallation und Reboot sind Vorschläge oder ausdrückliche Nutzeraktionen, keine automatischen Überraschungen.
 - Der [CareCenter-Gesundheitsaustauschvertrag v1](CARE_CENTER_EXCHANGE_CONTRACT.md)
   definiert einen datensparsamen, ausschließlich lesenden Schnappschuss für
   BACH/OCEAN. Er aktiviert weder Laufzeittransport noch eingehende Befehle,
   Telemetrie oder ferngesteuerte Wartungsbefugnisse.
 
+<a id="sec-15"></a><a id="windows-store-materials"></a><a id="windows-store-materialien"></a>
 ## Windows-Store-Materialien
 
 Das Projekt enthält die Grundlage für den Windows Store:
@@ -415,6 +433,7 @@ ordnet die Paketpfade unter `icons/` den Quellen des zentralen Builders unter
 
 Der Check baut die statischen GitHub-Pages-Dateien außerdem temporär und prüft `privacy/index.html`, `support/index.html`, `index.html` sowie den Build-Marker. Der aktive Workflow `.github/workflows/pages.yml` veröffentlicht die Routen `/privacy/` und `/support/` über GitHub Pages.
 
+<a id="sec-16"></a><a id="third-party-licenses--transparency"></a><a id="drittanbieter-lizenzen--transparenz"></a>
 ## Drittanbieter-Lizenzen & Transparenz
 
 CareCenter for Codex gewährleistet vollständige Lizenztransparenz und strikte Einhaltung der Distributionsanforderungen:
@@ -425,6 +444,7 @@ CareCenter for Codex gewährleistet vollständige Lizenztransparenz und strikte 
 - **Build- & Integrationswerkzeuge:** Safe-Start-Integration (`safe-start-for-codex`, MIT), PyInstaller-Kompilierung (GPLv2 mit PyInstaller-Ausnahme) und Hatchling (MIT).
 - **Audit- & Invarianten-Dokumentation:** Ein detaillierter Prüfbericht aller Laufzeit-, Entwicklungs- und Standardbibliotheks-Abhängigkeiten sowie der 10 Governance- und Sicherheits-Laufzeitinvarianten ist in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) dokumentiert. Das historische Textformat wird in [THIRD_PARTY_LICENSES.txt](THIRD_PARTY_LICENSES.txt) weitergeführt.
 
+<a id="sec-17"></a><a id="development--license"></a><a id="entwicklung--lizenz"></a>
 ## Entwicklung & Lizenz
 
 ### Entwicklung
@@ -443,3 +463,12 @@ Die Testsuite deckt Wartungssicherheit, Reparatur-Eskalation, Safe-Start-Integra
 CareCenter for Codex steht unter der [MIT-Lizenz](LICENSE). PySide6 wird unter
 der LGPL verwendet; das Verzeichnis der direkten Abhängigkeiten und sein
 Prüfumfang stehen in [THIRD_PARTY_LICENSES.txt](THIRD_PARTY_LICENSES.txt).
+
+<a id="sec-18"></a><a id="statutory-notice--521-bgb--liability-disclaimer"></a><a id="gesetzlicher-hinweis--521-bgb--haftungsausschluss"></a>
+## Gesetzlicher Hinweis (§ 521 BGB) & Haftungsausschluss
+
+### Gesetzliche Haftungsbeschränkung (§ 521 BGB - Gefälligkeitsrecht)
+Diese Software und die zugehörigen Automatisierungswerkzeuge werden unentgeltlich bereitgestellt. Gemäß § 521 BGB (Haftung des Schenkers / Gefälligkeitsrecht) ist die Haftung des Autors und der Mitwirkenden auf Vorsatz und grobe Fahrlässigkeit beschränkt. Die Bereitstellung erfolgt wie besehen ("as is") ohne ausdrückliche oder stillschweigende Gewährleistung.
+
+### Sicherheits-Reaktions-SLA
+Sicherheitsmeldungen werden gemäß [`SECURITY.md`](SECURITY.md) koordiniert, mit einer garantierten Reaktionszeit von 48 Stunden und einer Triage-Zusage von maximal 5 Werktagen.

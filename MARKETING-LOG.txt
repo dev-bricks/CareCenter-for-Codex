@@ -107,3 +107,20 @@ Repo: dev-bricks/CareCenter-for-Codex
 1. **GitHub Issues Template**: Consider adding issue form templates under `.github/ISSUE_TEMPLATE/` (bug report, feature request) to guide community issue creation alongside `welcome.yml`.
 2. **Release Announcement**: Tag and publish GitHub Release for v0.8.0 / v0.8.1 with link to `THIRD_PARTY_LICENSES.md` and `CARE_CENTER_EXCHANGE_CONTRACT.md`.
 3. **Ecosystem Cross-Referencing**: Ensure reciprocal discovery mentions in sibling developer tools (`safe-start-for-codex`, `companion-for-agy`).
+
+## Date: 2026-09-21
+Repo: dev-bricks/CareCenter-for-Codex
+
+### Automated Actions Applied (Pfad B Discoverability & Visual Design Refresh):
+1. **Repository Topics Saturation (20/20)**: Populated GitHub repository topics to full platform limit: `carecenter`, `codex`, `codex-cli`, `developer-tools`, `maintenance`, `openai-codex`, `pyside6`, `sqlite`, `system-tray`, `windows`, `desktop-app`, `dev-bricks`, `health-check`, `local-first`, `mcp`, `offline-first`, `open-bricks`, `process-hygiene`, `python`, `zero-egress`. Aligned PEP 621 `keywords` in `pyproject.toml` with the identical 20 terms.
+2. **Canonical Root NOTICE Attribution**: Created root `NOTICE` file formalizing copyright and organizational stewardship under Lukas Geiger, dev-bricks, and umbrella organization open-bricks, referencing MIT license and `THIRD_PARTY_LICENSES.md`. Added `NOTICE` to PEP 621 `license-files` and project URLs (`Notice`). Added Attribution NOTICE Shields.io badge to both English and German documentation.
+3. **Third-Party License Audit & Level 1 SBOM Refresh**: Refreshed audit recency timestamp to `2026-09-21` in `THIRD_PARTY_LICENSES.md` and `THIRD_PARTY_LICENSES.txt`, incorporating root NOTICE documentation and reaffirming the 10 Governance & Runtime Safety Invariants (`INV-LOCAL-01` to `INV-SLA-10`).
+4. **18-Point Quick Navigation Parity & Dual Reciprocal Anchors**: Expanded Quick Navigation from 17 to 18 points across `README.md`, `README.de.md`, and `README_de.md`. Added Section 18 (`Statutory Notice (§ 521 BGB) & Liability Disclaimer` / `Gesetzlicher Hinweis (§ 521 BGB) & Haftungsausschluss`) articulating German statutory liability limitation (*Gefälligkeitsrecht*) and 48-hour Security Response SLA.
+5. **Reciprocal Cross-Language HTML Anchors**: Enriched all 18 major headings with dual reciprocal HTML anchors (`sec-01` to `sec-18` alongside English and German slugs) preventing link breakage and cross-language fragment desynchronization.
+6. **AI Agent Context & Documentation Sync**: Refreshed `llms.txt` verification timestamp to `2026-09-21`, updated test counts (413 passed, 1 skipped), and indexed the 18-point structure and root NOTICE. Synchronized byte-identical `README_de.md`.
+7. **Contract Test Suite Expansion**: Expanded `tests/test_metadata.py` to validate NOTICE attribution, PEP 621 keywords, Section 18 statutory notice, and 18-point bilingual navigation parity.
+
+### Non-Automated Marketing & Discoverability Recommendations:
+1. **GitHub Social Preview**: Set a dedicated Open Graph / social preview image in repository settings matching `assets/banner.svg` styling.
+2. **Winget Manifest Publication**: Submit a winget manifest for `dev-bricks.CareCenter-for-Codex` once Store package preflight completes.
+3. **Ecosystem Cross-Referencing**: Confirm reciprocal discovery mentions in sibling developer tools (`safe-start-for-codex`, `companion-for-agy`, `lock-master`, `MethodenAnalyser`).

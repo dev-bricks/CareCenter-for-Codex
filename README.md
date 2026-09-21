@@ -5,7 +5,7 @@
 > Unofficial Windows tray & CLI utility that keeps the OpenAI Codex desktop app healthy — repairs failed starts, removes hung leftovers, and safely maintains the local SQLite log database. Fully offline, no telemetry.
 
 [![CareCenter tests](https://github.com/dev-bricks/CareCenter-for-Codex/actions/workflows/tests.yml/badge.svg)](https://github.com/dev-bricks/CareCenter-for-Codex/actions/workflows/tests.yml)
-[![Pytest Status](https://img.shields.io/badge/Tests-409%20passed-brightgreen.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
+[![Pytest Status](https://img.shields.io/badge/Tests-413%20passed-brightgreen.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
 [![Version](https://img.shields.io/badge/version-0.8.0-blue.svg)](https://github.com/dev-bricks/CareCenter-for-Codex/releases)
 [![Python](https://img.shields.io/badge/Python-3.12%20%7C%203.13-blue.svg)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-lightgrey.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
@@ -14,11 +14,13 @@
 [![Security SLA](https://img.shields.io/badge/Security%20SLA-48h%20Response%20%7C%205d%20Triage-blue.svg)](SECURITY.md)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Attribution](https://img.shields.io/badge/Attribution-NOTICE-blue.svg)](NOTICE)
 [![Third-Party Audited](https://img.shields.io/badge/Third--Party%20Licenses-Audited-blue.svg)](THIRD_PARTY_LICENSES.md)
 [![GUI Framework](https://img.shields.io/badge/GUI-PySide6-41CD52.svg)](https://pypi.org/project/PySide6/)
 [![Ecosystem dev-bricks](https://img.shields.io/badge/ecosystem-dev--bricks-blue.svg)](https://github.com/dev-bricks)
 [![Umbrella open-bricks](https://img.shields.io/badge/Umbrella-open--bricks-blue.svg)](https://github.com/open-bricks)
 [![AI Indexing](https://img.shields.io/badge/LLM--Ready-llms.txt-blueviolet.svg)](llms.txt)
+[![Audit](https://img.shields.io/badge/Last--Checked-2026--09--21-informational.svg)](CHANGELOG.md)
 
 [English](README.md) · [Deutsch](README.de.md)
 
@@ -51,13 +53,16 @@ Local audit notes such as `BEFUNDE.md` and temporary `TASKPLAN*.md` status files
 - [15. Windows Store Materials](#windows-store-materials)
 - [16. Third-Party Licenses & Transparency](#third-party-licenses--transparency)
 - [17. Development & License](#development--license)
+- [18. Statutory Notice (§ 521 BGB) & Liability Disclaimer](#statutory-notice--521-bgb--liability-disclaimer)
 
 ---
 
+<a id="sec-01"></a><a id="why--problem-statement"></a><a id="warum--problemstellung"></a>
 ## Why & Problem Statement
 
 On Windows, closing the Codex desktop window can leave a hung main process behind. That leftover process can hold the app singleton lock, so the next start appears to do nothing. CareCenter removes that first blocker safely: it only touches inactive ghost processes, stale lock files, and explicitly requested maintenance paths.
 
+<a id="sec-02"></a><a id="architecture--system-flow"></a><a id="architektur--systemfluss"></a>
 ## Architecture & System Flow
 
 ```mermaid
@@ -110,6 +115,7 @@ flowchart TD
     CLI --> APPX
 ```
 
+<a id="sec-03"></a><a id="complete-lifecycle-sequence"></a><a id="vollstaendiger-lebenszyklus-ablauf"></a><a id="vollständiger-lebenszyklus-ablauf"></a>
 ## Complete Lifecycle Sequence
 
 ```mermaid
@@ -159,6 +165,7 @@ sequenceDiagram
     Tray-->>User: Maintenance Cycle Complete (Progress & Log Updated)
 ```
 
+<a id="sec-04"></a><a id="key-capabilities--safety-invariants"></a><a id="kernfaehigkeiten--sicherheitsinvarianten"></a><a id="kernfähigkeiten--sicherheitsinvarianten"></a>
 ## Key Capabilities & Safety Invariants
 
 | Invariant / Capability | Architectural Guarantee | Enforcement Mechanism | Safety Boundary |
@@ -174,6 +181,7 @@ sequenceDiagram
 | **9. INV-NONDEST-09 (Non-Destructive AppX Resolution)** | Microsoft Store package troubleshooting preserves user data | Bounded escalation: no-admin cleanup -> admin suggestion -> Store reinstall PDP | Automatic destructive resets or package purges are strictly forbidden |
 | **10. INV-SLA-10 (Strict Verification Parity)** | 100% green test suite, clean linters, and synchronized contracts | Automated CI matrix, Pytest suite (391+ passed), Ruff, and compileall | Code changes require complete verification before release deployment |
 
+<a id="sec-05"></a><a id="target-personas--discoverability"></a><a id="zielgruppen--auffindbarkeit"></a>
 ## Target Personas & Discoverability
 
 CareCenter for Codex is architected for four primary user groups across the Windows desktop development ecosystem:
@@ -189,6 +197,7 @@ CareCenter for Codex is architected for four primary user groups across the Wind
 - **English:** `openai codex repair windows`, `codex desktop failed to start`, `codex singleton lock cleanup`, `kill hung codex process`, `codex sqlite vacuum maintenance`, `pyside6 tray developer tools`, `codex desktop background reaper`, `local-first zero-telemetry tray`
 - **German:** `OpenAI Codex Reparatur Windows`, `Codex Desktop startet nicht`, `Codex Singleton Lock bereinigen`, `hängende Codex Prozesse beenden`, `Codex SQLite Datenbank Wartung`, `PySide6 System Tray Werkzeug`, `Codex Hintergrundprozess Wächter`, `Lokal-Erstmals Desktop Werkzeug`
 
+<a id="sec-06"></a><a id="comparative-matrix--alternatives"></a><a id="vergleichsmatrix--alternativen"></a>
 ## Comparative Matrix & Alternatives
 
 The following matrix compares CareCenter for Codex against alternative operational patterns across 10 architectural and functional dimensions:
@@ -206,6 +215,7 @@ The following matrix compares CareCenter for Codex against alternative operation
 | **9. MS Store AppX Resolution Path** | **Bounded Escalation & Diagnostics** | Terminate / Reset only | Manual PowerShell AppX commands | ❌ Unsupported | Full manual Store reinstall |
 | **10. Security SLA & Contract Tests** | **48h SLA & 391+ Pytest Suite** | N/A | ❌ No test harness | ❌ Proprietary closed-source | Closed-source binary |
 
+<a id="sec-07"></a><a id="sibling-ecosystem--partner-tools"></a><a id="geschwisterwerkzeuge--partner-oekosystem"></a><a id="geschwisterwerkzeuge--partner-ökosystem"></a>
 ## Sibling Ecosystem & Partner Tools
 
 | Partner Tool | Organization | Role & Capability | Integration with CareCenter |
@@ -223,6 +233,7 @@ The following matrix compares CareCenter for Codex against alternative operation
 | **[SoftwareCenter](https://github.com/file-bricks/SoftwareCenter)** | file-bricks | Central PySide6 software catalog and desktop application dashboard | Lists and manages desktop utilities including CareCenter and companion tools |
 | **[DokuZen](https://github.com/doc-bricks/DokuZen)** | doc-bricks | Document processing, OCR, automated redaction, and PDF cleanup | Complements local-first desktop workflows with zero-network document security |
 
+<a id="sec-08"></a><a id="features"></a><a id="funktionen"></a>
 ## Features
 
 - Background watcher: checks every 60 seconds for old start blockers, detached runtime orphans, and duplicate runtime MCP process generations. Runtime-orphan cleanup requires a dead parent, a hard 30-minute grace period, and two CPU snapshots. Detached `codex exec` runs remain protected while CPU advances, a session rollout is newer than two minutes, or their `--output-last-message` target is still missing; inactive `language_server*` orphans remain eligible. Every successful orphan kill records PID, command line, and criterion in `app.log`. Runtime MCP cleanup still targets only idle launcher trees repeated under the same Store desktop app-server and always keeps the newest launch cohort.
@@ -242,6 +253,7 @@ The following matrix compares CareCenter for Codex against alternative operation
 - Status window with progress bar, live tray tooltip, and persistent audit logs.
 - Safe Start for Codex is shipped as a dependency and can be installed or updated from the CareCenter window, tray, or CLI. CareCenter uses it for release bursts, start storms, and catch-up hints.
 
+<a id="sec-09"></a><a id="screenshot"></a><a id="bildschirmfoto"></a>
 ## Screenshot
 
 The tray status window shows current state, removed-leftover count, progress, maintenance controls with Safe cancellation, Loop mode, Store actions, Safe Start actions, automation controls, and settings.
@@ -255,6 +267,7 @@ $env:PYTHONPATH="src"
 python -m codex_logdatenbank_wartung.cli store-screenshot
 ```
 
+<a id="sec-10"></a><a id="requirements"></a><a id="voraussetzungen"></a>
 ## Requirements
 
 - Windows 10 or Windows 11
@@ -263,6 +276,7 @@ python -m codex_logdatenbank_wartung.cli store-screenshot
 
 Packaged EXE builds do not require a separate Python installation.
 
+<a id="sec-11"></a><a id="install-and-run"></a><a id="installation-und-start"></a>
 ## Install and Run
 
 From source:
@@ -308,6 +322,7 @@ $env:CARECENTER_SAFE_START_SOURCE = "C:\path\to\REL-PUB_safe-start-for-codex"
 build_exe.bat
 ```
 
+<a id="sec-12"></a><a id="cli-usage"></a><a id="cli-befehle"></a>
 ## CLI Usage
 
 ```powershell
@@ -340,6 +355,7 @@ In the tray settings, `0` disables an age rule. Set `auto_mark_threads_read_days
 `auto_archive_threads_days` to independent values such as `2` and `10`. CareCenter applies
 the rules during background watcher ticks as soon as Codex is fully closed.
 
+<a id="sec-13"></a><a id="configuration"></a><a id="konfiguration"></a>
 ## Configuration
 
 Configuration, logs, and backups live outside cloud-synced folders by default:
@@ -377,6 +393,7 @@ python -m codex_logdatenbank_wartung.cli tray
 
 When set, `config.json`, `logs\`, and `backups\` are placed under that path instead of the default `%LOCALAPPDATA%\CareCenterForCodex\`.
 
+<a id="sec-14"></a><a id="safety-model--invariants"></a><a id="sicherheitsmodell--invarianten"></a>
 ## Safety Model & Invariants
 
 - Normal CareCenter runtime and the default CLI commands are local-only: they do
@@ -394,6 +411,7 @@ When set, `config.json`, `logs\`, and `backups\` are placed under that path inst
   defines a privacy-minimized, read-only snapshot for BACH/OCEAN. It adds no
   runtime transport, inbound command, telemetry, or remote maintenance authority.
 
+<a id="sec-15"></a><a id="windows-store-materials"></a><a id="windows-store-materialien"></a>
 ## Windows Store Materials
 
 The project includes Windows Store groundwork:
@@ -441,6 +459,7 @@ python scripts\build_store_pages.py --output _site
 
 The active workflow `.github/workflows/pages.yml` publishes the generated `/privacy/` and `/support/` routes through GitHub Pages.
 
+<a id="sec-16"></a><a id="third-party-licenses--transparency"></a><a id="drittanbieter-lizenzen--transparenz"></a>
 ## Third-Party Licenses & Transparency
 
 CareCenter for Codex maintains strict license transparency and distribution compliance:
@@ -451,6 +470,7 @@ CareCenter for Codex maintains strict license transparency and distribution comp
 - **Build & Integration Tooling:** Safe Start integration (`safe-start-for-codex`, MIT), PyInstaller packaging (GPLv2 with PyInstaller Exception), and Hatchling (MIT).
 - **Audit & Invariants Document:** A comprehensive audit of all runtime, development, standard library dependencies, and the 10 Governance & Runtime Safety Invariants is maintained in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md). Legacy text format is preserved in [THIRD_PARTY_LICENSES.txt](THIRD_PARTY_LICENSES.txt).
 
+<a id="sec-17"></a><a id="development--license"></a><a id="entwicklung--lizenz"></a>
 ## Development & License
 
 ### Development
@@ -469,3 +489,12 @@ The test suite covers maintenance safety, repair escalation, Safe Start integrat
 CareCenter for Codex is licensed under [MIT](LICENSE). PySide6 is used under the LGPL;
 the direct-dependency inventory and its update scope are documented in
 [THIRD_PARTY_LICENSES.txt](THIRD_PARTY_LICENSES.txt).
+
+<a id="sec-18"></a><a id="statutory-notice--521-bgb--liability-disclaimer"></a><a id="gesetzlicher-hinweis--521-bgb--haftungsausschluss"></a>
+## Statutory Notice (§ 521 BGB) & Liability Disclaimer
+
+### Statutory Liability Limitation (§ 521 BGB - Gefälligkeitsrecht / Gratuitous Performance)
+This software and associated automation harnesses are provided free of charge without commercial consideration. In accordance with German statutory law (§ 521 BGB - *Gefälligkeitsrecht*), the liability of the author and contributors is strictly restricted to intent (*Vorsatz*) and gross negligence (*grobe Fahrlässigkeit*). The software is provided "as is", without warranty of any kind, express or implied.
+
+### Security Response SLA
+Security vulnerability disclosures are coordinated under [`SECURITY.md`](SECURITY.md), providing a guaranteed 48-hour response acknowledgement and a 5-business-day triage commitment.

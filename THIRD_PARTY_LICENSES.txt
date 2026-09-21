@@ -1,19 +1,19 @@
 # Third-Party Licenses
 
-Last checked: 2026-09-20 against the declared project metadata, PyPI metadata,
+Last checked: 2026-09-21 against the declared project metadata, PyPI metadata,
 the pinned Safe Start GitHub revision, and system API boundaries.
 
 Comprehensive audit document: see `THIRD_PARTY_LICENSES.md` for full details,
-SPDX identifiers, LGPL-3.0 dynamic linking rules, and the 10 Governance & Runtime
-Safety Invariants (INV-LOCAL-01 through INV-SLA-10).
+SPDX identifiers, LGPL-3.0 dynamic linking rules, Level 1 SBOM, and the 10 Governance
+& Runtime Safety Invariants (INV-LOCAL-01 through INV-SLA-10).
 
 Scope: direct dependencies declared in `pyproject.toml`. This is a direct
 dependency inventory, not a frozen transitive SBOM and not a replacement for
 license files shipped inside bundled wheels or executables.
 
-## Project License
+## Project License & Attribution Notice
 
-CareCenter for Codex is licensed under the MIT License. See `LICENSE`.
+CareCenter for Codex is licensed under the MIT License. See `LICENSE` and `NOTICE`.
 
 ## Direct Runtime Dependencies
 

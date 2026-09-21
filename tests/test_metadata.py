@@ -80,7 +80,7 @@ def test_llms_txt_and_docs_sync() -> None:
     assert llms_path.is_file()
 
     content = llms_path.read_text(encoding="utf-8")
-    assert "Last-checked: 2026-09-20" in content
+    assert "Last-checked: 2026-09-21" in content
     assert "https://github.com/dev-bricks/CareCenter-for-Codex" in content
     assert "carecenter-for-codex" in content
 
@@ -98,14 +98,16 @@ def test_readme_badges_consistency() -> None:
         assert "open--bricks" in readme
         assert "llms.txt" in readme
         assert "PySide6" in readme
+        assert "Attribution-NOTICE" in readme
         assert ("Security%20SLA" in readme or "Sicherheits--SLA" in readme)
         assert ("code%20style-ruff" in readme or "Code--Stil-ruff" in readme)
         assert ("Third--Party%20Licenses-Audited" in readme or "Drittanbieter--Lizenzen-Gepr" in readme)
-        assert "Tests-409" in readme
+        assert ("Last--Checked-2026--09--21" in readme or "Gepr%C3%BCft-2026--09--21" in readme)
+        assert "Tests-413" in readme
 
 
 def test_quick_navigation_anchors_parity() -> None:
-    """Verify that both READMEs contain identical 17-item Quick Navigation anchors matching headings."""
+    """Verify that both READMEs contain identical 18-item Quick Navigation anchors matching headings."""
     readme_en = (ROOT / "README.md").read_text(encoding="utf-8")
     readme_de = (ROOT / "README.de.md").read_text(encoding="utf-8")
 
@@ -127,6 +129,7 @@ def test_quick_navigation_anchors_parity() -> None:
         "Windows Store Materials",
         "Third-Party Licenses & Transparency",
         "Development & License",
+        "Statutory Notice (§ 521 BGB) & Liability Disclaimer",
     ]
 
     de_expected_headings = [
@@ -147,6 +150,7 @@ def test_quick_navigation_anchors_parity() -> None:
         "Windows-Store-Materialien",
         "Drittanbieter-Lizenzen & Transparenz",
         "Entwicklung & Lizenz",
+        "Gesetzlicher Hinweis (§ 521 BGB) & Haftungsausschluss",
     ]
 
     for heading in en_expected_headings:
@@ -475,7 +479,8 @@ def test_pep621_license_files_and_pytest_norecursedirs() -> None:
     assert pyproject_path.is_file()
 
     content = pyproject_path.read_text(encoding="utf-8")
-    assert 'license-files = ["LICENSE", "THIRD_PARTY_LICENSES.md"]' in content
+    assert 'license-files = ["LICENSE", "NOTICE", "THIRD_PARTY_LICENSES.md"]' in content
+    assert 'Notice = "https://github.com/dev-bricks/CareCenter-for-Codex/blob/main/NOTICE"' in content
     assert "rfc3339-validator>=0.1.4" in content
     assert "isoduration>=20.11.0" in content
     assert "norecursedirs =" in content
@@ -494,8 +499,10 @@ def test_third_party_licenses_audit_recency_and_format_deps() -> None:
     md_text = md_path.read_text(encoding="utf-8")
     txt_text = txt_path.read_text(encoding="utf-8")
 
-    assert "Audit Date:** 2026-09-20" in md_text
-    assert "Last checked: 2026-09-20" in txt_text
+    assert "Audit Date:** 2026-09-21" in md_text
+    assert "Last checked: 2026-09-21" in txt_text
+    assert "NOTICE" in md_text
+    assert "NOTICE" in txt_text
     assert "rfc3339-validator" in md_text
     assert "rfc3339-validator" in txt_text
     assert "isoduration" in md_text
@@ -510,3 +517,78 @@ def test_changelog_and_marketing_log_recent_pfad_a_entry() -> None:
     assert "Technical Hygiene & Quality Hardening (2026-09-20) [Pfad A]" in changelog
     assert "## Date: 2026-09-20" in marketing
     assert "dev-bricks/CareCenter-for-Codex" in marketing
+
+
+def test_canonical_root_notice_attribution() -> None:
+    """Verify root NOTICE exists and declares copyright, dev-bricks, open-bricks, and MIT license."""
+    notice_path = ROOT / "NOTICE"
+    assert notice_path.is_file(), "Missing root NOTICE file"
+
+    text = notice_path.read_text(encoding="utf-8")
+    assert "CareCenter for Codex" in text
+    assert "Copyright (c) 2026 Lukas Geiger" in text
+    assert "dev-bricks" in text
+    assert "open-bricks" in text
+    assert "MIT License" in text
+    assert "THIRD_PARTY_LICENSES.md" in text
+
+
+def test_pep621_keywords_saturation_20_of_20() -> None:
+    """Verify pyproject.toml contains all 20 saturated discoverability keywords."""
+    pyproject_path = ROOT / "pyproject.toml"
+    assert pyproject_path.is_file()
+
+    text = pyproject_path.read_text(encoding="utf-8")
+    expected_keywords = [
+        "carecenter",
+        "codex",
+        "codex-cli",
+        "developer-tools",
+        "maintenance",
+        "openai-codex",
+        "pyside6",
+        "sqlite",
+        "system-tray",
+        "windows",
+        "desktop-app",
+        "dev-bricks",
+        "health-check",
+        "local-first",
+        "mcp",
+        "offline-first",
+        "open-bricks",
+        "process-hygiene",
+        "python",
+        "zero-egress",
+    ]
+    for kw in expected_keywords:
+        assert f'"{kw}"' in text, f"Missing keyword '{kw}' in pyproject.toml"
+
+
+def test_statutory_notice_521_bgb_bilingual() -> None:
+    """Verify both READMEs and llms.txt contain Section 18 statutory § 521 BGB disclaimer and 48h SLA."""
+    readme_en = (ROOT / "README.md").read_text(encoding="utf-8")
+    readme_de = (ROOT / "README.de.md").read_text(encoding="utf-8")
+    llms_txt = (ROOT / "llms.txt").read_text(encoding="utf-8")
+
+    assert "## Statutory Notice (§ 521 BGB) & Liability Disclaimer" in readme_en
+    assert "§ 521 BGB" in readme_en
+    assert ("48-hour" in readme_en or "48 hours" in readme_en)
+
+    assert "## Gesetzlicher Hinweis (§ 521 BGB) & Haftungsausschluss" in readme_de
+    assert "§ 521 BGB" in readme_de
+    assert "48 Stunden" in readme_de
+
+    assert "§ 521 BGB" in llms_txt
+    assert "INV-SLA-10" in llms_txt
+
+
+def test_changelog_and_marketing_log_recent_pfad_b_entry() -> None:
+    """Verify CHANGELOG.md and MARKETING-LOG.txt contain 2026-09-21 Pfad B entries."""
+    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    marketing = (ROOT / "MARKETING-LOG.txt").read_text(encoding="utf-8")
+
+    assert "Discoverability, Design & Navigation Parity Refresh (2026-09-21) [Pfad B]" in changelog
+    assert "## Date: 2026-09-21" in marketing
+    assert "dev-bricks/CareCenter-for-Codex" in marketing
+    assert "Repository Topics Saturation (20/20)" in marketing
