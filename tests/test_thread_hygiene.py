@@ -204,3 +204,60 @@ def test_rechecks_codex_activity_after_backup_immediately_before_move(tmp_path: 
         assert conn.execute(
             "SELECT archived FROM threads WHERE id='starts-during-backup'"
         ).fetchone()[0] == 0
+
+
+def test_maintain_threads_creates_state_backup_when_archiving_unreads(tmp_path: Path) -> None:
+    config = make_config(tmp_path)
+    add_thread(config, "old", 20)
+    write_unread(config, ["old", "keep"])
+
+    result = maintain_threads(config, archive_days=10, process_provider=lambda: [], now=NOW)
+
+    assert result.status == "ok"
+    assert result.archived == 1
+    assert result.marked_read == 1
+    assert result.state_backup is not None
+    assert Path(result.state_backup).exists()
+    state = json.loads(global_state_path(config).read_text(encoding="utf-8"))
+    assert state["electron-persisted-atom-state"]["unread-thread-ids-by-host-v1"]["local"] == ["keep"]
+
+
+def test_maintain_threads_does_not_modify_state_when_no_unreads_archived(tmp_path: Path) -> None:
+    config = make_config(tmp_path)
+    add_thread(config, "old", 20)
+    write_unread(config, ["other"])
+    initial_content = global_state_path(config).read_text(encoding="utf-8")
+
+    result = maintain_threads(config, archive_days=10, process_provider=lambda: [], now=NOW)
+
+    assert result.status == "ok"
+    assert result.archived == 1
+    assert result.marked_read == 0
+    assert result.state_backup is None
+    assert global_state_path(config).read_text(encoding="utf-8") == initial_content
+
+
+def test_maintain_threads_dry_run_does_not_modify_db_or_files(tmp_path: Path) -> None:
+    config = make_config(tmp_path)
+    old_path = add_thread(config, "old", 20)
+    write_unread(config, ["old", "other"])
+    initial_content = global_state_path(config).read_text(encoding="utf-8")
+
+    result = maintain_threads(
+        config,
+        mark_read_days=2,
+        archive_days=10,
+        process_provider=lambda: [],
+        now=NOW,
+        dry_run=True,
+    )
+
+    assert result.status == "ok"
+    assert result.dry_run is True
+    assert result.marked_read == 1
+    assert result.archived == 1
+    assert old_path.exists()
+    assert not (config.codex_home / "archived_sessions" / old_path.name).exists()
+    assert global_state_path(config).read_text(encoding="utf-8") == initial_content
+    with sqlite3.connect(config.state_db_path) as conn:
+        assert conn.execute("SELECT archived FROM threads WHERE id='old'").fetchone()[0] == 0

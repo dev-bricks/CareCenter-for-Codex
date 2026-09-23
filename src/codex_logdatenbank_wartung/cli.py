@@ -287,16 +287,13 @@ def cmd_mark_runs_read(args: argparse.Namespace) -> int:
     from .thread_hygiene import maintain_threads
 
     config = load_config(args)
-    if args.dry_run:
-        from .mark_runs_read import mark_all_automation_runs_read
-        result = mark_all_automation_runs_read(config, dry_run=True)
-    else:
-        result = maintain_threads(
-            config,
-            mark_all_read=args.older_than_days <= 0,
-            mark_read_days=max(0, args.older_than_days),
-            archive_days=max(0, args.archive_older_than_days),
-        )
+    result = maintain_threads(
+        config,
+        mark_all_read=args.older_than_days <= 0,
+        mark_read_days=max(0, args.older_than_days),
+        archive_days=max(0, args.archive_older_than_days),
+        dry_run=args.dry_run,
+    )
     print(result.to_text())
     return {"ok": 0, "nothing": 0, "blocked": 2, "failed": 1}.get(result.status, 1)
 

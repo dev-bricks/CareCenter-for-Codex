@@ -28,15 +28,25 @@ class ThreadHygieneResult:
     message: str = ""
     state_backup: str | None = None
     database_backup: str | None = None
+    dry_run: bool = False
 
     def to_dict(self) -> dict[str, object]:
         return asdict(self)
 
     def to_text(self) -> str:
-        return (
-            f"Status: {self.status}\n{self.message}\n"
-            f"Als gelesen markiert: {self.marked_read}\nArchiviert: {self.archived}"
-        )
+        lines = [
+            f"Status: {self.status}",
+            self.message,
+            f"Als gelesen markiert: {self.marked_read}",
+            f"Archiviert: {self.archived}",
+        ]
+        if self.dry_run:
+            lines.append("Dry-Run: keine Datei geändert.")
+        if self.state_backup:
+            lines.append(f"State-Backup: {self.state_backup}")
+        if self.database_backup:
+            lines.append(f"DB-Backup: {self.database_backup}")
+        return "\n".join(lines)
 
 
 def _backup_path(path: Path, suffix: str) -> Path:
@@ -53,31 +63,34 @@ def maintain_threads(
     mark_all_read: bool = False,
     process_provider: ProcessProvider | None = None,
     now: int | None = None,
+    dry_run: bool = False,
 ) -> ThreadHygieneResult:
     """Markiert alte ungelesene Threads und/oder archiviert alte Threads.
 
     ``0`` deaktiviert die jeweilige Altersregel. ``mark_all_read`` leert unabhängig
     vom Alter alle lokalen Ungelesen-IDs. Unbekannte IDs bleiben bei Altersfiltern erhalten.
+    ``dry_run=True`` simuliert die Zählung ohne Änderungen an DB oder Dateien.
     """
     if find_codex_processes(config, provider=process_provider):
         return ThreadHygieneResult(
             "blocked",
             message="Codex Desktop oder CLI läuft; Ausführung vorgemerkt/übersprungen.",
+            dry_run=dry_run,
         )
     explicit_archive_ids = set(archive_thread_ids or ())
     if not mark_all_read and mark_read_days <= 0 and archive_days <= 0 and not explicit_archive_ids:
-        return ThreadHygieneResult("nothing", message="Keine Thread-Regel aktiviert.")
+        return ThreadHygieneResult("nothing", message="Keine Thread-Regel aktiviert.", dry_run=dry_run)
 
     db_path = config.state_db_path
     state_path = global_state_path(config)
     if not db_path.exists():
-        return ThreadHygieneResult("failed", message=f"Thread-Datenbank fehlt: {db_path}")
+        return ThreadHygieneResult("failed", message=f"Thread-Datenbank fehlt: {db_path}", dry_run=dry_run)
 
     try:
         state_raw = state_path.read_text(encoding="utf-8") if state_path.exists() else "{}"
         state = json.loads(state_raw)
     except (OSError, ValueError) as exc:
-        return ThreadHygieneResult("failed", message=f"Globaler Zustand unlesbar: {exc}")
+        return ThreadHygieneResult("failed", message=f"Globaler Zustand unlesbar: {exc}", dry_run=dry_run)
 
     current = int(time.time() if now is None else now)
     read_cutoff = current - max(0, int(mark_read_days)) * 86400
@@ -122,8 +135,24 @@ def maintain_threads(
             )
         ]
 
+        archive_unread_count = 0
+        for row in candidates:
+            for ids in unread_by_host.values():
+                if isinstance(ids, list) and row["id"] in ids:
+                    archive_unread_count += 1
+
         if not marked and not candidates:
-            return ThreadHygieneResult("nothing", message="Keine passenden Threads gefunden.")
+            return ThreadHygieneResult("nothing", message="Keine passenden Threads gefunden.", dry_run=dry_run)
+
+        if dry_run:
+            total_marked = marked + archive_unread_count
+            return ThreadHygieneResult(
+                "ok",
+                marked_read=total_marked,
+                archived=len(candidates),
+                message=f"Dry-Run: {total_marked} Thread(s) würden als gelesen markiert, {len(candidates)} archiviert.",
+                dry_run=True,
+            )
 
         # Zweiter, frischer CIM-Snapshot unmittelbar vor dem ersten Backup. Der
         # initiale Readback allein ließ ein TOCTOU-Fenster offen, in dem eine
@@ -141,7 +170,9 @@ def maintain_threads(
             conn.backup(backup_conn)
         finally:
             backup_conn.close()
-        if marked and state_path.exists():
+
+        will_modify_state = (marked > 0 or archive_unread_count > 0)
+        if will_modify_state and state_path.exists():
             state_backup = _backup_path(state_path, "thread-state-bak")
             state_backup.write_text(state_raw, encoding="utf-8")
 
@@ -161,16 +192,21 @@ def maintain_threads(
         conn.execute("BEGIN IMMEDIATE")
         archived = 0
         for row in candidates:
-            source = Path(str(row["rollout_path"]))
-            target = archive_root / source.name
-            if source.exists() and source.resolve() != target.resolve():
-                if target.exists():
-                    raise FileExistsError(f"Archivziel existiert bereits: {target}")
-                shutil.move(str(source), str(target))
-                moved.append((source, target))
+            raw_path = str(row["rollout_path"] or "").strip()
+            if raw_path:
+                source = Path(raw_path)
+                target = archive_root / source.name
+                if source.exists() and source.resolve() != target.resolve():
+                    if target.exists():
+                        raise FileExistsError(f"Archivziel existiert bereits: {target}")
+                    shutil.move(str(source), str(target))
+                    moved.append((source, target))
+                target_str = str(target)
+            else:
+                target_str = ""
             conn.execute(
                 "UPDATE threads SET archived=1, archived_at=?, rollout_path=? WHERE id=?",
-                (current, str(target), row["id"]),
+                (current, target_str, row["id"]),
             )
             archived += 1
             for host, ids in unread_by_host.items():
@@ -178,7 +214,7 @@ def maintain_threads(
                     unread_by_host[host] = [item for item in ids if item != row["id"]]
                     marked += 1
         conn.commit()
-        if marked or archived:
+        if marked > 0:
             state_path.parent.mkdir(parents=True, exist_ok=True)
             _atomic_write_json(state_path, state)
         return ThreadHygieneResult(
@@ -186,6 +222,7 @@ def maintain_threads(
             message=f"{marked} Thread(s) als gelesen markiert, {archived} archiviert.",
             state_backup=str(state_backup) if state_backup else None,
             database_backup=str(db_backup),
+            dry_run=False,
         )
     except Exception as exc:
         conn.rollback()

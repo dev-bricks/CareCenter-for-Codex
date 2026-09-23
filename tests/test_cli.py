@@ -150,3 +150,35 @@ def test_tray_command_starts_runtime_logging_before_launch(tmp_path: Path) -> No
     assert rc == 0
     start_logging.assert_called_once_with()
     run_tray.assert_called_once_with(cfg)
+
+
+def test_cmd_mark_runs_read_dry_run_delegates_to_maintain_threads(tmp_path: Path, capsys) -> None:
+    cfg = tmp_path / "config.json"
+    cfg.write_text("{}", encoding="utf-8")
+
+    class FakeResult:
+        status = "ok"
+
+        def to_text(self) -> str:
+            return "Dry-Run: 3 Thread(s) würden als gelesen markiert, 2 archiviert."
+
+    with patch(
+        "codex_logdatenbank_wartung.thread_hygiene.maintain_threads",
+        return_value=FakeResult(),
+    ) as maintain_mock:
+        rc = main([
+            "--config", str(cfg),
+            "mark-runs-read",
+            "--dry-run",
+            "--older-than-days", "7",
+            "--archive-older-than-days", "14",
+        ])
+
+    assert rc == 0
+    maintain_mock.assert_called_once()
+    _, kwargs = maintain_mock.call_args
+    assert kwargs["mark_all_read"] is False
+    assert kwargs["mark_read_days"] == 7
+    assert kwargs["archive_days"] == 14
+    assert kwargs["dry_run"] is True
+    assert "Dry-Run: 3 Thread(s)" in capsys.readouterr().out
