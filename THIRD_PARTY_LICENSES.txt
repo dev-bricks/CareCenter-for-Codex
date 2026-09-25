@@ -19,27 +19,139 @@ CareCenter for Codex is licensed under the MIT License. See `LICENSE` and `NOTIC
 
 | Package | Constraint / revision | Version checked | License metadata | Source |
 |---|---:|---:|---|---|
-| PySide6 | `>=6.7` | 6.11.1 | LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only | https://pypi.org/project/PySide6/ |
-| tomlkit | `>=0.13` | 0.15.0 | MIT | https://pypi.org/project/tomlkit/ |
+| PySide6 | `>=6.7.0` | 6.11.1 | LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only | https://pypi.org/project/PySide6/ |
+| tomlkit | `>=0.13.0` | 0.15.0 | MIT | https://pypi.org/project/tomlkit/ |
+
+## Qt for Python Runtime Wheels
+
+| Package | Requirement | Checked metadata version | License metadata | Source |
+|---|---|---:|---|---|
+| PySide6_Addons | transitive via `PySide6` | 6.11.1 | LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only | https://pypi.org/project/PySide6-Addons/ |
+| PySide6_Essentials | transitive via `PySide6` | 6.11.1 | LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only | https://pypi.org/project/PySide6-Essentials/ |
+| shiboken6 | transitive via `PySide6` | 6.11.1 | LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only | https://pypi.org/project/shiboken6/ |
 
 ## Safe Start Integration and Build Dependencies
 
 | Package | Declared use | Constraint / revision | Version checked | License metadata | Source |
 |---|---|---:|---:|---|---|
 | safe-start-for-codex | Optional integration and EXE build | commit `dcb369a64f403f6551bcb3bac16565c56ec79474` | 1.1.3 | MIT | https://github.com/dev-bricks/safe-start-for-codex |
-| PyInstaller | Optional Windows EXE build | `>=6.0` | 6.21.0 | GPLv2-or-later with PyInstaller's special exception | https://pypi.org/project/pyinstaller/ |
+| PyInstaller | Optional Windows EXE build | `>=6.10.0` | 6.21.0 | GPLv2-or-later with PyInstaller's special exception | https://pypi.org/project/pyinstaller/ |
+| altgraph | Graph module for PyInstaller | `>=0.17.4` | 0.17.4 | MIT | https://pypi.org/project/altgraph/ |
+| packaging | Version handling for build | `>=24.0` | 24.2 | Apache-2.0 OR BSD-2-Clause | https://pypi.org/project/packaging/ |
 | hatchling | Build backend / EXE build | `>=1.25` | 1.31.0 | MIT | https://pypi.org/project/hatchling/ |
 
 ## Direct Development Dependencies
 
 | Package | Constraint | Version checked | License metadata | Source |
 |---|---:|---:|---|---|
-| pytest | `>=8.0` | 9.1.1 | MIT | https://pypi.org/project/pytest/ |
-| Ruff | `>=0.5` | 0.15.21 | MIT | https://pypi.org/project/ruff/ |
+| pytest | `>=9.1.1` | 9.1.1 | MIT | https://pypi.org/project/pytest/ |
+| Ruff | `>=0.9.0` | 0.15.21 | MIT | https://pypi.org/project/ruff/ |
 | mypy | `>=1.10` | 2.3.0 | MIT | https://pypi.org/project/mypy/ |
 | jsonschema[format] | `>=4.23` | 4.26.0 | MIT | https://pypi.org/project/jsonschema/ |
 | rfc3339-validator | `>=0.1.4` | 0.1.4 | MIT | https://pypi.org/project/rfc3339-validator/ |
 | isoduration | `>=20.11.0` | 20.11.0 | ISC | https://pypi.org/project/isoduration/ |
+
+---
+
+## Detailed Component Inventory
+
+PySide6
+License: LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only
+SPDX: LGPL-3.0-only
+URL: https://pypi.org/project/PySide6/
+Notice: Official Python bindings for Qt 6 GUI, Widgets, Core, and QThread modules (>=6.7.0). Dynamically linked unmodified shared library.
+
+PySide6_Addons
+License: LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only
+SPDX: LGPL-3.0-only
+URL: https://pypi.org/project/PySide6-Addons/
+Notice: Add-on modules for PySide6 Qt framework.
+
+PySide6_Essentials
+License: LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only
+SPDX: LGPL-3.0-only
+URL: https://pypi.org/project/PySide6-Essentials/
+Notice: Essential Core, GUI, and Widgets C++ libraries for Qt.
+
+shiboken6
+License: LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only
+SPDX: LGPL-3.0-only
+URL: https://pypi.org/project/shiboken6/
+Notice: CPython binding generator runtime for PySide6.
+
+tomlkit
+License: MIT
+SPDX: MIT
+URL: https://pypi.org/project/tomlkit/
+Notice: Style-preserving TOML parsing and serialization library for Python configuration management.
+
+safe-start-for-codex
+License: MIT
+SPDX: MIT
+URL: https://github.com/dev-bricks/safe-start-for-codex
+Notice: Pinned integration for safe startup gating, burst protection, and desktop process pacing.
+
+PyInstaller
+License: GPL-2.0-or-later WITH Bootloader-exception
+SPDX: GPL-2.0-or-later WITH Bootloader-exception
+URL: https://pypi.org/project/pyinstaller/
+Notice: Standalone executable packaging tool. Official special exception permits distributing built binaries under CareCenter's MIT license.
+
+altgraph
+License: MIT
+SPDX: MIT
+URL: https://pypi.org/project/altgraph/
+Notice: Graph computation module used by PyInstaller for module discovery.
+
+packaging
+License: Apache-2.0 OR BSD-2-Clause
+SPDX: Apache-2.0 OR BSD-2-Clause
+URL: https://pypi.org/project/packaging/
+Notice: Core utilities for Python package versions and PEP specification compliance.
+
+hatchling
+License: MIT
+SPDX: MIT
+URL: https://pypi.org/project/hatchling/
+Notice: Extensible PEP 517 build backend for wheel distribution.
+
+pytest
+License: MIT
+SPDX: MIT
+URL: https://pypi.org/project/pytest/
+Notice: Testing framework for Python. Pinned floor >=9.1.1 protects against CVE-2025-7117.
+
+ruff
+License: MIT OR Apache-2.0
+SPDX: MIT OR Apache-2.0
+URL: https://pypi.org/project/ruff/
+Notice: High-performance Python linter and formatter.
+
+mypy
+License: MIT
+SPDX: MIT
+URL: https://pypi.org/project/mypy/
+Notice: Optional static type checker for Python.
+
+jsonschema
+License: MIT
+SPDX: MIT
+URL: https://pypi.org/project/jsonschema/
+Notice: An implementation of JSON Schema for Python used in contract verification.
+
+rfc3339-validator
+License: MIT
+SPDX: MIT
+URL: https://pypi.org/project/rfc3339-validator/
+Notice: Pure python RFC3339 timestamp format validator.
+
+isoduration
+License: ISC
+SPDX: ISC
+URL: https://pypi.org/project/isoduration/
+Notice: Operations with ISO 8601 durations and time expressions.
+
+---
 
 ## Distribution Notes
 

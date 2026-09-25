@@ -45,7 +45,7 @@ Dieses Tool führt sicherheitsrelevante lokale Operationen aus:
 
 ### Kontakt & Meldewege
 
-1. **GitHub Security Advisories (bevorzugt):** [GitHub Private Vulnerability Reporting](https://github.com/dev-bricks/CareCenter-for-Codex/security/advisories)
+1. **GitHub Security Advisories (bevorzugt):** [GitHub Private Vulnerability Reporting](https://github.com/dev-bricks/CareCenter-for-Codex/security/advisories) (Direktformular: [Neues Advisory einreichen](https://github.com/dev-bricks/CareCenter-for-Codex/security/advisories/new))
 2. **Direkter Sicherheitskontakt:**
    - `security@open-bricks.org`
    - `security@dev-bricks.org`
@@ -97,7 +97,7 @@ This tool performs security-relevant local operations:
 
 ### Contact & Reporting Channels
 
-1. **GitHub Security Advisories (Preferred):** [GitHub Private Vulnerability Reporting](https://github.com/dev-bricks/CareCenter-for-Codex/security/advisories)
+1. **GitHub Security Advisories (Preferred):** [GitHub Private Vulnerability Reporting](https://github.com/dev-bricks/CareCenter-for-Codex/security/advisories) (Direct submission: [Open New Advisory](https://github.com/dev-bricks/CareCenter-for-Codex/security/advisories/new))
 2. **Direct Maintainer Contact:**
    - `security@open-bricks.org`
    - `security@dev-bricks.org`

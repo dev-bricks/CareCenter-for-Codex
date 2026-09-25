@@ -47,6 +47,22 @@ DECISIONS.md
 TASKPLAN*.md
 HANDOFF-CODEX-START.md
 CODEX-AUTO-DEBUG-DESIGN.md
+
+# --- Secrets, Certificates & Sensitive Data Defense ---
+*.pfx
+*.p12
+*.pem
+*.key
+*.cer
+*.crt
+credentials.json
+token.json
+client_secret*.json
+secrets.*
+keyring/
+pytest_out.txt
+pytest*.txt
+
 # --- Canonical Lock-System & Multi-Agent Defense ---
 LOCK
 LOCK.*
