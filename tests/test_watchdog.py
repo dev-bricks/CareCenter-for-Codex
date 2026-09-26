@@ -497,6 +497,63 @@ def test_runtime_mcp_duplicates_reaped_while_desktop_is_active() -> None:
     assert killed_pids == [701, 702, 703]
 
 
+def test_runtime_mcp_duplicate_candidate_with_live_parent_is_not_reaped() -> None:
+    from unittest.mock import patch
+
+    from codex_logdatenbank_wartung.processes import ProcessInfo
+
+    parent = ProcessInfo(700, "codex.exe", command_line="codex app-server")
+    root = ProcessInfo(701, "node.exe", command_line="node mcp-server", parent_pid=700)
+    with patch(
+        "codex_logdatenbank_wartung.watchdog.find_runtime_mcp_duplicate_roots",
+        return_value=[root],
+    ):
+        killed_pids: list[int] = []
+        reaped = reap_runtime_mcp_duplicates(
+            make_config(reap_runtime_mcp_duplicates=True, runtime_mcp_activity_sample_seconds=0.0),
+            execute=True,
+            provider=lambda: [parent, root],
+            killer=lambda pid: (killed_pids.append(pid) or True, "ok"),
+        )
+
+    assert reaped == 0
+    assert killed_pids == []
+
+
+def test_runtime_orphan_log_keeps_last_parent_identity(caplog) -> None:
+    from codex_logdatenbank_wartung.processes import ProcessInfo
+
+    now = datetime.now()
+    parent = ProcessInfo(710, "node.exe", command_line="node session-host.js")
+    orphan = ProcessInfo(
+        711,
+        "node.exe",
+        command_line="node ellmos-controlcenter-mcp/server.mjs",
+        parent_pid=710,
+        cpu_ticks=4,
+        created_at=(now - timedelta(hours=2)).isoformat(),
+    )
+    # A prior read captured the parent identity; the next two reads see the
+    # actual orphan and provide the required stable/idle evidence.
+    from codex_logdatenbank_wartung.processes import find_companion_orphans
+
+    find_companion_orphans(provider=lambda: [parent, orphan], min_age_seconds=0, now=now)
+    snapshots = iter([[orphan], [orphan]])
+    killed: list[int] = []
+    with caplog.at_level(logging.WARNING, logger="CareCenterForCodex.watchdog"):
+        reaped = reap_runtime_orphans(
+            make_config(),
+            provider=lambda: next(snapshots),
+            killer=lambda pid: (killed.append(pid) or True, "ok"),
+            sleeper=lambda _seconds: None,
+        )
+
+    assert reaped == 1
+    assert killed == [711]
+    assert "parent_name='node.exe'" in caplog.text
+    assert "session-host.js" in caplog.text
+
+
 def test_runtime_mcp_default_kill_uses_complete_process_tree() -> None:
     from unittest.mock import patch
 

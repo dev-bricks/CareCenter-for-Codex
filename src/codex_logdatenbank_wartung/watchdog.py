@@ -44,6 +44,8 @@ from .processes import (
     ProcessProvider,
     find_companion_orphans,
     find_runtime_mcp_duplicate_roots,
+    parent_is_dead,
+    parent_snapshot,
     runtime_orphan_kind,
     tree_pids,
     windows_processes,
@@ -109,10 +111,18 @@ def _has_recent_session_rollout(
 
 def _log_runtime_orphan_kill(process: ProcessInfo, criterion: str) -> None:
     command_line = " ".join(process.command_line.splitlines())
+    parent = parent_snapshot(process.parent_pid)
+    parent_info = parent[0] if parent else None
+    parent_seen = parent[1] if parent else None
     _LOGGER.warning(
-        "orphan_kill pid=%d command_line=%r criterion=%s",
+        "orphan_kill pid=%d command_line=%r parent_pid=%d parent_name=%r "
+        "parent_command_line=%r parent_last_seen=%r criterion=%s",
         process.pid,
         command_line,
+        process.parent_pid,
+        parent_info.name if parent_info else None,
+        " ".join(parent_info.command_line.splitlines()) if parent_info else None,
+        parent_seen,
         criterion,
     )
 
@@ -248,6 +258,14 @@ def reap_runtime_orphans(
             ok, _ = killer(orphan.pid)
         else:
             try:
+                # Review finding (T-20260926-212716751): NOT a tree-kill. Every
+                # PID reaped here was individually vetted (dead parent, min
+                # age, two idle CPU snapshots) -- a descendant was never
+                # checked against those same criteria, so killing its whole
+                # subtree would terminate processes no criterion actually
+                # covers. A genuinely orphaned descendant becomes reap-able
+                # on its own in a later cycle once IT independently satisfies
+                # dead-parent/age/CPU-idle.
                 subprocess.run(
                     ["taskkill", "/F", "/PID", str(orphan.pid)],
                     check=True,
@@ -316,6 +334,10 @@ def reap_runtime_mcp_duplicates(
             config, "runtime_mcp_min_matching_roots", 2
         ),
     )
+    # Duplicate signatures are only a read-only candidate signal. A live
+    # app-server parent is an active cohort, not a zombie; never kill it here.
+    initial_by_pid = {process.pid: process for process in initial_processes}
+    roots = [root for root in roots if parent_is_dead(root, initial_by_pid)]
     if not roots or not execute:
         return len(roots)
 
@@ -355,6 +377,7 @@ def reap_runtime_mcp_duplicates(
         for root in roots:
             ok, _ = killer(root.pid)
             if ok:
+                _log_runtime_orphan_kill(root, "kind=mcp_server,parent=dead,duplicate-cohort")
                 reaped += 1
         return reaped
 
@@ -367,7 +390,10 @@ def reap_runtime_mcp_duplicates(
                 timeout=15,
                 **no_window_kwargs(),
             )
-            return int(completed.returncode == 0)
+            ok = completed.returncode == 0
+            if ok:
+                _log_runtime_orphan_kill(root, "kind=mcp_server,parent=dead,duplicate-cohort")
+            return int(ok)
         except (OSError, subprocess.TimeoutExpired):
             return 0
 

@@ -239,7 +239,45 @@ _CODEX_EXEC_PATTERN = re.compile(r"(?:^|\s)exec(?:\s|$)", re.IGNORECASE)
 _LANGUAGE_SERVER_NAME_PATTERN = re.compile(
     r"^language_server(?:[._-]|$)", re.IGNORECASE
 )
-RuntimeOrphanKind = Literal["companion_app_server", "language_server", "codex_exec"]
+_LANGUAGE_SERVER_MARKERS = (
+    "typescript-language-server",
+    "tsserver",
+    "pyright-langserver",
+    "pylsp",
+    "jedi-language-server",
+    "rust-analyzer",
+    "clangd",
+    "gopls",
+    "yaml-language-server",
+    "bash-language-server",
+    "vscode-json-languageserver",
+    "lua-language-server",
+    "sourcekit-lsp",
+    "jdtls",
+    "zls",
+)
+_MCP_SERVER_MARKERS = (
+    "code-assist-mcp",
+    "@modelcontextprotocol",
+    "model-context-protocol",
+    "mcp-server",
+    "mcp_server",
+)
+# Review finding (T-20260926-212716751): these broad separator+"mcp" markers
+# used to be plain substrings, so "acme_mcpayments.exe" (an unrelated payments
+# tool) or "battle-mcp-launcher.exe" (a game) also matched "_mcp"/"-mcp"
+# anywhere in the name. Requiring "mcp" to end at a separator or the string's
+# end -- matching real names like "...-mcp", "...-mcp.exe", "mcp server.log"
+# -- keeps the intended catch-all for ad-hoc "<name>-mcp" server binaries
+# without matching "mcp" as a mid-word fragment of something else.
+_MCP_BROAD_TOKEN_PATTERN = re.compile(r"[-_ ]mcp(?:[/\\. ]|$)")
+RuntimeOrphanKind = Literal[
+    "companion_app_server", "language_server", "mcp_server", "codex_exec"
+]
+
+# Last known identity is used only for audit output after a parent disappears;
+# it never makes a process eligible for termination.
+_PARENT_HISTORY: dict[int, tuple[ProcessInfo, str]] = {}
 
 
 def _is_companion_app_server(process: ProcessInfo) -> bool:
@@ -256,11 +294,18 @@ def _is_companion_app_server(process: ProcessInfo) -> bool:
 
 
 def runtime_orphan_kind(process: ProcessInfo) -> RuntimeOrphanKind | None:
-    """Klassifiziere nur die eng definierten Runtime-Waisen-Zieltypen."""
+    """Klassifiziere nur allowlist-basierte Runtime-Waisen-Zieltypen."""
     if _is_companion_app_server(process):
         return "companion_app_server"
-    if _LANGUAGE_SERVER_NAME_PATTERN.match(process.name):
+    haystack = f"{process.executable} {process.command_line}".lower()
+    if _LANGUAGE_SERVER_NAME_PATTERN.match(process.name) or any(
+        marker in haystack for marker in _LANGUAGE_SERVER_MARKERS
+    ):
         return "language_server"
+    if any(marker in haystack for marker in _MCP_SERVER_MARKERS) or _MCP_BROAD_TOKEN_PATTERN.search(
+        haystack
+    ):
+        return "mcp_server"
     if process.name.lower() == "codex.exe" and _CODEX_EXEC_PATTERN.search(
         process.command_line
     ):
@@ -303,6 +348,16 @@ def _parent_is_dead(
     return False
 
 
+def parent_is_dead(process: ProcessInfo, processes_by_pid: dict[int, ProcessInfo]) -> bool:
+    """Public safety predicate shared by every mutating reaper."""
+    return _parent_is_dead(process, processes_by_pid)
+
+
+def parent_snapshot(parent_pid: int) -> tuple[ProcessInfo, str] | None:
+    """Return the last observed parent identity for audit purposes only."""
+    return _PARENT_HISTORY.get(parent_pid)
+
+
 def is_companion_orphan(process: ProcessInfo, *, min_age_seconds: int = 300) -> bool:
     """Erkennt verwaiste Companion-app-server-Prozesse (codex-plugin-cc #277).
 
@@ -332,6 +387,9 @@ def find_companion_orphans(
     """
     provider = provider or windows_processes
     processes = provider()
+    observed_at = datetime.now().isoformat(timespec="seconds")
+    for process in processes:
+        _PARENT_HISTORY[process.pid] = (process, observed_at)
     processes_by_pid = {process.pid: process for process in processes}
     return [
         process

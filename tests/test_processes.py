@@ -14,6 +14,7 @@ from codex_logdatenbank_wartung.processes import (
     find_runtime_mcp_duplicate_roots,
     is_companion_orphan,
     process_type,
+    runtime_orphan_kind,
     tree_pids,
     windows_processes,
 )
@@ -204,6 +205,49 @@ def test_runtime_orphan_finder_requires_dead_parent_and_minimum_age() -> None:
     assert live_parent == []
     assert [process.pid for process in dead_parent] == [82001]
     assert too_young == []
+
+
+def test_runtime_orphan_finder_covers_mcp_nodes_and_common_language_servers() -> None:
+    now = datetime.fromisoformat("2026-08-30T03:00:00")
+    parent = ProcessInfo(19848, "node.exe", command_line="node host.js", created_at="2026-08-29T01:00:00")
+    mcp = ProcessInfo(
+        82003,
+        "node.exe",
+        command_line="node C:/tools/ellmos-controlcenter-mcp/dist/index.js",
+        parent_pid=19848,
+        created_at="2026-08-29T02:00:00",
+    )
+    language_server = ProcessInfo(
+        82004,
+        "node.exe",
+        command_line="node typescript-language-server --stdio",
+        parent_pid=19848,
+        created_at="2026-08-29T02:00:00",
+    )
+
+    assert runtime_orphan_kind(mcp) == "mcp_server"
+    assert runtime_orphan_kind(language_server) == "language_server"
+    assert find_companion_orphans(provider=lambda: [parent, mcp, language_server], min_age_seconds=1800, now=now) == []
+    assert [item.pid for item in find_companion_orphans(
+        provider=lambda: [mcp, language_server], min_age_seconds=1800, now=now
+    )] == [82003, 82004]
+
+
+def test_runtime_orphan_finder_broad_mcp_markers_do_not_misclassify_unrelated_names() -> None:
+    """Review finding (T-20260926-212716751): `_MCP_SERVER_MARKERS` includes
+    broad substrings (' mcp', '-mcp', '_mcp') with no further vetting. Any
+    unrelated process whose name happens to contain one of these as a
+    substring must NOT be classified (and therefore never made reap-eligible)
+    as an MCP server."""
+    unrelated = [
+        ProcessInfo(90001, "acme_mcpayments.exe", command_line="acme_mcpayments.exe --daemon"),
+        ProcessInfo(90002, "battle-mcp-launcher.exe", command_line="battle-mcp-launcher.exe --fullscreen"),
+    ]
+    for process in unrelated:
+        assert runtime_orphan_kind(process) is None, (
+            f"{process.name!r} was misclassified as an MCP server via a broad "
+            "substring marker"
+        )
 
 
 def _desktop_runtime_generations() -> list[ProcessInfo]:

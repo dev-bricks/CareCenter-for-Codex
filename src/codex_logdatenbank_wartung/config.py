@@ -166,6 +166,14 @@ class MaintenanceConfig:
     safe_start_catchup_min_period_hours: int = 24
     safe_start_storm_window_minutes: int = 10
     safe_start_storm_release_threshold: int = 3
+    # zombie-killer-tray bleibt ebenfalls ein eigenständiges Werkzeug -- läuft als
+    # eigener Subprozess (T-20260926-212716751), nicht als In-Process-Import.
+    # Deckt verwaiste MCP-/Language-Server-Prozesse produktübergreifend ab; der
+    # bestehende Runtime-MCP-Reaper (processes.py/watchdog.py) bleibt unverändert
+    # auf Codex-Companion-Prozesse fokussiert -- beide ergänzen sich, keine Regel
+    # wird dupliziert.
+    zombie_killer_watch_interval_seconds: int = 600
+    zombie_killer_min_age_seconds: int = 1800
     # Abstand fuer CareCenter-eigene gestaffelte Automations-Freigaben.
     # Safe Start selbst nutzt seine eigene config.json (Default dort: 3 sofort, dann 5 Minuten).
     automation_stagger_delay_seconds: int = 60
@@ -326,6 +334,17 @@ class MaintenanceConfig:
     def safe_start_config_file(self) -> Path:
         """Pfad zur Safe-Start-Konfiguration."""
         return Path(self.safe_start_config_path).expanduser()
+
+    @property
+    def zombie_killer_state_dir(self) -> Path:
+        """zombie-killer-tray-Arbeitsverzeichnis unterhalb von CODEX_HOME.
+
+        zombie-killer-tray schreibt seinen Laufzeitzustand (`zombie_events.jsonl`,
+        `zombie_worker_errors.log`) in sein aktuelles Arbeitsverzeichnis, nicht an
+        einen fest codierten Pfad -- dieser Ordner wird als `cwd` an den
+        Subprozess übergeben (siehe `launch_zombie_killer_watch`).
+        """
+        return self.codex_home / "zombie-killer-tray"
 
     @property
     def config_toml_path(self) -> Path:
