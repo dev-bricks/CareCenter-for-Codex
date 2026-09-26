@@ -93,5 +93,3 @@ Public documentation:
 - THIRD_PARTY_LICENSES.txt: legacy text license inventory
 - STORE_LISTING.md, PRIVACY_POLICY.md, SUPPORT.md: Store release materials
 - SECURITY.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md: community health files
-
-Last-checked: 2026-09-21
