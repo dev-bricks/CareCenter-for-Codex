@@ -233,6 +233,23 @@ def test_runtime_orphan_finder_covers_mcp_nodes_and_common_language_servers() ->
     )] == [82003, 82004]
 
 
+def test_runtime_orphan_finder_broad_mcp_markers_do_not_misclassify_unrelated_names() -> None:
+    """Review finding (T-20260926-212716751): `_MCP_SERVER_MARKERS` includes
+    broad substrings (' mcp', '-mcp', '_mcp') with no further vetting. Any
+    unrelated process whose name happens to contain one of these as a
+    substring must NOT be classified (and therefore never made reap-eligible)
+    as an MCP server."""
+    unrelated = [
+        ProcessInfo(90001, "acme_mcpayments.exe", command_line="acme_mcpayments.exe --daemon"),
+        ProcessInfo(90002, "battle-mcp-launcher.exe", command_line="battle-mcp-launcher.exe --fullscreen"),
+    ]
+    for process in unrelated:
+        assert runtime_orphan_kind(process) is None, (
+            f"{process.name!r} was misclassified as an MCP server via a broad "
+            "substring marker"
+        )
+
+
 def _desktop_runtime_generations() -> list[ProcessInfo]:
     store_root = (
         r"C:\Program Files\WindowsApps\OpenAI.Codex_26.707.3563.0_x64__2p2nqsd0c76g0"

@@ -333,6 +333,7 @@ python -m codex_logdatenbank_wartung.cli safe-start-install
 python -m codex_logdatenbank_wartung.cli zombie-killer-report
 python -m codex_logdatenbank_wartung.cli zombie-killer-install
 python -m codex_logdatenbank_wartung.cli zombie-killer-watch
+python -m codex_logdatenbank_wartung.cli zombie-killer-stop
 python -m codex_logdatenbank_wartung.cli schedule install --interval-minutes 180
 ```
 

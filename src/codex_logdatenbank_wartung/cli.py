@@ -328,6 +328,20 @@ def cmd_zombie_killer_watch(args: argparse.Namespace) -> int:
     return 0 if result.status == "ok" else 1
 
 
+def cmd_zombie_killer_stop(args: argparse.Namespace) -> int:
+    import json as _json
+
+    from .zombie_killer_integration import stop_zombie_killer_watch
+
+    config = load_config(args)
+    result = stop_zombie_killer_watch(config)
+    if args.json:
+        print(_json.dumps(result.to_dict(), ensure_ascii=False, indent=2))
+    else:
+        print(result.to_text())
+    return 0 if result.status in ("ok", "not-running") else 1
+
+
 def cmd_mark_runs_read(args: argparse.Namespace) -> int:
     from .thread_hygiene import maintain_threads
 
@@ -631,6 +645,13 @@ def build_parser() -> argparse.ArgumentParser:
         "--json", action="store_true", help="Ergebnis als JSON ausgeben."
     )
     zombie_killer_watch_parser.set_defaults(func=cmd_zombie_killer_watch)
+
+    zombie_killer_stop_parser = subparsers.add_parser(
+        "zombie-killer-stop",
+        help="Stop a zombie-killer-tray watch subprocess started via zombie-killer-watch.",
+    )
+    zombie_killer_stop_parser.add_argument("--json", action="store_true")
+    zombie_killer_stop_parser.set_defaults(func=cmd_zombie_killer_stop)
 
     mark_runs_parser = subparsers.add_parser(
         "mark-runs-read",

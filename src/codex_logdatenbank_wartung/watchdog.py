@@ -258,8 +258,16 @@ def reap_runtime_orphans(
             ok, _ = killer(orphan.pid)
         else:
             try:
+                # Review finding (T-20260926-212716751): NOT a tree-kill. Every
+                # PID reaped here was individually vetted (dead parent, min
+                # age, two idle CPU snapshots) -- a descendant was never
+                # checked against those same criteria, so killing its whole
+                # subtree would terminate processes no criterion actually
+                # covers. A genuinely orphaned descendant becomes reap-able
+                # on its own in a later cycle once IT independently satisfies
+                # dead-parent/age/CPU-idle.
                 subprocess.run(
-                    ["taskkill", "/T", "/F", "/PID", str(orphan.pid)],
+                    ["taskkill", "/F", "/PID", str(orphan.pid)],
                     check=True,
                     capture_output=True,
                     **no_window_kwargs(),

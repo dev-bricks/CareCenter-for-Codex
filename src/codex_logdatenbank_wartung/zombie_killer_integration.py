@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import os
+import signal
 import subprocess
 import sys
 from collections.abc import Callable
@@ -77,6 +78,22 @@ class ZombieKillerLaunchResult:
             self.message,
             f"Statusordner: {self.state_dir}",
         ]
+        if self.pid is not None:
+            lines.append(f"PID: {self.pid}")
+        return "\n".join(lines)
+
+
+@dataclass(slots=True)
+class ZombieKillerStopResult:
+    status: str
+    message: str
+    pid: int | None = None
+
+    def to_dict(self) -> dict[str, object]:
+        return asdict(self)
+
+    def to_text(self) -> str:
+        lines = [f"Status: {self.status}", self.message]
         if self.pid is not None:
             lines.append(f"PID: {self.pid}")
         return "\n".join(lines)
@@ -261,6 +278,10 @@ def _zombie_killer_env(config: MaintenanceConfig) -> dict[str, str]:
     return env
 
 
+def _watch_pid_file(state_dir: Path) -> Path:
+    return state_dir / "watch.pid"
+
+
 def launch_zombie_killer_watch(
     config: MaintenanceConfig,
     *,
@@ -268,7 +289,19 @@ def launch_zombie_killer_watch(
     min_age_seconds: int | None = None,
     popen: Callable[..., subprocess.Popen[str]] | None = None,
 ) -> ZombieKillerLaunchResult:
-    """Starte `python -m zombie_killer_tray watch` als eigenen Subprozess.
+    """Starte `python -m zombie_killer_tray watch` als eigenen, langlebigen
+    Subprozess.
+
+    KEIN `--parent-pid`: Review-Fund (T-20260926-212716751) -- zombie-killer-
+    tray beendet den watch-Prozess, sobald die dort per `--parent-pid`
+    angegebene PID stirbt. Ein CLI-Aufruf wie `zombie-killer-watch` beendet
+    sich selbst, sobald `command_zombie_killer_watch` zurueckkehrt; wuerde
+    diese eigene, kurzlebige PID als `--parent-pid` durchgereicht, stuerbe
+    der Watcher innerhalb von rund einer Sekunde nach dem Start, bevor er
+    ueberhaupt einen Zyklus lief. Der Lebenszyklus des Watchers wird
+    stattdessen unabhaengig ueber eine PID-Datei verwaltet
+    (`stop_zombie_killer_watch()`), nicht ueber die Lebenszeit des
+    aufrufenden Prozesses.
 
     Laufzeitzustand (`zombie_events.jsonl`, `zombie_worker_errors.log`)
     landet im zombie-killer-eigenen Statusordner unterhalb von CODEX_HOME
@@ -284,7 +317,6 @@ def launch_zombie_killer_watch(
         "--yes",
         "--interval", str(interval_seconds or config.zombie_killer_watch_interval_seconds),
         "--min-age", str(min_age_seconds or config.zombie_killer_min_age_seconds),
-        "--parent-pid", str(os.getpid()),
     ]
 
     env = _zombie_killer_env(config)
@@ -307,12 +339,15 @@ def launch_zombie_killer_watch(
             last_error = str(exc)
             continue
         pid = getattr(process, "pid", None)
+        pid_int = int(pid) if isinstance(pid, int) else None
+        if pid_int is not None:
+            _watch_pid_file(state_dir).write_text(str(pid_int), encoding="utf-8")
         return ZombieKillerLaunchResult(
             status="ok",
             command=command,
-            message="zombie-killer-tray wurde als eigener Watch-Subprozess gestartet.",
+            message="zombie-killer-tray wurde als eigener, langlebiger Watch-Subprozess gestartet.",
             state_dir=str(state_dir),
-            pid=int(pid) if isinstance(pid, int) else None,
+            pid=pid_int,
         )
 
     return ZombieKillerLaunchResult(
@@ -321,6 +356,49 @@ def launch_zombie_killer_watch(
         message=last_error or "Kein Python-Befehl für zombie-killer-tray gefunden.",
         state_dir=str(state_dir),
     )
+
+
+def _is_our_watch_process(pid: int) -> bool | None:
+    """True/False if verifiable, None if psutil is unavailable (best-effort:
+    zombie-killer-tray always pulls psutil in as its own dependency, so this
+    is only missing if the extra itself was never installed)."""
+    try:
+        import psutil
+    except ImportError:
+        return None
+    try:
+        return "zombie_killer_tray" in " ".join(psutil.Process(pid).cmdline())
+    except psutil.Error:
+        return False
+
+
+def stop_zombie_killer_watch(config: MaintenanceConfig) -> ZombieKillerStopResult:
+    """Stop the watch subprocess started by `launch_zombie_killer_watch`,
+    identified via its PID file rather than any parent/child relationship."""
+    pid_file = _watch_pid_file(config.zombie_killer_state_dir)
+    if not pid_file.exists():
+        return ZombieKillerStopResult(status="not-running", message="Keine PID-Datei gefunden.")
+    try:
+        pid = int(pid_file.read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        pid_file.unlink(missing_ok=True)
+        return ZombieKillerStopResult(status="not-running", message="PID-Datei unlesbar; entfernt.")
+
+    verified = _is_our_watch_process(pid)
+    if verified is False:
+        pid_file.unlink(missing_ok=True)
+        return ZombieKillerStopResult(
+            status="not-found", message="PID gehoert nicht (mehr) zu zombie-killer-tray.", pid=pid
+        )
+
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except OSError:
+        pid_file.unlink(missing_ok=True)
+        return ZombieKillerStopResult(status="already-stopped", message="Prozess lief nicht mehr.", pid=pid)
+
+    pid_file.unlink(missing_ok=True)
+    return ZombieKillerStopResult(status="ok", message="zombie-killer-tray wurde beendet.", pid=pid)
 
 
 def _last_cycle_event(state_dir: Path) -> dict[str, object] | None:

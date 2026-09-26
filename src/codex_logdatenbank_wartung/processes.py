@@ -262,11 +262,15 @@ _MCP_SERVER_MARKERS = (
     "model-context-protocol",
     "mcp-server",
     "mcp_server",
-    "-mcp",
-    "_mcp",
-    " mcp",
-    "mcp ",
 )
+# Review finding (T-20260926-212716751): these broad separator+"mcp" markers
+# used to be plain substrings, so "acme_mcpayments.exe" (an unrelated payments
+# tool) or "battle-mcp-launcher.exe" (a game) also matched "_mcp"/"-mcp"
+# anywhere in the name. Requiring "mcp" to end at a separator or the string's
+# end -- matching real names like "...-mcp", "...-mcp.exe", "mcp server.log"
+# -- keeps the intended catch-all for ad-hoc "<name>-mcp" server binaries
+# without matching "mcp" as a mid-word fragment of something else.
+_MCP_BROAD_TOKEN_PATTERN = re.compile(r"[-_ ]mcp(?:[/\\. ]|$)")
 RuntimeOrphanKind = Literal[
     "companion_app_server", "language_server", "mcp_server", "codex_exec"
 ]
@@ -298,7 +302,9 @@ def runtime_orphan_kind(process: ProcessInfo) -> RuntimeOrphanKind | None:
         marker in haystack for marker in _LANGUAGE_SERVER_MARKERS
     ):
         return "language_server"
-    if any(marker in haystack for marker in _MCP_SERVER_MARKERS):
+    if any(marker in haystack for marker in _MCP_SERVER_MARKERS) or _MCP_BROAD_TOKEN_PATTERN.search(
+        haystack
+    ):
         return "mcp_server"
     if process.name.lower() == "codex.exe" and _CODEX_EXEC_PATTERN.search(
         process.command_line
