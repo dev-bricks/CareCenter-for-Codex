@@ -76,6 +76,10 @@ build = [
     "safe-start-for-codex @ git+https://github.com/dev-bricks/safe-start-for-codex.git@dcb369a64f403f6551bcb3bac16565c56ec79474",
     # T-20260926-212716751: zombie-killer-tray#4 (src/-Paketierung) merged as 039b4f2.
     "zombie-killer-tray @ git+https://github.com/dev-bricks/zombie-killer-tray.git@039b4f2c7acd69063b39d6168c757b0b2fca2438",
+    # Review finding: declared explicitly (not just hoped-for transitively via
+    # zombie-killer-tray) -- stop_zombie_killer_watch()/launch's double-start
+    # guard fail-closed without it, so it must not be an implicit assumption.
+    "psutil>=7.2,<8",
     "pyinstaller>=6.10.0",
     "altgraph>=0.17.4",
     "packaging>=24.0",

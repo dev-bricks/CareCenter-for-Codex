@@ -5,6 +5,7 @@ import json
 import os
 import signal
 import subprocess
+import sys
 import time
 from pathlib import Path
 from types import SimpleNamespace
@@ -108,7 +109,132 @@ def test_launch_zombie_killer_watch_invokes_module_with_expected_args(tmp_path: 
     )
     assert captured["cwd"] == str(config.zombie_killer_state_dir)
     assert Path(captured["cwd"]).is_dir(), "launch must create the state dir before spawning"
-    assert (config.zombie_killer_state_dir / "watch.pid").read_text(encoding="utf-8") == "4242"
+    pid_payload = json.loads((config.zombie_killer_state_dir / "watch.pid").read_text(encoding="utf-8"))
+    assert pid_payload["pid"] == 4242
+
+
+def test_launch_uses_preview_mode_without_apply(tmp_path: Path) -> None:
+    """Review finding: a test (or any caller) that only wants to exercise the
+    watcher's lifecycle, not its actual reap behaviour, must be able to omit
+    --yes -- otherwise a real watch subprocess can terminate real, qualifying
+    orphans on whatever machine runs it."""
+    config = make_config(tmp_path)
+
+    def fake_popen(command, **kwargs):
+        return SimpleNamespace(pid=1)
+
+    result = launch_zombie_killer_watch(config, apply=False, popen=fake_popen)
+    assert result.status == "ok"
+    assert "--yes" not in result.command
+
+
+def test_launch_refuses_a_second_start_while_the_first_watcher_is_verified_alive(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """Review finding: a second `watch` used to silently overwrite watch.pid,
+    orphaning the first watcher (still running, now unreachable via stop)."""
+    config = make_config(tmp_path)
+    state_dir = config.zombie_killer_state_dir
+    state_dir.mkdir(parents=True, exist_ok=True)
+    (state_dir / "watch.pid").write_text(
+        json.dumps({"pid": 424242, "create_time": 123.0}), encoding="utf-8"
+    )
+    monkeypatch.setattr(
+        "codex_logdatenbank_wartung.zombie_killer_integration._verify_watch_process",
+        lambda pid, create_time: True,
+    )
+    called = False
+
+    def fake_popen(command, **kwargs):
+        nonlocal called
+        called = True
+        return SimpleNamespace(pid=1)
+
+    result = launch_zombie_killer_watch(config, popen=fake_popen)
+
+    assert result.status == "already-running"
+    assert result.pid == 424242
+    assert called is False, "must never spawn a second watcher over a verified-alive one"
+    assert json.loads((state_dir / "watch.pid").read_text(encoding="utf-8"))["pid"] == 424242
+
+
+def test_launch_refuses_a_second_start_when_verification_is_unavailable(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """Fail-closed applies to the double-start guard too: if we cannot tell
+    whether the existing PID is still our watcher, refuse rather than risk a
+    duplicate -- same direction as stop's fail-closed fix."""
+    config = make_config(tmp_path)
+    state_dir = config.zombie_killer_state_dir
+    state_dir.mkdir(parents=True, exist_ok=True)
+    (state_dir / "watch.pid").write_text(
+        json.dumps({"pid": 424242, "create_time": 123.0}), encoding="utf-8"
+    )
+    monkeypatch.setattr(
+        "codex_logdatenbank_wartung.zombie_killer_integration._verify_watch_process",
+        lambda pid, create_time: None,
+    )
+    called = False
+
+    def fake_popen(command, **kwargs):
+        nonlocal called
+        called = True
+        return SimpleNamespace(pid=1)
+
+    result = launch_zombie_killer_watch(config, popen=fake_popen)
+
+    assert result.status == "verification-unavailable"
+    assert called is False
+
+
+def test_launch_proceeds_when_the_existing_pid_file_is_stale(tmp_path: Path, monkeypatch) -> None:
+    config = make_config(tmp_path)
+    state_dir = config.zombie_killer_state_dir
+    state_dir.mkdir(parents=True, exist_ok=True)
+    (state_dir / "watch.pid").write_text(
+        json.dumps({"pid": 424242, "create_time": 123.0}), encoding="utf-8"
+    )
+    monkeypatch.setattr(
+        "codex_logdatenbank_wartung.zombie_killer_integration._verify_watch_process",
+        lambda pid, create_time: False,
+    )
+
+    def fake_popen(command, **kwargs):
+        return SimpleNamespace(pid=99999)
+
+    result = launch_zombie_killer_watch(config, popen=fake_popen)
+
+    assert result.status == "ok"
+    assert result.pid == 99999
+    assert json.loads((state_dir / "watch.pid").read_text(encoding="utf-8"))["pid"] == 99999
+
+
+def test_resolve_python_executable_uses_sys_executable_when_not_frozen() -> None:
+    from codex_logdatenbank_wartung.zombie_killer_integration import (
+        _resolve_watch_python_executable,
+    )
+
+    assert _resolve_watch_python_executable() == sys.executable
+
+
+def test_resolve_python_executable_resolves_through_the_launcher_when_frozen(monkeypatch) -> None:
+    """Review finding: in a frozen build, `sys.executable` is the packaged
+    host app, not an interpreter, and launching via the bare `py -3`
+    launcher would hand back the LAUNCHER's pid, not the worker's. The real
+    interpreter path must be resolved once via the launcher's own stdout."""
+    from codex_logdatenbank_wartung.zombie_killer_integration import (
+        _resolve_watch_python_executable,
+    )
+
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    real_path = sys.executable
+
+    def fake_runner(command: list[str]) -> subprocess.CompletedProcess[str]:
+        assert command[:2] == ["py", "-3"]
+        return subprocess.CompletedProcess(command, returncode=0, stdout=real_path + "\n", stderr="")
+
+    resolved = _resolve_watch_python_executable(runner=fake_runner)
+    assert resolved == real_path
 
 
 def test_launch_zombie_killer_watch_falls_back_to_config_defaults(tmp_path: Path) -> None:
@@ -173,13 +299,17 @@ def test_stop_reports_not_running_without_a_pid_file(tmp_path: Path) -> None:
 
 
 def test_stop_reports_not_found_for_a_stale_pid_reused_by_something_else(tmp_path: Path) -> None:
+    pytest.importorskip("psutil")
     config = make_config(tmp_path)
     state_dir = config.zombie_killer_state_dir
     state_dir.mkdir(parents=True, exist_ok=True)
     # PID of the current test process itself -- definitely alive, definitely
-    # NOT a zombie-killer-tray process, so this exercises the cmdline check
-    # refusing to kill an unrelated process that happens to have reused the pid.
-    (state_dir / "watch.pid").write_text(str(os.getpid()), encoding="utf-8")
+    # NOT a zombie-killer-tray process (wrong cmdline AND, deliberately, a
+    # create_time far from its real one), so this exercises the reuse check
+    # refusing to kill an unrelated process that happens to reuse the pid.
+    (state_dir / "watch.pid").write_text(
+        json.dumps({"pid": os.getpid(), "create_time": 1.0}), encoding="utf-8"
+    )
 
     result = stop_zombie_killer_watch(config)
 
@@ -187,15 +317,44 @@ def test_stop_reports_not_found_for_a_stale_pid_reused_by_something_else(tmp_pat
     assert not (state_dir / "watch.pid").exists(), "stale/wrong pid file must be cleaned up"
 
 
-def test_stop_reports_already_stopped_for_a_dead_pid(tmp_path: Path, monkeypatch) -> None:
+def test_stop_fails_closed_when_verification_is_unavailable(tmp_path: Path, monkeypatch) -> None:
+    """Review finding (blocking): stop used to fail-OPEN when verification
+    returned None (psutil unavailable) -- it killed the PID anyway. A stale,
+    verification-less PID file could then terminate an unrelated process
+    that happened to reuse the PID. It must instead refuse and leave the
+    process untouched."""
     config = make_config(tmp_path)
     state_dir = config.zombie_killer_state_dir
     state_dir.mkdir(parents=True, exist_ok=True)
-    (state_dir / "watch.pid").write_text("999999999", encoding="utf-8")
-    monkeypatch.setattr(
-        "codex_logdatenbank_wartung.zombie_killer_integration._is_our_watch_process",
-        lambda pid: None,  # simulate psutil unavailable/inconclusive -- still must not crash
+    (state_dir / "watch.pid").write_text(
+        json.dumps({"pid": 999999999, "create_time": 123.0}), encoding="utf-8"
     )
+    killed: list[int] = []
+    monkeypatch.setattr(
+        "codex_logdatenbank_wartung.zombie_killer_integration._verify_watch_process",
+        lambda pid, create_time: None,
+    )
+    monkeypatch.setattr(os, "kill", lambda pid, sig: killed.append(pid))
+
+    result = stop_zombie_killer_watch(config)
+
+    assert result.status == "verification-unavailable"
+    assert killed == [], "must NOT signal the pid when verification is unavailable (fail-closed)"
+    assert (state_dir / "watch.pid").exists(), "an unresolved pid file is left in place, not deleted"
+
+
+def test_stop_reports_already_stopped_for_a_verified_but_dead_pid(tmp_path: Path, monkeypatch) -> None:
+    config = make_config(tmp_path)
+    state_dir = config.zombie_killer_state_dir
+    state_dir.mkdir(parents=True, exist_ok=True)
+    (state_dir / "watch.pid").write_text(
+        json.dumps({"pid": 999999999, "create_time": 123.0}), encoding="utf-8"
+    )
+    monkeypatch.setattr(
+        "codex_logdatenbank_wartung.zombie_killer_integration._verify_watch_process",
+        lambda pid, create_time: True,
+    )
+    monkeypatch.setattr(os, "kill", lambda pid, sig: (_ for _ in ()).throw(OSError("gone")))
 
     result = stop_zombie_killer_watch(config)
 
@@ -223,8 +382,15 @@ def test_real_watch_subprocess_outlives_its_launcher_and_stop_terminates_it(
     pytest.importorskip("zombie_killer_tray")
     config = make_config(tmp_path)
 
-    result = launch_zombie_killer_watch(config, interval_seconds=3, min_age_seconds=30)
+    # apply=False (preview/no --yes): review finding -- with --yes, this real
+    # subprocess would actually reap real, qualifying orphan processes on
+    # whatever machine runs this test (including CI). Lifecycle behaviour
+    # (survives its launcher, responds to stop) does not require apply=True.
+    result = launch_zombie_killer_watch(
+        config, interval_seconds=3, min_age_seconds=30, apply=False
+    )
     assert result.status == "ok", result.message
+    assert "--yes" not in result.command
     pid = result.pid
     assert pid is not None
 
