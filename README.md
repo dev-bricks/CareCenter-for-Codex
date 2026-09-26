@@ -322,6 +322,8 @@ $env:CARECENTER_SAFE_START_SOURCE = "C:\path\to\REL-PUB_safe-start-for-codex"
 build_exe.bat
 ```
 
+The same pattern applies to the optional [zombie-killer-tray](https://github.com/dev-bricks/zombie-killer-tray) integration (conservative cleanup of orphaned MCP and language-server processes, launched as its own subprocess via `zombie-killer-watch`): pinned to an exact commit by default, overridable for a local sibling checkout via `$env:CARECENTER_ZOMBIE_KILLER_SOURCE`.
+
 <a id="sec-12"></a><a id="cli-usage"></a><a id="cli-befehle"></a>
 ## CLI Usage
 
@@ -341,6 +343,9 @@ python -m codex_logdatenbank_wartung.cli store-repair --level repair --execute
 python -m codex_logdatenbank_wartung.cli store-materials
 python -m codex_logdatenbank_wartung.cli safe-start-report
 python -m codex_logdatenbank_wartung.cli safe-start-install
+python -m codex_logdatenbank_wartung.cli zombie-killer-report
+python -m codex_logdatenbank_wartung.cli zombie-killer-install
+python -m codex_logdatenbank_wartung.cli zombie-killer-watch
 python -m codex_logdatenbank_wartung.cli schedule install --interval-minutes 180
 ```
 
@@ -467,7 +472,7 @@ CareCenter for Codex maintains strict license transparency and distribution comp
 - **Core Application:** Licensed under the permissive [MIT License](LICENSE).
 - **GUI Subsystem:** Powered by **PySide6** (`>=6.7`), dynamically linked in full compliance with the **GNU Lesser General Public License v3 (LGPL-3.0-only)**. No Qt6/PySide6 source code is modified or redistributed in proprietary form. Users retain the freedom to relink or replace the installed PySide6 runtime wheels.
 - **Configuration Engine:** Built on **tomlkit** under the **MIT License**.
-- **Build & Integration Tooling:** Safe Start integration (`safe-start-for-codex`, MIT), PyInstaller packaging (GPLv2 with PyInstaller Exception), and Hatchling (MIT).
+- **Build & Integration Tooling:** Safe Start integration (`safe-start-for-codex`, MIT), zombie-killer-tray integration (`zombie-killer-tray`, MIT), PyInstaller packaging (GPLv2 with PyInstaller Exception), and Hatchling (MIT).
 - **Audit & Invariants Document:** A comprehensive audit of all runtime, development, standard library dependencies, and the 10 Governance & Runtime Safety Invariants is maintained in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md). Legacy text format is preserved in [THIRD_PARTY_LICENSES.txt](THIRD_PARTY_LICENSES.txt).
 
 <a id="sec-17"></a><a id="development--license"></a><a id="entwicklung--lizenz"></a>

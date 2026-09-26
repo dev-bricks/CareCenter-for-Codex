@@ -309,6 +309,8 @@ $env:CARECENTER_SAFE_START_SOURCE = "C:\Pfad\zu\REL-PUB_safe-start-for-codex"
 build_exe.bat
 ```
 
+Dasselbe Muster gilt für die optionale [zombie-killer-tray](https://github.com/dev-bricks/zombie-killer-tray)-Integration (konservative Bereinigung verwaister MCP- und Language-Server-Prozesse, gestartet als eigener Subprozess über `zombie-killer-watch`): standardmäßig auf einen exakten Commit gepinnt, überschreibbar für einen lokalen Schwester-Checkout via `$env:CARECENTER_ZOMBIE_KILLER_SOURCE`.
+
 <a id="sec-12"></a><a id="cli-usage"></a><a id="cli-befehle"></a>
 ## CLI-Befehle
 
@@ -328,6 +330,9 @@ python -m codex_logdatenbank_wartung.cli store-repair --level repair --execute
 python -m codex_logdatenbank_wartung.cli store-materials
 python -m codex_logdatenbank_wartung.cli safe-start-report
 python -m codex_logdatenbank_wartung.cli safe-start-install
+python -m codex_logdatenbank_wartung.cli zombie-killer-report
+python -m codex_logdatenbank_wartung.cli zombie-killer-install
+python -m codex_logdatenbank_wartung.cli zombie-killer-watch
 python -m codex_logdatenbank_wartung.cli schedule install --interval-minutes 180
 ```
 
@@ -441,7 +446,7 @@ CareCenter for Codex gewährleistet vollständige Lizenztransparenz und strikte 
 - **Hauptanwendung:** Lizenziert unter der freien und permissiven [MIT-Lizenz](LICENSE).
 - **GUI-Subsystem:** Entwickelt mit **PySide6** (`>=6.7`), dynamisch eingebunden unter vollständiger Einhaltung der **GNU Lesser General Public License v3 (LGPL-3.0-only)**. Es werden keine Qt6/PySide6-Quelltexte modifiziert oder in proprietärer Form verteilt. Nutzer behalten die Freiheit, die installierten PySide6-Laufzeitbibliotheken zu ersetzen oder neu zu binden.
 - **Konfigurations-Engine:** Basiert auf **tomlkit** unter der **MIT-Lizenz**.
-- **Build- & Integrationswerkzeuge:** Safe-Start-Integration (`safe-start-for-codex`, MIT), PyInstaller-Kompilierung (GPLv2 mit PyInstaller-Ausnahme) und Hatchling (MIT).
+- **Build- & Integrationswerkzeuge:** Safe-Start-Integration (`safe-start-for-codex`, MIT), zombie-killer-tray-Integration (`zombie-killer-tray`, MIT), PyInstaller-Kompilierung (GPLv2 mit PyInstaller-Ausnahme) und Hatchling (MIT).
 - **Audit- & Invarianten-Dokumentation:** Ein detaillierter Prüfbericht aller Laufzeit-, Entwicklungs- und Standardbibliotheks-Abhängigkeiten sowie der 10 Governance- und Sicherheits-Laufzeitinvarianten ist in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) dokumentiert. Das historische Textformat wird in [THIRD_PARTY_LICENSES.txt](THIRD_PARTY_LICENSES.txt) weitergeführt.
 
 <a id="sec-17"></a><a id="development--license"></a><a id="entwicklung--lizenz"></a>

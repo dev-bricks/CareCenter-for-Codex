@@ -283,6 +283,51 @@ def cmd_safe_start_install(args: argparse.Namespace) -> int:
     return 0 if result.status == "ok" else 1
 
 
+def cmd_zombie_killer_report(args: argparse.Namespace) -> int:
+    import json as _json
+
+    from .zombie_killer_integration import build_zombie_killer_status
+
+    config = load_config(args)
+    status = build_zombie_killer_status(config)
+    if args.json:
+        print(_json.dumps(status.to_dict(), ensure_ascii=False, indent=2))
+    else:
+        print(status.to_text())
+    return 0
+
+
+def cmd_zombie_killer_install(args: argparse.Namespace) -> int:
+    import json as _json
+
+    from .zombie_killer_integration import install_zombie_killer_package
+
+    result = install_zombie_killer_package(target=args.target)
+    if args.json:
+        print(_json.dumps(result.to_dict(), ensure_ascii=False, indent=2))
+    else:
+        print(result.to_text())
+    return 0 if result.status == "ok" else 1
+
+
+def cmd_zombie_killer_watch(args: argparse.Namespace) -> int:
+    import json as _json
+
+    from .zombie_killer_integration import launch_zombie_killer_watch
+
+    config = load_config(args)
+    result = launch_zombie_killer_watch(
+        config,
+        interval_seconds=args.interval,
+        min_age_seconds=args.min_age,
+    )
+    if args.json:
+        print(_json.dumps(result.to_dict(), ensure_ascii=False, indent=2))
+    else:
+        print(result.to_text())
+    return 0 if result.status == "ok" else 1
+
+
 def cmd_mark_runs_read(args: argparse.Namespace) -> int:
     from .thread_hygiene import maintain_threads
 
@@ -548,6 +593,44 @@ def build_parser() -> argparse.ArgumentParser:
         "--json", action="store_true", help="Ergebnis als JSON ausgeben."
     )
     safe_start_install_parser.set_defaults(func=cmd_safe_start_install)
+
+    zombie_killer_parser = subparsers.add_parser(
+        "zombie-killer-report",
+        help="zombie-killer-tray-Status prüfen (letzter Bereinigungszyklus).",
+    )
+    zombie_killer_parser.add_argument("--json", action="store_true", help="Status als JSON ausgeben.")
+    zombie_killer_parser.set_defaults(func=cmd_zombie_killer_report)
+
+    zombie_killer_install_parser = subparsers.add_parser(
+        "zombie-killer-install",
+        help="zombie-killer-tray installieren oder aktualisieren.",
+    )
+    zombie_killer_install_parser.add_argument(
+        "--target",
+        default=None,
+        help="Optionales pip-Ziel. Ohne Angabe: lokale Schwesterquelle, sonst commit-gepinnte GitHub-Quelle.",
+    )
+    zombie_killer_install_parser.add_argument(
+        "--json", action="store_true", help="Ergebnis als JSON ausgeben."
+    )
+    zombie_killer_install_parser.set_defaults(func=cmd_zombie_killer_install)
+
+    zombie_killer_watch_parser = subparsers.add_parser(
+        "zombie-killer-watch",
+        help="zombie-killer-tray als eigenen Watch-Subprozess starten (verwaiste MCP-/Language-Server-Prozesse).",
+    )
+    zombie_killer_watch_parser.add_argument(
+        "--interval", type=int, default=None,
+        help="Prüfintervall in Sekunden (Default: config.zombie_killer_watch_interval_seconds).",
+    )
+    zombie_killer_watch_parser.add_argument(
+        "--min-age", type=int, default=None,
+        help="Mindestalter in Sekunden, bevor ein Kandidat beendet wird (Default: config.zombie_killer_min_age_seconds).",
+    )
+    zombie_killer_watch_parser.add_argument(
+        "--json", action="store_true", help="Ergebnis als JSON ausgeben."
+    )
+    zombie_killer_watch_parser.set_defaults(func=cmd_zombie_killer_watch)
 
     mark_runs_parser = subparsers.add_parser(
         "mark-runs-read",
