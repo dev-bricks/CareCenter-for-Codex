@@ -21,14 +21,11 @@ from pathlib import Path
 
 from .config import MaintenanceConfig
 
-# T-20260926-212716751: zombie-killer-tray#4 (src/-Paketierung) ist gepusht,
-# aber noch nicht gemergt -- der Pin zeigt auf den Branch-Kopf. Nach dem Merge
-# hier auf den Merge-Commit umstellen (derselbe Verifikationsschritt wie beim
-# ursprünglichen safe-start-for-codex-Pin).
+# T-20260926-212716751: zombie-killer-tray#4 (src/-Paketierung) merged as 039b4f2.
 ZOMBIE_KILLER_PACKAGE_SPEC = (
     "zombie-killer-tray @ "
     "git+https://github.com/dev-bricks/zombie-killer-tray.git"
-    "@6c8eb2cc8773e662c65e7a5c39d060b974805c3d"
+    "@039b4f2c7acd69063b39d6168c757b0b2fca2438"
 )
 ZOMBIE_KILLER_SOURCE_ENV = "CARECENTER_ZOMBIE_KILLER_SOURCE"
 CREATE_NO_WINDOW = 0x08000000

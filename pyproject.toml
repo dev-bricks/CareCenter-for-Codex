@@ -74,9 +74,8 @@ dev = [
 ]
 build = [
     "safe-start-for-codex @ git+https://github.com/dev-bricks/safe-start-for-codex.git@dcb369a64f403f6551bcb3bac16565c56ec79474",
-    # T-20260926-212716751: zombie-killer-tray#4 (src/-Paketierung) not yet merged;
-    # pinned to its branch head, move to the merge commit once #4 lands.
-    "zombie-killer-tray @ git+https://github.com/dev-bricks/zombie-killer-tray.git@6c8eb2cc8773e662c65e7a5c39d060b974805c3d",
+    # T-20260926-212716751: zombie-killer-tray#4 (src/-Paketierung) merged as 039b4f2.
+    "zombie-killer-tray @ git+https://github.com/dev-bricks/zombie-killer-tray.git@039b4f2c7acd69063b39d6168c757b0b2fca2438",
     "pyinstaller>=6.10.0",
     "altgraph>=0.17.4",
     "packaging>=24.0",
