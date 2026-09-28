@@ -148,7 +148,7 @@ def load_automations(config: MaintenanceConfig) -> list[AutomationRecord]:
                 id=automation_id,
                 name=_quoted_string(data.get("name")) or automation_id,
                 path=toml_path,
-                status=_quoted_string(data.get("status")) or "UNKNOWN",
+                status=_quoted_string(data.get("status")).strip().upper() or "UNKNOWN",
             )
         )
     return records
@@ -242,8 +242,8 @@ def _append_event(config: MaintenanceConfig, result: AutomationControlResult) ->
 
 def _set_status(record: AutomationRecord, status: str) -> bool:
     data = _read_toml(record.path)
-    current = _quoted_string(data.get("status"))
-    if current == status:
+    current = _quoted_string(data.get("status")).strip().upper()
+    if current == status.strip().upper():
         return False
     data["status"] = status
     if "updated_at" in data:

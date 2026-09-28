@@ -104,9 +104,9 @@ def _parse_toml_sections(text: str) -> dict[str, dict[str, str]]:
         line = line.strip()
         if not line or line.startswith("#"):
             continue
-        section_match = re.match(r'^\[(.+)\]$', line)
+        section_match = re.match(r"^\[(.+)\](?:\s*#.*)?$", line)
         if section_match:
-            current_section = section_match.group(1)
+            current_section = section_match.group(1).strip()
             sections.setdefault(current_section, {})
             continue
         if "=" in line and current_section:
@@ -117,14 +117,18 @@ def _parse_toml_sections(text: str) -> dict[str, dict[str, str]]:
 
 
 def _extract_mcp_package(section_data: dict[str, str]) -> str | None:
-    """Extrahiert den npm-Paketnamen aus MCP-Server-Konfiguration."""
-    args_raw = section_data.get("args", "")
-    if "node_modules" in args_raw:
-        match = re.search(r'node_modules[/\\]([^/\\"]+(?:-mcp))[/\\]', args_raw)
+    """Extrahiert den npm-Paketnamen aus MCP-Server-Konfiguration (args und command)."""
+    raw = f"{section_data.get('command', '')} {section_data.get('args', '')}"
+    normalized = raw.replace("\\", "/")
+    if "node_modules" in normalized:
+        match = re.search(r"node_modules/((?:@[^/\\\"\s]+/)?[\w.-]+-mcp)\b", normalized)
         if match:
             return match.group(1)
-    for candidate in re.findall(r'[\w@-]+-mcp\b', args_raw):
-        return candidate
+    matches = re.findall(
+        r"(?:^|[\s\"'(\[])((?:@[a-zA-Z0-9_.-]+/)?[a-zA-Z0-9_.-]+-mcp)\b", normalized
+    )
+    if matches:
+        return matches[0]
     return None
 
 
@@ -162,9 +166,12 @@ def audit_config_toml(config: MaintenanceConfig) -> AuditReport:
     for section_name, data in sections.items():
         if not section_name.startswith("plugins."):
             continue
-        plugin_name = section_name.removeprefix("plugins.").strip('"')
+        plugin_name = section_name.removeprefix("plugins.").strip('"').strip("'")
         enabled = data.get("enabled", "").lower() == "true"
-        if enabled and plugin_name in _KNOWN_WINDOWS_IRRELEVANT_PLUGINS:
+        if enabled and (
+            plugin_name in _KNOWN_WINDOWS_IRRELEVANT_PLUGINS
+            or plugin_name.split("@")[0] in {"build-ios-apps", "build-macos-apps"}
+        ):
             report.add(
                 "Ungenutztes Plugin",
                 "info",
@@ -603,8 +610,8 @@ def fix_duplicate_mcp(config: MaintenanceConfig) -> int:
         keep = names[0]
         for name in names:
             data = mcp_table.get(name, {})
-            args_str = str(data.get("args", ""))
-            if "node_modules" in args_str:
+            combined_src = f"{data.get('command', '')} {data.get('args', '')}".replace("\\", "/")
+            if "node_modules" in combined_src:
                 keep = name
                 break
         to_remove.extend(n for n in names if n != keep)
@@ -641,10 +648,14 @@ def fix_unused_plugins(config: MaintenanceConfig) -> int:
         return 0
 
     fixed = 0
-    for plugin_name, plugin_data in plugins_table.items():
+    for raw_plugin_name, plugin_data in plugins_table.items():
         if not isinstance(plugin_data, dict):
             continue
-        if plugin_name not in _KNOWN_PLATFORM_LOCKED_PLUGINS:
+        plugin_name = str(raw_plugin_name).strip('"').strip("'")
+        if (
+            plugin_name not in _KNOWN_PLATFORM_LOCKED_PLUGINS
+            and plugin_name.split("@")[0] not in {"build-ios-apps", "build-macos-apps"}
+        ):
             continue
         enabled = plugin_data.get("enabled")
         if enabled is True:

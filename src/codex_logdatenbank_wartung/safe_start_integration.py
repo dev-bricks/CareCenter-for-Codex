@@ -522,8 +522,8 @@ def _snapshot_restore_rows(snapshot: dict[str, object]) -> list[dict[str, object
 
 def _set_automation_toml_status(path: Path, status: str) -> bool:
     document = tomlkit.parse(path.read_text(encoding="utf-8", errors="replace"))
-    current = str(document.get("status") or "")
-    if current == status:
+    current = str(document.get("status") or "").strip().upper()
+    if current == status.strip().upper():
         return False
     document["status"] = status
     if "updated_at" in document:

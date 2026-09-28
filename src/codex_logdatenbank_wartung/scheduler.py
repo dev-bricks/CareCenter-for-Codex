@@ -56,7 +56,7 @@ def build_runner_script(
         "@echo off\n"
         "setlocal\n"
         'set "PYTHONIOENCODING=utf-8"\n'
-        f'set "PYTHONPATH={source_path};%PYTHONPATH%"\n'
+        f'if defined PYTHONPATH (set "PYTHONPATH={source_path};%PYTHONPATH%") else (set "PYTHONPATH={source_path}")\n'
         f'"{python_path}" -m codex_logdatenbank_wartung.cli --config "{config_path}" '
         "maintain --execute --trigger scheduled-task\n"
         "exit /b %errorlevel%\n"
