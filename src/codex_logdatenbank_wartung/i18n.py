@@ -1,22 +1,85 @@
-"""Leichtgewichtige i18n-Unterstützung (Deutsch/Englisch) für Enduser-Texte.
+"""Leichtgewichtige i18n-Unterstützung (Tier-2 Standard nach Policy P-006) für Enduser-Texte.
 
-Der Katalog bleibt bewusst direkt im Code: Für zwei Sprachen ist ein externes
-Framework mehr Reibung als Nutzen. Die aktive Sprache wird aus der Konfiguration
-oder System-Locale gesetzt und kann im Tray über die Einstellungen gewechselt werden.
+Enthält die Tier-2 Standardkonstanten (de, en, es, zh, ja, ru), eine 4-stufige
+Fallback-Kette (Zielsprache -> en -> de -> key) sowie optionale Entkopplung über
+externe locales/translations.json Dateien.
 """
 
 from __future__ import annotations
 
+import json
 import locale
+import logging
+from pathlib import Path
 from typing import Literal
 
-Language = Literal["de", "en"]
-LANGUAGES: tuple[Language, ...] = ("de", "en")
+logger = logging.getLogger(__name__)
 
-_CATALOG: dict[str, dict[Language, str]] = {
+Language = Literal["de", "en", "es", "zh", "ja", "ru"]
+SUPPORTED_LANGUAGES: tuple[Language, ...] = ("de", "en", "es", "zh", "ja", "ru")
+DEFAULT_LANGUAGE: Language = "de"
+FALLBACK_CHAIN: tuple[Language, ...] = ("en", "de")
+LANGUAGES: tuple[Language, ...] = SUPPORTED_LANGUAGES
+
+LANGUAGE_DISPLAY_NAMES: dict[str, str] = {
+    "de": "Deutsch",
+    "en": "English",
+    "es": "Español",
+    "zh": "中文",
+    "ja": "日本語",
+    "ru": "Русский",
+}
+
+_CATALOG: dict[str, dict[str, str]] = {
     # -- Language / settings --
-    "language_de": {"de": "Deutsch", "en": "German"},
-    "language_en": {"de": "Englisch", "en": "English"},
+    "language_de": {
+        "de": "Deutsch",
+        "en": "German",
+        "es": "Alemán",
+        "zh": "德语",
+        "ja": "ドイツ語",
+        "ru": "Немецкий",
+    },
+    "language_en": {
+        "de": "Englisch",
+        "en": "English",
+        "es": "Inglés",
+        "zh": "英语",
+        "ja": "英語",
+        "ru": "Английский",
+    },
+    "language_es": {
+        "de": "Spanisch",
+        "en": "Spanish",
+        "es": "Español",
+        "zh": "西班牙语",
+        "ja": "スペイン語",
+        "ru": "Испанский",
+    },
+    "language_zh": {
+        "de": "Chinesisch",
+        "en": "Chinese",
+        "es": "Chino",
+        "zh": "中文",
+        "ja": "中国語",
+        "ru": "Китайский",
+    },
+    "language_ja": {
+        "de": "Japanisch",
+        "en": "Japanese",
+        "es": "Japonés",
+        "zh": "日语",
+        "ja": "日本語",
+        "ru": "Японский",
+    },
+    "language_ru": {
+        "de": "Russisch",
+        "en": "Russian",
+        "es": "Ruso",
+        "zh": "俄语",
+        "ja": "ロシア語",
+        "ru": "Русский",
+    },
     "settings_group": {"de": "Einstellungen", "en": "Settings"},
     "settings_config_audit": {"de": "Config-Audit", "en": "Config audit"},
     "settings_language": {"de": "Sprache:", "en": "Language:"},
@@ -1009,26 +1072,37 @@ _CATALOG: dict[str, dict[Language, str]] = {
     },
 }
 
-_current: Language = "de"
+_current: Language = DEFAULT_LANGUAGE
 
 
 def detect_language() -> Language:
     """Sprache aus System-Locale ableiten (Fallback: Deutsch)."""
     try:
         lang, _ = locale.getdefaultlocale()
-        if lang and lang.lower().startswith("en"):
-            return "en"
+        if lang:
+            code = lang.lower()
+            for prefix, mapped in (
+                ("en", "en"),
+                ("es", "es"),
+                ("zh", "zh"),
+                ("ja", "ja"),
+                ("ru", "ru"),
+                ("de", "de"),
+            ):
+                if code.startswith(prefix):
+                    return mapped  # type: ignore[return-value]
     except (ValueError, TypeError):
         pass
-    return "de"
+    return DEFAULT_LANGUAGE
 
 
 def normalize_language(lang: object) -> Language | None:
     """Prüfe und normalisiere einen externen Sprachwert."""
     if isinstance(lang, str):
         value = lang.strip().lower()
-        if value in LANGUAGES:
-            return value
+        base = value.split("_")[0].split("-")[0]
+        if base in SUPPORTED_LANGUAGES:
+            return base  # type: ignore[return-value]
     return None
 
 
@@ -1042,11 +1116,23 @@ def get_language() -> Language:
 
 
 def t(key: str, **kwargs: object) -> str:
-    """Übersetze einen Schlüssel in die aktive Sprache. Unbekannte Keys werden direkt zurückgegeben."""
+    """Übersetze einen Schlüssel in die aktive Sprache.
+
+    Fallback-Kette (4-stufig): Zielsprache (_current) -> en -> de -> key.
+    Unbekannte Keys werden direkt als key zurückgegeben.
+    """
     entry = _CATALOG.get(key)
     if entry is None:
-        return key
-    text = entry.get(_current) or entry.get("de") or key
+        text = key
+    else:
+        # 4-stufige Fallback-Kette: Zielsprache -> en -> de -> key
+        text = key
+        for candidate in (_current, "en", "de"):
+            val = entry.get(candidate)
+            if val:
+                text = val
+                break
+
     if kwargs:
         try:
             return text.format(**kwargs)
@@ -1057,10 +1143,76 @@ def t(key: str, **kwargs: object) -> str:
 
 def language_label(lang: Language | str) -> str:
     """Lokalisierter Name einer Sprache in der aktuell aktiven Sprache."""
-    normalized = normalize_language(lang) or "de"
-    return t(f"language_{normalized}")
+    normalized = normalize_language(lang) or DEFAULT_LANGUAGE
+    label = t(f"language_{normalized}")
+    if label != f"language_{normalized}":
+        return label
+    return LANGUAGE_DISPLAY_NAMES.get(normalized, normalized)
 
 
 def available_keys() -> list[str]:
     """Alle verfügbaren Übersetzungsschlüssel (für Tests)."""
     return sorted(_CATALOG.keys())
+
+
+def get_locales_path() -> Path:
+    """Ermittelt den Standardpfad zur externen translations.json Datei."""
+    # 1. Project-root locales/ (wenn im Source-Checkout)
+    root_locales = Path(__file__).resolve().parent.parent.parent / "locales" / "translations.json"
+    if root_locales.is_file():
+        return root_locales
+    # 2. Package-interne locales/ (wenn installiert/packaged)
+    pkg_locales = Path(__file__).resolve().parent / "locales" / "translations.json"
+    if pkg_locales.is_file():
+        return pkg_locales
+    return root_locales
+
+
+def load_translations_file(path: Path | str | None = None) -> int:
+    """Lädt externe Übersetzungen aus einer JSON-Datei und aktualisiert _CATALOG.
+
+    Gibt die Anzahl der geladenen/aktualisierten Schlüssel zurück.
+    """
+    p = get_locales_path() if path is None else Path(path)
+    if not p.is_file():
+        return 0
+    try:
+        with open(p, encoding="utf-8") as f:
+            data = json.load(f)
+    except (json.JSONDecodeError, OSError, UnicodeDecodeError) as e:
+        logger.warning("Konnte externe Übersetzungen aus %s nicht laden: %s", p, e)
+        return 0
+
+    if not isinstance(data, dict):
+        return 0
+
+    count = 0
+    for k, v in data.items():
+        if isinstance(v, dict):
+            if k in _CATALOG:
+                for lang_code, trans_val in v.items():
+                    if isinstance(trans_val, str) and trans_val.strip():
+                        _CATALOG[k][lang_code] = trans_val
+            else:
+                _CATALOG[k] = {
+                    lang_code: trans_val
+                    for lang_code, trans_val in v.items()
+                    if isinstance(trans_val, str)
+                }
+            count += 1
+    return count
+
+
+def export_translations_json(path: Path | str | None = None) -> Path:
+    """Exportiert den aktuellen Katalog nach locales/translations.json."""
+    p = get_locales_path() if path is None else Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    with open(p, "w", encoding="utf-8") as f:
+        json.dump(_CATALOG, f, indent=2, ensure_ascii=False)
+    return p
+
+
+# Auto-Load externe Übersetzungen beim Modulimport, falls Datei existiert
+_ext_path = get_locales_path()
+if _ext_path.is_file():
+    load_translations_file(_ext_path)

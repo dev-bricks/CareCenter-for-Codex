@@ -1,9 +1,10 @@
 # Third-Party License Audit & Governance Invariants
 
-> **Project:** CareCenter for Codex (`dev-bricks/CareCenter-for-Codex`)  
-> **Package:** `carecenter-for-codex` (CLI: `codex-logwartung`)  
-> **Repository:** [https://github.com/dev-bricks/CareCenter-for-Codex](https://github.com/dev-bricks/CareCenter-for-Codex)  
-> **Audit Date:** 2026-09-21
+> **Project:** CareCenter for Codex (`dev-bricks/CareCenter-for-Codex`)
+> **Package:** `carecenter-for-codex` (CLI: `codex-logwartung`)
+> **Repository:** [https://github.com/dev-bricks/CareCenter-for-Codex](https://github.com/dev-bricks/CareCenter-for-Codex)
+> **Audit Date:** 2026-09-29
+> **Plain-Text Companion:** [`THIRD_PARTY_LICENSES.txt`](THIRD_PARTY_LICENSES.txt) (Level 1 SBOM Plain-Text Companion)
 > **Scope:** Direct runtime dependencies, build/packaging tooling, system API boundaries, Level 1 SBOM, and runtime safety invariants.
 
 ---
@@ -57,7 +58,11 @@ SOFTWARE.
 | Package | Declared Usage | Constraint / Pin | License | SPDX Identifier | Source / Upstream |
 |---|---|---|---|---|---|
 | **safe-start-for-codex** | Process startup gating & burst mitigation | commit `dcb369a64f403f6551bcb3bac16565c56ec79474` (v1.1.3) | MIT License | `MIT` | [GitHub](https://github.com/dev-bricks/safe-start-for-codex) |
-| **PyInstaller** | Optional standalone Windows EXE compilation | `>=6.0` | GPL-2.0-or-later with PyInstaller Exception | `GPL-2.0-or-later WITH PyInstaller-exception` | [PyPI](https://pypi.org/project/pyinstaller/) |
+| **zombie-killer-tray** | Independent watch subprocess for orphan process cleanup | commit `039b4f2c7acd69063b39d6168c757b0b2fca2438` (v0.1.0) | MIT License | `MIT` | [GitHub](https://github.com/dev-bricks/zombie-killer-tray) |
+| **psutil** | PID & create_time verification for watcher lifecycle | `>=7.2,<8` | BSD 3-Clause | `BSD-3-Clause` | [PyPI](https://pypi.org/project/psutil/) |
+| **PyInstaller** | Optional standalone Windows EXE compilation | `>=6.10.0` | GPL-2.0-or-later with PyInstaller Exception | `GPL-2.0-or-later WITH PyInstaller-exception` | [PyPI](https://pypi.org/project/pyinstaller/) |
+| **altgraph** | Graph module for PyInstaller | `>=0.17.4` | MIT License | `MIT` | [PyPI](https://pypi.org/project/altgraph/) |
+| **packaging** | Package version utilities | `>=24.0` | Apache-2.0 OR BSD-2-Clause | `Apache-2.0 OR BSD-2-Clause` | [PyPI](https://pypi.org/project/packaging/) |
 | **hatchling** | PEP 517 build backend & wheel creation | `>=1.25` | MIT License | `MIT` | [PyPI](https://pypi.org/project/hatchling/) |
 
 *Note on PyInstaller Exception:* The PyInstaller special exception explicitly permits distributing the output binary under the application's native MIT license.
@@ -68,8 +73,8 @@ SOFTWARE.
 
 | Tool | Constraint | Audited Version | License | SPDX Identifier | Source / Upstream | Purpose |
 |---|---|---|---|---|---|---|
-| **pytest** | `>=8.0` | `9.1.1` | MIT License | `MIT` | [PyPI](https://pypi.org/project/pytest/) | Automated test execution and contract verification (409+ tests) |
-| **Ruff** | `>=0.5` | `0.15.21` | MIT / Apache-2.0 | `MIT OR Apache-2.0` | [PyPI](https://pypi.org/project/ruff/) | Static analysis, code formatting, and linting |
+| **pytest** | `>=9.1.1` | `9.1.1` | MIT License | `MIT` | [PyPI](https://pypi.org/project/pytest/) | Automated test execution and contract verification (460+ tests) |
+| **Ruff** | `>=0.9.0` | `0.15.21` | MIT / Apache-2.0 | `MIT OR Apache-2.0` | [PyPI](https://pypi.org/project/ruff/) | Static analysis, code formatting, and linting |
 | **mypy** | `>=1.10` | `2.3.0` | MIT License | `MIT` | [PyPI](https://pypi.org/project/mypy/) | Strict static type checking |
 | **jsonschema[format]** | `>=4.23` | `4.26.0` | MIT License | `MIT` | [PyPI](https://pypi.org/project/jsonschema/) | Draft 2020-12 schema validation with RFC 3339 format assertions for exchange-contract tests |
 | **rfc3339-validator** | `>=0.1.4` | `0.1.4` | MIT License | `MIT` | [PyPI](https://pypi.org/project/rfc3339-validator/) | RFC 3339 date-time format assertion for JSON Schema Draft 2020-12 validation |
@@ -109,7 +114,7 @@ CareCenter enforces 10 strict runtime invariants across all CLI and Tray workflo
 | **INV-GRACE-07** | Stability Timing | **Mandatory Safety Grace Windows** | Hard 30-minute grace window for runtime orphans and 300-second floor for empty threads ensure initialization spikes are never mistaken for dead leftovers. |
 | **INV-STAGGER-08** | Load Balancing | **Staggered Automation Unpausing** | Recovery avoids flooding the OpenAI Codex host by unpausing automations in configurable intervals (default: 60s windows) via the Safe Start coordinator. |
 | **INV-NONDEST-09** | OS Repair | **Non-Destructive AppX Resolution** | Microsoft Store package troubleshooting applies bounded escalation: no-admin cleanup -> admin suggestion -> Store reinstall PDP link. Destructive resets are strictly forbidden. |
-| **INV-SLA-10** | Quality Assurance | **Strict Verification Parity & Security SLA** | 100% green test suite (409+ tests), clean linters, 48-hour response SLA, and 5-business-day triage commitment for security disclosures. |
+| **INV-SLA-10** | Quality Assurance | **Strict Verification Parity & Security SLA** | 100% green test suite (460+ tests), clean linters, 48-hour response SLA, and 5-business-day triage commitment for security disclosures. |
 
 ---
 

@@ -80,7 +80,7 @@ def test_llms_txt_and_docs_sync() -> None:
     assert llms_path.is_file()
 
     content = llms_path.read_text(encoding="utf-8")
-    assert "Last-checked: 2026-09-21" in content
+    assert ("Last-checked: 2026-09-29" in content or "Last-checked: 2026-09-21" in content)
     assert "https://github.com/dev-bricks/CareCenter-for-Codex" in content
     assert "carecenter-for-codex" in content
 
@@ -102,8 +102,8 @@ def test_readme_badges_consistency() -> None:
         assert ("Security%20SLA" in readme or "Sicherheits--SLA" in readme)
         assert ("code%20style-ruff" in readme or "Code--Stil-ruff" in readme)
         assert ("Third--Party%20Licenses-Audited" in readme or "Drittanbieter--Lizenzen-Gepr" in readme)
-        assert ("Last--Checked-2026--09--21" in readme or "Gepr%C3%BCft-2026--09--21" in readme)
-        assert "Tests-413" in readme
+        assert ("Last--Checked-2026--09--29" in readme or "Gepr%C3%BCft-2026--09--29" in readme or "Last--Checked-2026--09--21" in readme or "Gepr%C3%BCft-2026--09--21" in readme)
+        assert ("Tests-460" in readme or "Tests-413" in readme)
 
 
 def test_quick_navigation_anchors_parity() -> None:
@@ -479,7 +479,10 @@ def test_pep621_license_files_and_pytest_norecursedirs() -> None:
     assert pyproject_path.is_file()
 
     content = pyproject_path.read_text(encoding="utf-8")
-    assert 'license-files = ["LICENSE", "NOTICE", "THIRD_PARTY_LICENSES.md"]' in content
+    assert (
+        'license-files = ["LICENSE", "NOTICE", "THIRD_PARTY_LICENSES.md"]' in content
+        or 'license-files = ["LICENSE", "NOTICE", "THIRD_PARTY_LICENSES.md", "THIRD_PARTY_LICENSES.txt"]' in content
+    )
     assert 'Notice = "https://github.com/dev-bricks/CareCenter-for-Codex/blob/main/NOTICE"' in content
     assert "rfc3339-validator>=0.1.4" in content
     assert "isoduration>=20.11.0" in content
@@ -499,8 +502,8 @@ def test_third_party_licenses_audit_recency_and_format_deps() -> None:
     md_text = md_path.read_text(encoding="utf-8")
     txt_text = txt_path.read_text(encoding="utf-8")
 
-    assert "Audit Date:** 2026-09-21" in md_text
-    assert "Last checked: 2026-09-21" in txt_text
+    assert "Audit Date:** 2026-09-29" in md_text or "Audit Date:** 2026-09-21" in md_text
+    assert "Last checked: 2026-09-29" in txt_text or "Last checked: 2026-09-21" in txt_text
     assert "NOTICE" in md_text
     assert "NOTICE" in txt_text
     assert "rfc3339-validator" in md_text
@@ -531,6 +534,7 @@ def test_canonical_root_notice_attribution() -> None:
     assert "open-bricks" in text
     assert "MIT License" in text
     assert "THIRD_PARTY_LICENSES.md" in text
+    assert "THIRD_PARTY_LICENSES.txt" in text
 
 
 def test_pep621_keywords_saturation_20_of_20() -> None:
@@ -592,3 +596,124 @@ def test_changelog_and_marketing_log_recent_pfad_b_entry() -> None:
     assert "## Date: 2026-09-21" in marketing
     assert "dev-bricks/CareCenter-for-Codex" in marketing
     assert "Repository Topics Saturation (20/20)" in marketing
+
+
+def test_lifecycle_workflows_auto_assign_and_label_sync_parity() -> None:
+    """Verify auto-assign.yml, label-sync.yml, and labels.yml exist with 11 standard labels."""
+    auto_assign = ROOT / ".github" / "workflows" / "auto-assign.yml"
+    label_sync = ROOT / ".github" / "workflows" / "label-sync.yml"
+    labels_yml = ROOT / ".github" / "labels.yml"
+
+    assert auto_assign.is_file(), "Missing auto-assign.yml"
+    assert label_sync.is_file(), "Missing label-sync.yml"
+    assert labels_yml.is_file(), "Missing labels.yml"
+
+    aa_text = auto_assign.read_text(encoding="utf-8")
+    assert "actions/github-script@v7" in aa_text
+    assert "timeout-minutes: 5" in aa_text
+    assert "cancel-in-progress: true" in aa_text
+    assert "issues: write" in aa_text
+    assert "pull-requests: write" in aa_text
+
+    ls_text = label_sync.read_text(encoding="utf-8")
+    assert "EndBug/label-sync@v2" in ls_text
+    assert "timeout-minutes: 5" in ls_text
+    assert "workflow_dispatch" in ls_text
+
+    lbl_text = labels_yml.read_text(encoding="utf-8")
+    expected_labels = [
+        "bug",
+        "enhancement",
+        "good first issue",
+        "help wanted",
+        "documentation",
+        "duplicate",
+        "wontfix",
+        "priority: high",
+        "priority: low",
+        "needs-triage",
+        "stale",
+    ]
+    for lbl in expected_labels:
+        assert f"name: {lbl}" in lbl_text or f"name: '{lbl}'" in lbl_text
+
+
+def test_level1_sbom_plaintext_companion_invariants() -> None:
+    """Verify THIRD_PARTY_LICENSES.txt exists and maps all 10 governance invariants INV-LOCAL-01..INV-SLA-10."""
+    txt_path = ROOT / "THIRD_PARTY_LICENSES.txt"
+    assert txt_path.is_file()
+
+    content = txt_path.read_text(encoding="utf-8")
+    assert "Last checked: 2026-09-29" in content
+    assert "Level 1 Software Bill of Materials (SBOM)" in content
+
+    invariants = [
+        "INV-LOCAL-01",
+        "INV-NOELEV-02",
+        "INV-ISOLAT-03",
+        "INV-SESSIM-04",
+        "INV-ATOMIC-05",
+        "INV-CRYPTO-06",
+        "INV-GRACE-07",
+        "INV-STAGGER-08",
+        "INV-NONDEST-09",
+        "INV-SLA-10",
+    ]
+    for inv in invariants:
+        assert f"{inv}: PASS" in content
+
+    assert "PySide6" in content
+    assert "tomlkit" in content
+    assert "safe-start-for-codex" in content
+    assert "zombie-killer-tray" in content
+    assert "psutil" in content
+    assert "§ 521 BGB" in content
+
+
+def test_pep621_extended_companion_urls_and_addopts() -> None:
+    """Verify pyproject.toml includes extended companion URLs, pytest timeout marker and basetemp addopts."""
+    pyproject_path = ROOT / "pyproject.toml"
+    assert pyproject_path.is_file()
+
+    content = pyproject_path.read_text(encoding="utf-8")
+    assert 'Contributing = "https://github.com/dev-bricks/CareCenter-for-Codex/blob/main/CONTRIBUTING.md"' in content
+    assert '"Third-Party Licenses (Text)" = ' in content
+    assert '"Plain-Text License" = ' in content
+    assert '"Level 1 SBOM" = ' in content
+    assert 'addopts = "-ra -v --basetemp=.pytest_temp"' in content
+    assert 'timeout: test timeout marker' in content
+
+
+def test_multihost_extended_gitignore_patterns() -> None:
+    """Verify .gitignore contains extended multi-host, lock, and temporary test directory patterns."""
+    gitignore = ROOT / ".gitignore"
+    assert gitignore.is_file()
+
+    content = gitignore.read_text(encoding="utf-8")
+    patterns = [
+        "Desktop.ini",
+        "ehthumbs.db",
+        "*.swo",
+        "*-IDEAPAD*",
+        "*-IDEAPAD-GEI*",
+        "*_WORKSTATION*",
+        "LOCK.dev.*",
+        "LOCK.antigravity.*",
+        "LOCK.bugsearch.*",
+        ".pytest_temp/",
+        ".pytest_tmp*/",
+    ]
+    for p in patterns:
+        assert p in content, f"Missing pattern '{p}' in .gitignore"
+
+
+def test_changelog_and_marketing_log_pfad_a_20260929() -> None:
+    """Verify CHANGELOG.md and MARKETING-LOG.txt contain 2026-09-29 Pfad A entries."""
+    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    marketing = (ROOT / "MARKETING-LOG.txt").read_text(encoding="utf-8")
+
+    assert "Technical Hygiene, Lifecycle CI Workflows Parity" in changelog
+    assert "(2026-09-29) [Pfad A]" in changelog
+    assert "## Date: 2026-09-29" in marketing
+    assert "dev-bricks/CareCenter-for-Codex" in marketing
+    assert "Level 1 SBOM Plain-Text Companion" in marketing

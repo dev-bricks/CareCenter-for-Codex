@@ -1,7 +1,7 @@
 # CareCenter for Codex
 
-> Last-checked: 2026-09-21
-> Test suite: 414 collected tests (413 passed, 1 skipped, verified 2026-09-21)
+> Last-checked: 2026-09-29
+> Test suite: 462 collected tests (460 passed, 2 skipped, verified 2026-09-29)
 
 CareCenter for Codex is an unofficial local Windows tray and CLI utility for
 maintaining the OpenAI Codex desktop app installation. It repairs failed
@@ -32,7 +32,7 @@ Important boundaries & Invariants (INV-LOCAL-01 through INV-SLA-10):
 - INV-GRACE-07: Mandatory grace windows (30m orphan grace, 300s empty thread floor).
 - INV-STAGGER-08: Staggered automation unpausing via Safe Start (60s default).
 - INV-NONDEST-09: Non-destructive Microsoft Store package repair escalation.
-- INV-SLA-10: Strict test parity (409+ tests) & 48-hour security response SLA.
+- INV-SLA-10: Strict test parity (460+ tests) & 48-hour security response SLA.
 - `CARE_CENTER_EXCHANGE_CONTRACT.md` defines the versioned, privacy-minimized,
   one-way CareCenter -> BACH/OCEAN health snapshot. It is a schema boundary, not
   a runtime transport, inbound command channel, or grant of repair authority.
@@ -79,7 +79,7 @@ Verification:
 - python -m compileall -q src tests
 - python -m ruff check src tests
 - python -m pytest -q
-- Current local verification: 414 collected tests (413 passed, 1 skipped) pass on Python 3.12 (2026-09-21)
+- Current local verification: 462 collected tests (460 passed, 2 skipped) pass on Python 3.12 (2026-09-29)
 
 Public documentation:
 - README.md: overview, install, usage, 18-point navigation, target personas, comparative matrix, § 521 BGB disclaimer
@@ -90,6 +90,6 @@ Public documentation:
 - CHANGELOG.md: release history
 - NOTICE: canonical root attribution notice (Lukas Geiger, dev-bricks, open-bricks)
 - THIRD_PARTY_LICENSES.md: comprehensive license audit, SPDX tags, and 10 safety invariants
-- THIRD_PARTY_LICENSES.txt: legacy text license inventory
+- THIRD_PARTY_LICENSES.txt: Level 1 SBOM plain-text companion with Invariant Compliance Status table (INV-LOCAL-01..INV-SLA-10)
 - STORE_LISTING.md, PRIVACY_POLICY.md, SUPPORT.md: Store release materials
 - SECURITY.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md: community health files

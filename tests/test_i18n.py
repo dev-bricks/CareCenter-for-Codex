@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from codex_logdatenbank_wartung.i18n import (
     _CATALOG,
     available_keys,
@@ -170,3 +172,147 @@ def test_maintenance_runner_uses_i18n_german(tmp_path) -> None:
     result = MaintenanceRunner(config, lambda: []).run(dry_run=False)
     ok_step = next(s for s in result.steps if s.name == "Codex-Prozessprüfung")
     assert "Keine Codex" in ok_step.message
+
+
+# ---------------------------------------------------------------------------
+# Tier-2 Mehrsprachigkeit (P-006): 4-Stufen-Fallback & Locales-Support
+# ---------------------------------------------------------------------------
+
+def test_tier2_constants_and_types() -> None:
+    from codex_logdatenbank_wartung.i18n import (
+        DEFAULT_LANGUAGE,
+        FALLBACK_CHAIN,
+        LANGUAGE_DISPLAY_NAMES,
+        LANGUAGES,
+        SUPPORTED_LANGUAGES,
+    )
+
+    assert SUPPORTED_LANGUAGES == ("de", "en", "es", "zh", "ja", "ru")
+    assert DEFAULT_LANGUAGE == "de"
+    assert FALLBACK_CHAIN == ("en", "de")
+    assert LANGUAGES == SUPPORTED_LANGUAGES
+
+    for lang in SUPPORTED_LANGUAGES:
+        assert lang in LANGUAGE_DISPLAY_NAMES
+        assert len(LANGUAGE_DISPLAY_NAMES[lang]) > 0
+
+
+def test_tier2_normalization_and_locales() -> None:
+    assert normalize_language("es") == "es"
+    assert normalize_language("ES") == "es"
+    assert normalize_language(" es-ES ") == "es"
+    assert normalize_language("zh") == "zh"
+    assert normalize_language("zh_CN") == "zh"
+    assert normalize_language("ja") == "ja"
+    assert normalize_language("ja-JP") == "ja"
+    assert normalize_language("ru") == "ru"
+    assert normalize_language("ru_RU") == "ru"
+    assert normalize_language("fr") is None
+    assert normalize_language("it_IT") is None
+    assert normalize_language(None) is None
+    assert normalize_language(123) is None
+
+
+def test_four_stage_fallback_chain() -> None:
+    """Prüft die 4-stufige Fallback-Kette: Zielsprache -> en -> de -> key."""
+    # Test-Einträge im Katalog simulieren
+    _CATALOG["_test_fallback_all"] = {"de": "DE_Wert", "en": "EN_Wert", "es": "ES_Wert"}
+    _CATALOG["_test_fallback_no_es"] = {"de": "DE_Wert", "en": "EN_Wert"}
+    _CATALOG["_test_fallback_only_de"] = {"de": "DE_Wert"}
+    _CATALOG["_test_fallback_none"] = {}
+
+    try:
+        set_language("es")
+        # Stufe 1: Zielsprache vorhanden -> ES_Wert
+        assert t("_test_fallback_all") == "ES_Wert"
+        # Stufe 2: Zielsprache fehlt -> Fallback auf EN
+        assert t("_test_fallback_no_es") == "EN_Wert"
+        # Stufe 3: Zielsprache & EN fehlen -> Fallback auf DE
+        assert t("_test_fallback_only_de") == "DE_Wert"
+        # Stufe 4: Keine Übersetzung vorhanden -> Key selbst
+        assert t("_test_fallback_none") == "_test_fallback_none"
+        assert t("_test_completely_unknown") == "_test_completely_unknown"
+    finally:
+        set_language("de")
+        _CATALOG.pop("_test_fallback_all", None)
+        _CATALOG.pop("_test_fallback_no_es", None)
+        _CATALOG.pop("_test_fallback_only_de", None)
+        _CATALOG.pop("_test_fallback_none", None)
+
+
+def test_language_labels_for_all_tier2_languages() -> None:
+    set_language("de")
+    assert language_label("de") == "Deutsch"
+    assert language_label("en") == "Englisch"
+    assert language_label("es") == "Spanisch"
+    assert language_label("zh") == "Chinesisch"
+    assert language_label("ja") == "Japanisch"
+    assert language_label("ru") == "Russisch"
+
+    set_language("en")
+    assert language_label("de") == "German"
+    assert language_label("en") == "English"
+    assert language_label("es") == "Spanish"
+    assert language_label("zh") == "Chinese"
+    assert language_label("ja") == "Japanese"
+    assert language_label("ru") == "Russian"
+    set_language("de")
+
+
+def test_locales_file_paths_and_loading(tmp_path) -> None:
+    import json
+
+    from codex_logdatenbank_wartung.i18n import (
+        export_translations_json,
+        get_locales_path,
+        load_translations_file,
+    )
+
+    path = get_locales_path()
+    assert isinstance(path, Path)
+
+    # Exportieren in temporäre Datei
+    export_path = tmp_path / "exported.json"
+    exported = export_translations_json(export_path)
+    assert exported.is_file()
+
+    with open(export_path, encoding="utf-8") as f:
+        data = json.load(f)
+    assert isinstance(data, dict)
+    assert "ready" in data
+
+    # Laden aus temporärer Datei mit neuem Schlüssel
+    custom_json = tmp_path / "custom.json"
+    with open(custom_json, "w", encoding="utf-8") as f:
+        json.dump({"_custom_dyn_key": {"de": "Dynamisch", "en": "Dynamic"}}, f)
+
+    loaded_count = load_translations_file(custom_json)
+    assert loaded_count == 1
+    assert t("_custom_dyn_key") == "Dynamisch"
+
+    set_language("en")
+    assert t("_custom_dyn_key") == "Dynamic"
+    set_language("de")
+
+    # Aufräumen
+    _CATALOG.pop("_custom_dyn_key", None)
+
+    # Nicht existierende Datei oder Fehler führen nicht zum Absturz
+    assert load_translations_file(tmp_path / "nonexistent.json") == 0
+
+
+def test_locales_translations_json_exists_and_valid() -> None:
+    import json
+
+    from codex_logdatenbank_wartung.i18n import get_locales_path
+
+    locales_file = get_locales_path()
+    assert locales_file.is_file(), f"locales/translations.json fehlt unter {locales_file}"
+
+    with open(locales_file, encoding="utf-8") as f:
+        data = json.load(f)
+
+    assert isinstance(data, dict)
+    assert len(data) >= 318
+    assert "ready" in data
+    assert "settings_language" in data

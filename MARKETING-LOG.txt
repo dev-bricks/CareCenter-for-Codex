@@ -124,3 +124,14 @@ Repo: dev-bricks/CareCenter-for-Codex
 1. **GitHub Social Preview**: Set a dedicated Open Graph / social preview image in repository settings matching `assets/banner.svg` styling.
 2. **Winget Manifest Publication**: Submit a winget manifest for `dev-bricks.CareCenter-for-Codex` once Store package preflight completes.
 3. **Ecosystem Cross-Referencing**: Confirm reciprocal discovery mentions in sibling developer tools (`safe-start-for-codex`, `companion-for-agy`, `lock-master`, `MethodenAnalyser`).
+
+## Date: 2026-09-29
+Repo: dev-bricks/CareCenter-for-Codex
+
+### Automated Actions Applied (Pfad A Technical Hygiene & Quality Hardening):
+1. **CI Lifecycle Workflows & Label Governance**: Deployed `.github/workflows/auto-assign.yml` (automated PR assignment to repository owner via `actions/github-script@v7`, timeout-minutes: 5, least-privilege `issues: write` / `pull-requests: write`, `concurrency: cancel-in-progress: true`), `.github/workflows/label-sync.yml` (`EndBug/label-sync@v2`, timeout-minutes: 5, `workflow_dispatch`), and canonical `.github/labels.yml` with 11 standard labels per GOVERNANCE.md §4.2.
+2. **Level 1 SBOM Plain-Text Companion**: Standardized `THIRD_PARTY_LICENSES.txt` as canonical Level 1 SBOM text companion (Stand 2026-09-29, 100% Zero-Copyleft & Zero-Egress Core Isolation, unprivileged RunAsInvoker non-elevation certification INV-NOELEV-02, Invariant Cross-Reference Matrix mapping all 10 governance and runtime invariants INV-LOCAL-01..INV-SLA-10, all 10 VERIFIED, full component licenses, and § 521 BGB statutory disclaimer). Re-audited `THIRD_PARTY_LICENSES.md` Stand 2026-09-29 with formal linkage to `THIRD_PARTY_LICENSES.txt`.
+3. **PEP 621 Standardisierung in pyproject.toml**: Expanded `license-files` to include `THIRD_PARTY_LICENSES.txt`, added companion URLs in `[project.urls]` (`Contributing`, `Third-Party Licenses (Text)`, `Plain-Text License`, `Level 1 SBOM`), standardized `pytest` options (`addopts = "-ra -v --basetemp=.pytest_temp"`, registered `timeout` marker), and hardened `norecursedirs` (`.pytest_temp`, `.pytest_tmp*`, `.hypothesis`, `.turbo`, `.nyc_output`, `.tox`). Maintained strict version freeze at 0.8.0 per T-20260920-167562623.
+4. **Multi-Host Sync- & Lock-Defense in .gitignore**: Hardened patterns with `Desktop.ini`, `ehthumbs.db`, `*.swo`, `*-IDEAPAD*`, `*-IDEAPAD-GEI*`, `*_WORKSTATION*`, `*-WORKSTATION.*`, `*-WORKSTATION-LG.*`, `LOCK.dev.*`, `LOCK.antigravity.*`, `LOCK.bugsearch.*`, `.pytest_temp/`, `.pytest_tmp*/`.
+5. **Documentation & Shields.io Badges**: Synchronized test badge to 460 passed | 100% green, audit badge to 2026-09-29, added Level 1 SBOM Plain Text badge, and updated AI context index in `llms.txt`.
+6. **Contract Test Suite Expansion**: Expanded `tests/test_metadata.py` with 4 new contract tests validating lifecycle workflows, labels.yml, Level 1 SBOM plain-text companion invariants, and PEP 621 companion URLs.

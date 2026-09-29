@@ -22,6 +22,9 @@ venv/
 .claude/
 Thumbs.db
 desktop.ini
+Desktop.ini
+ehthumbs.db
+*.swo
 
 # --- Local runtime data (never committed) ---
 # Config, logs and backups live outside the repo by default
@@ -70,6 +73,10 @@ LOCK*.txt
 LOCK.user.*
 LOCK.until.*
 LOCK.condition.*
+LOCK.dev.*
+LOCK.antigravity.*
+LOCK.bugsearch.*
+LOCK.txt
 LOCK.permissions.json
 *.lock
 .automation-lock
@@ -84,6 +91,12 @@ LOCK.permissions.json
 *-LAPTOP*
 *-ASUS*
 *-ASUS-GEI*
+*-IDEAPAD*
+*-IDEAPAD-GEI*
+*_WORKSTATION*
+*_WORKSTATION-LG*
+*-WORKSTATION.*
+*-WORKSTATION-LG.*
 *-Mac Studio*
 *-MacBook*
 *-conflict-*
@@ -101,6 +114,8 @@ wheelhouse/
 .hypothesis/
 .turbo/
 .nyc_output/
+.pytest_temp/
+.pytest_tmp*/
 
 # --- Temporary & Editor Files ---
 *.tmp

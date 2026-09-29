@@ -1,15 +1,16 @@
 # Third-Party Licenses
 
-Last checked: 2026-09-21 against the declared project metadata, PyPI metadata,
-the pinned Safe Start GitHub revision, and system API boundaries.
+Last checked: 2026-09-29 against the declared project metadata, PyPI metadata,
+the pinned Safe Start and zombie-killer-tray GitHub revisions, and system API boundaries.
 
 Comprehensive audit document: see `THIRD_PARTY_LICENSES.md` for full details,
 SPDX identifiers, LGPL-3.0 dynamic linking rules, Level 1 SBOM, and the 10 Governance
 & Runtime Safety Invariants (INV-LOCAL-01 through INV-SLA-10).
 
 Scope: direct dependencies declared in `pyproject.toml`. This is a direct
-dependency inventory, not a frozen transitive SBOM and not a replacement for
-license files shipped inside bundled wheels or executables.
+dependency inventory and plain-text Level 1 Software Bill of Materials (SBOM),
+not a frozen transitive lockfile and not a replacement for license files shipped
+inside bundled wheels or executables.
 
 ## Project License & Attribution Notice
 
@@ -99,6 +100,12 @@ SPDX: MIT
 URL: https://github.com/dev-bricks/zombie-killer-tray
 Notice: Pinned integration for conservative cleanup of orphaned MCP and language-server processes, launched as an independent watch subprocess.
 
+psutil
+License: BSD-3-Clause
+SPDX: BSD-3-Clause
+URL: https://pypi.org/project/psutil/
+Notice: Cross-platform process and system monitoring library utilized for verified watcher PID and create_time validation.
+
 PyInstaller
 License: GPL-2.0-or-later WITH Bootloader-exception
 SPDX: GPL-2.0-or-later WITH Bootloader-exception
@@ -159,17 +166,39 @@ SPDX: ISC
 URL: https://pypi.org/project/isoduration/
 Notice: Operations with ISO 8601 durations and time expressions.
 
+Python Standard Library
+License: PSF-2.0
+SPDX: PSF-2.0
+URL: https://docs.python.org/3/license.html
+Notice: Core standard library modules (sqlite3, pathlib, subprocess, json, dataclasses, typing, argparse, logging).
+
+---
+
+## Level 1 SBOM Invariant Compliance Status (Stand 2026-09-29)
+
+- INV-LOCAL-01: PASS (100% Local-First & Zero-Egress; fully offline runtime loop, zero telemetry, zero cloud sync)
+- INV-NOELEV-02: PASS (Unprivileged user-mode execution via RunAsInvoker; zero UAC elevation or kernel drivers)
+- INV-ISOLAT-03: PASS (Fail-closed process protection & singleton isolation; active work strictly shielded)
+- INV-SESSIM-04: PASS (CLI session & agent workstation immunity for Node-based Codex CLI & detached codex exec)
+- INV-ATOMIC-05: PASS (Pre-mutation SQLite snapshots; state_5.sqlite + WAL + SHM backed up atomically before mutation)
+- INV-CRYPTO-06: PASS (Cryptographic & structural integrity verification via PRAGMA integrity_check before checkpoint)
+- INV-GRACE-07: PASS (Mandatory safety grace windows; 30-minute orphan age floor, 300-second empty thread floor)
+- INV-STAGGER-08: PASS (Staggered automation unpausing via Safe Start coordinator; configurable 60s pacing windows)
+- INV-NONDEST-09: PASS (Non-destructive Microsoft Store package repair escalation; no-admin -> admin suggestion -> Store PDP)
+- INV-SLA-10: PASS (Strict verification parity [460+ passed tests], 48-hour security response SLA, 5-business-day triage commitment)
+
 ---
 
 ## Distribution Notes
 
 - PySide6 is used as an unmodified dynamically linked library. No Qt/PySide6
   source is included or modified in this repository.
-- Safe Start is not available from PyPI as of this check. The explicit installer
-  and build extra therefore use the verified public repository revision above;
-  a local checkout is used only through `CARECENTER_SAFE_START_SOURCE`.
+- Safe Start and zombie-killer-tray are not currently distributed on PyPI as of this check.
+  The explicit installer and build extras use the verified public repository revisions above;
+  local checkouts are supported via respective environment overrides.
 - PyInstaller's special exception allows distributing the generated executable
   under the application's own MIT license.
+- Statutory liability limitation applies under German law (§ 521 BGB Gefälligkeitsrecht).
 - Binary release preparation must inspect the actual bundled distributions and
   retain their shipped license files.
 
