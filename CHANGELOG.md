@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Tier-2 Multi-Language Architecture & 4-Stage Fallback Modernization (CCC-I18N-01 / Policy P-006) on 2026-09-29:
+  - Modernized `src/codex_logdatenbank_wartung/i18n.py` to full Tier-2 multi-language standards (`SUPPORTED_LANGUAGES = ("de", "en", "es", "zh", "ja", "ru")`, `DEFAULT_LANGUAGE = "de"`, `FALLBACK_CHAIN = ("en", "de")`, `LANGUAGES = SUPPORTED_LANGUAGES`, `LANGUAGE_DISPLAY_NAMES`).
+  - Implemented robust 4-stage fallback chain in `t(key, **kwargs)`: `active language -> en -> de -> key`, guaranteeing graceful degradation when translations are missing.
+  - Enhanced language detection and normalization: `detect_language()` and `normalize_language()` now parse full locale specifiers and regional dialects (`es-ES`, `zh_CN`, `ja-JP`, `ru_RU`).
+  - Added native language labels for all 6 target languages with localized display name fallbacks.
+  - Added decoupled external translation file support (`locales/translations.json`) via `get_locales_path()`, `load_translations_file()`, `export_translations_json()`, and automatic non-blocking autoloading on module initialization.
+  - Exported complete `locales/translations.json` dictionary covering all 318 catalog keys.
+  - Added 6 comprehensive automated contract and unit tests in `tests/test_i18n.py` (full suite 471 passed, 2 skipped, 100% green). [G 2026-09-29]
+- Verification (2026-09-29): Pytest full suite 471 passed, 2 skipped (100% green); Ruff check clean (0 errors); compileall clean (0 errors); git diff --check clean.
+
 - Technical Hygiene, Lifecycle CI Workflows Parity, Level 1 SBOM Text-Companion & Metadata Contract Hardening (2026-09-29) [Pfad A]:
   - Deployed GitHub Actions lifecycle workflows `.github/workflows/auto-assign.yml` (auto-assigning PRs to repository owner via `actions/github-script@v7`, timeout-minutes: 5, least-privilege `issues: write` / `pull-requests: write`, `concurrency: cancel-in-progress: true`) and `.github/workflows/label-sync.yml` (`EndBug/label-sync@v2`, timeout-minutes: 5, `workflow_dispatch`, `issues: write`, `concurrency: cancel-in-progress: true`).
   - Deployed canonical `.github/labels.yml` with 11 standard labels according to GOVERNANCE.md §4.2 (`bug`, `enhancement`, `good first issue`, `help wanted`, `documentation`, `duplicate`, `wontfix`, `priority: high`, `priority: low`, `needs-triage`, `stale`).
