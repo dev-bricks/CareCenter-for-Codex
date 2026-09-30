@@ -59,6 +59,43 @@ def test_all_keys_have_both_languages() -> None:
     assert not missing, f"Fehlende Uebersetzungen: {missing}"
 
 
+def test_all_keys_have_spanish() -> None:
+    """Jeder Eintrag muss auch 'es' (Spanisch, Stufe 2 / Tier-2 nach Policy P-006) enthalten."""
+    missing: list[str] = []
+    for key, translations in _CATALOG.items():
+        if "es" not in translations or not isinstance(translations["es"], str) or not translations["es"].strip():
+            missing.append(f"{key}: missing or empty 'es'")
+    assert not missing, f"Fehlende spanische Uebersetzungen: {missing}"
+
+
+def test_spanish_translation() -> None:
+    set_language("es")
+    assert t("ready") == "Listo."
+    assert t("maintenance_done_ok") == "Mantenimiento completado."
+    assert t("window_close") == "Cerrar (continúa en segundo plano)"
+    set_language("de")
+
+
+def test_spanish_format_parameters() -> None:
+    set_language("es")
+    result = t("waiting_for_idle", cpu=42.7)
+    assert "43%" in result or "42%" in result
+    assert "esperando a la inactividad" in result
+    set_language("de")
+
+
+def test_language_switch_to_spanish() -> None:
+    set_language("es")
+    es = t("process_check_ok")
+    set_language("en")
+    en = t("process_check_ok")
+    set_language("de")
+    de = t("process_check_ok")
+    assert es != en and es != de
+    assert "No se detectaron" in es
+    set_language("de")
+
+
 def test_available_keys_returns_sorted_list() -> None:
     keys = available_keys()
     assert isinstance(keys, list)
@@ -316,3 +353,20 @@ def test_locales_translations_json_exists_and_valid() -> None:
     assert len(data) >= 318
     assert "ready" in data
     assert "settings_language" in data
+    # Test that Spanish is present and non-empty in translations.json
+    for key, val in data.items():
+        assert "es" in val, f"Key '{key}' in translations.json missing 'es'"
+        assert isinstance(val["es"], str) and val["es"].strip(), f"Key '{key}' has empty 'es'"
+
+
+def test_manage_translations_check_gate() -> None:
+    """Prüft das manage_translations CLI-Gate direkt als Modul."""
+    import sys
+    from pathlib import Path
+
+    root_dir = Path(__file__).resolve().parents[1]
+    sys.path.insert(0, str(root_dir))
+    import manage_translations
+
+    exit_code = manage_translations.check_gate(verbose=False)
+    assert exit_code == 0, "manage_translations.check_gate() failed"

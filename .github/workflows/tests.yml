@@ -49,5 +49,8 @@ jobs:
       - name: Lint sources and tests
         run: python -m ruff check src tests
 
+      - name: Validate translations
+        run: python manage_translations.py --check
+
       - name: Run tests
         run: python -m pytest -q

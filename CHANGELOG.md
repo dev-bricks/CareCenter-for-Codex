@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Curated Spanish Tier-2 Localization & Translation Management CLI (CCC-I18N-02 & CCC-I18N-03 / Policy P-006) on 2026-09-30:
+  - Curated and validated complete Spanish (`es`) translations for all 322 catalog keys across UI, menus, settings, dialogs, maintenance, repair, and process states in `src/codex_logdatenbank_wartung/i18n.py` and `locales/translations.json`.
+  - Guaranteed exact format placeholder parity (`{app}`, `{count}`, `{cpu}`, `{hours}`, `{days}`, `{mode}`, `{seconds}`, `{status}`, `{step}`) across all languages without parameter drift.
+  - Implemented project-root translation management CLI `manage_translations.py` with AST/regex source scanning (`--scan`), two-way synchronization (`--sync`, `--export-json`), and strict CI check gate (`--check`).
+  - Integrated `python manage_translations.py --check` gate step into GitHub Actions workflow `.github/workflows/tests.yml`.
+  - Expanded test suite in `tests/test_i18n.py` with 5 new automated tests (`test_all_keys_have_spanish`, `test_spanish_translation`, `test_spanish_format_parameters`, `test_language_switch_to_spanish`, `test_manage_translations_check_gate`).
+- Verification (2026-09-30): Pytest full suite 476 passed, 2 skipped (100% green); Ruff check clean (0 errors); compileall clean (0 errors); git diff --check clean.
+
 - Tier-2 Multi-Language Architecture & 4-Stage Fallback Modernization (CCC-I18N-01 / Policy P-006) on 2026-09-29:
   - Modernized `src/codex_logdatenbank_wartung/i18n.py` to full Tier-2 multi-language standards (`SUPPORTED_LANGUAGES = ("de", "en", "es", "zh", "ja", "ru")`, `DEFAULT_LANGUAGE = "de"`, `FALLBACK_CHAIN = ("en", "de")`, `LANGUAGES = SUPPORTED_LANGUAGES`, `LANGUAGE_DISPLAY_NAMES`).
   - Implemented robust 4-stage fallback chain in `t(key, **kwargs)`: `active language -> en -> de -> key`, guaranteeing graceful degradation when translations are missing.
