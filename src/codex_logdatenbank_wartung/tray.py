@@ -64,7 +64,16 @@ APP_SHORT = "CareCenter"
 
 
 def _app_icon() -> QIcon:
-    """App-Icon laden — gebündelt (PyInstaller `_MEIPASS`) oder aus dem Projekt-Root (Dev)."""
+    """App-Icon laden — via app_icon_loader oder Fallback."""
+    try:
+        from .app_icon_loader import load_app_icon
+
+        loaded = load_app_icon()
+        if loaded is not None and not loaded.isNull():
+            return loaded
+    except Exception:
+        pass
+
     bases = []
     meipass = getattr(sys, "_MEIPASS", "")
     if meipass:

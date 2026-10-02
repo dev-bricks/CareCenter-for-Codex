@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Complete Multi-Resolution Icon & Asset Suite Generation (APP_ICON_GENERATOR) on 2026-10-02:
+  - Generated and anchored 1024x1024 master PNG assets (`CareCenterForCodex.png`, `DesktopIcon.png`, `icon.png`, `CareCenter.png`, `assets/CareCenterForCodex.png`, `assets/DesktopIcon.png`, `assets/icon.png`, `assets/CareCenter.png`, `mobile_icons/icon.png`) with authentic brand identity.
+  - Built full 7-layer Windows ICOs (16x16, 24x24, 32x32, 48x48, 64x64, 128x128, 256x256 @ 32bpp RGBA) for `CareCenterForCodex.ico`, `DesktopIcon.ico`, `icon.ico`, `ICO.ico`, `CareCenter.ico`, and corresponding mirrors in `assets/` (`CareCenterForCodex.ico`, `app_icon.ico`, `DesktopIcon.ico`, `icon.ico`, `CareCenter.ico`).
+  - Generated 5-layer favicon ICOs (16, 24, 32, 48, 64 px) and 64x64 favicon PNGs across root, `assets/` and `mobile_icons/`.
+  - Created complete PWA Mobile Suite under `mobile_icons/` (`icon.png`, `icon-192.png`, `icon-512.png`, `icon-maskable-192.png`, `icon-maskable-512.png` with 80% safe zone on `#0f172a`, `apple-touch-icon.png`, `apple-touch-icon-180.png`, `manifest.json`, and subfolder `icons/`).
+  - Completed Microsoft Store tile suite in `store_assets/` and `store_package/CareCenter for Codex/icons/` (`Square44x44Logo.png`, `icon_44x44.png`, `Square50x50Logo.png`, `icon_50x50.png`, `StoreLogo.png`, `Square150x150Logo.png`, `icon_150x150.png`, `Wide310x150Logo.png`, `icon_310x150.png`, `Square310x310Logo.png`, `icon_310x310.png`, `README.md`).
+  - Implemented runtime icon loader in `src/codex_logdatenbank_wartung/app_icon_loader.py` with multi-path resolution and safe headless fallback; wired `_app_icon()` in `src/codex_logdatenbank_wartung/tray.py`.
+  - Implemented automated contract test suite in `tests/test_assets_and_icons.py` with 5 hermetic contract tests verifying master icons, 7-layer ICO binaries, assets parity, PWA manifest, store tiles, and runtime loader (5/5 passed; full suite 481 passed, 2 skipped, 100% green). [G 2026-10-02]
+- Verification (2026-10-02): Pytest full suite 481 passed, 2 skipped (100% green); Ruff check clean (0 errors); compileall clean (0 errors); git diff --check clean.
+
 - Curated Spanish Tier-2 Localization & Translation Management CLI (CCC-I18N-02 & CCC-I18N-03 / Policy P-006) on 2026-09-30:
   - Curated and validated complete Spanish (`es`) translations for all 322 catalog keys across UI, menus, settings, dialogs, maintenance, repair, and process states in `src/codex_logdatenbank_wartung/i18n.py` and `locales/translations.json`.
   - Guaranteed exact format placeholder parity (`{app}`, `{count}`, `{cpu}`, `{hours}`, `{days}`, `{mode}`, `{seconds}`, `{status}`, `{step}`) across all languages without parameter drift.
