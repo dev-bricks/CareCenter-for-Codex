@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Zombie Killer Status Parsing, PID Validation & Process Resilience Hardening (SOFTWARE_BUGSEARCH Bugsweep) on 2026-10-03:
+  - Hardened `_read_watch_pid_file` in `src/codex_logdatenbank_wartung/zombie_killer_integration.py` against non-dictionary JSON payloads (e.g. lists, strings, integers) and added `AttributeError` catching and explicit dictionary type verification.
+  - Added non-positive PID guard (`pid <= 0`) and `ValueError` catching in `_verify_watch_process` and `_process_create_time` to prevent crashes when invalid or zero PIDs are passed to `psutil.Process(pid)`.
+  - Added safe numeric coercions `_safe_float` and `_safe_int` in `build_zombie_killer_status` to safely handle `None` values and corrupt non-numeric strings in `zombie_events.jsonl` without unhandled `TypeError` or `ValueError`.
+  - Added hermetic regression test suite in `tests/test_bugsweep_zombie_killer_resilience_20261003.py` covering non-dict PID files, missing pid fields, negative/zero PIDs, null event attributes, and invalid string event values (6/6 passed; full test suite 487 passed, 2 skipped, 100% green). [G 2026-10-03]
+- Verification (2026-10-03): Pytest full suite 487 passed, 2 skipped (100% green); Ruff check clean (0 errors); compileall clean (0 errors); git diff --check clean.
+
 - Complete Multi-Resolution Icon & Asset Suite Generation (APP_ICON_GENERATOR) on 2026-10-02:
   - Generated and anchored 1024x1024 master PNG assets (`CareCenterForCodex.png`, `DesktopIcon.png`, `icon.png`, `CareCenter.png`, `assets/CareCenterForCodex.png`, `assets/DesktopIcon.png`, `assets/icon.png`, `assets/CareCenter.png`, `mobile_icons/icon.png`) with authentic brand identity.
   - Built full 7-layer Windows ICOs (16x16, 24x24, 32x32, 48x48, 64x64, 128x128, 256x256 @ 32bpp RGBA) for `CareCenterForCodex.ico`, `DesktopIcon.ico`, `icon.ico`, `ICO.ico`, `CareCenter.ico`, and corresponding mirrors in `assets/` (`CareCenterForCodex.ico`, `app_icon.ico`, `DesktopIcon.ico`, `icon.ico`, `CareCenter.ico`).

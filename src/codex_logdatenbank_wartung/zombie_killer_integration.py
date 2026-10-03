@@ -310,23 +310,29 @@ def _read_watch_pid_file(state_dir: Path) -> tuple[int, float | None] | None:
         return None
     try:
         payload = json.loads(pid_file.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            return None
         raw_create_time = payload.get("create_time")
+        if "pid" not in payload:
+            return None
         return (
             int(payload["pid"]),
             float(raw_create_time) if raw_create_time is not None else None,
         )
-    except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
+    except (OSError, ValueError, KeyError, TypeError, AttributeError, json.JSONDecodeError):
         return None
 
 
 def _process_create_time(pid: int) -> float | None:
+    if pid <= 0:
+        return None
     try:
         import psutil
     except ImportError:
         return None
     try:
         return psutil.Process(pid).create_time()
-    except psutil.Error:
+    except (psutil.Error, ValueError):
         return None
 
 
@@ -337,6 +343,8 @@ def _verify_watch_process(pid: int, expected_create_time: float | None) -> bool 
     callers MUST treat this as "do not touch" (review finding: `stop` used
     to fail-open on None, so a stale, verification-less PID file could
     terminate an unrelated process that happened to reuse the PID)."""
+    if pid <= 0:
+        return False
     try:
         import psutil
     except ImportError:
@@ -345,11 +353,12 @@ def _verify_watch_process(pid: int, expected_create_time: float | None) -> bool 
         proc = psutil.Process(pid)
         actual_create_time = proc.create_time()
         cmdline = " ".join(proc.cmdline())
-    except psutil.Error:
+    except (psutil.Error, ValueError):
         return False
     if expected_create_time is not None and abs(actual_create_time - expected_create_time) > 2.0:
         return False  # a different incarnation -- the pid was reused
     return "zombie_killer_tray" in cmdline
+
 
 
 def launch_zombie_killer_watch(
@@ -516,6 +525,24 @@ def _last_cycle_event(state_dir: Path) -> dict[str, object] | None:
     return last
 
 
+def _safe_float(val: object) -> float | None:
+    if val is None:
+        return None
+    try:
+        return float(val)  # type: ignore[arg-type]
+    except (ValueError, TypeError):
+        return None
+
+
+def _safe_int(val: object) -> int | None:
+    if val is None:
+        return None
+    try:
+        return int(val)  # type: ignore[arg-type]
+    except (ValueError, TypeError):
+        return None
+
+
 def build_zombie_killer_status(config: MaintenanceConfig) -> ZombieKillerStatus:
     state_dir = config.zombie_killer_state_dir
     notes: list[str] = []
@@ -527,7 +554,7 @@ def build_zombie_killer_status(config: MaintenanceConfig) -> ZombieKillerStatus:
     return ZombieKillerStatus(
         available=available,
         state_dir=str(state_dir),
-        last_cycle_at=float(last_cycle["cycle_at"]) if last_cycle else None,
-        last_cycle_count=int(last_cycle["count"]) if last_cycle and "count" in last_cycle else None,
+        last_cycle_at=_safe_float(last_cycle.get("cycle_at")) if isinstance(last_cycle, dict) else None,
+        last_cycle_count=_safe_int(last_cycle.get("count")) if isinstance(last_cycle, dict) else None,
         notes=notes,
     )
