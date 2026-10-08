@@ -5,7 +5,7 @@
 > Inoffizielles lokales Windows-Tray- und CLI-Werkzeug, das die OpenAI-Codex-Desktop-App gesund hält — repariert fehlgeschlagene Starts, entfernt hängende Reste und wartet die SQLite-Logdatenbank sicher. Vollständig offline, keine Telemetrie.
 
 [![CareCenter Tests](https://github.com/dev-bricks/CareCenter-for-Codex/actions/workflows/tests.yml/badge.svg)](https://github.com/dev-bricks/CareCenter-for-Codex/actions/workflows/tests.yml)
-[![Pytest Status](https://img.shields.io/badge/Tests-460%20bestanden-brightgreen.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
+[![Pytest Status](https://img.shields.io/badge/Tests-489%20bestanden-brightgreen.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
 [![Version](https://img.shields.io/badge/Version-0.8.0-blue.svg)](https://github.com/dev-bricks/CareCenter-for-Codex/releases)
 [![Python](https://img.shields.io/badge/Python-3.12%20%7C%203.13-blue.svg)](https://www.python.org/)
 [![Plattform](https://img.shields.io/badge/Plattform-Windows%2010%20%7C%2011-lightgrey.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
@@ -17,12 +17,14 @@
 [![Attribution](https://img.shields.io/badge/Attribution-NOTICE-blue.svg)](NOTICE)
 [![Drittanbieter-Audit](https://img.shields.io/badge/Drittanbieter--Lizenzen-Gepr%C3%BCft-blue.svg)](THIRD_PARTY_LICENSES.md)
 [![Level 1 SBOM: Plain Text](https://img.shields.io/badge/Level%201%20SBOM-Plain%20Text-blue.svg)](THIRD_PARTY_LICENSES.txt)
+[![i18n](https://img.shields.io/badge/i18n-DE%20%7C%20EN%20%7C%20ES-blueviolet.svg)](locales/)
+[![Icons](https://img.shields.io/badge/Icons-Multi--Layer%20ICO%20%7C%20PWA-informational.svg)](assets/)
 [![GUI Framework](https://img.shields.io/badge/GUI-PySide6-41CD52.svg)](https://pypi.org/project/PySide6/)
 [![Ökosystem dev-bricks](https://img.shields.io/badge/Ökosystem-dev--bricks-blue.svg)](https://github.com/dev-bricks)
 [![Dachorganisation open-bricks](https://img.shields.io/badge/Dach-open--bricks-blue.svg)](https://github.com/open-bricks)
 [![KI-Indexierung](https://img.shields.io/badge/LLM--Bereit-llms.txt-blueviolet.svg)](llms.txt)
-[![Audit](https://img.shields.io/badge/Gepr%C3%BCft-2026--09--29-informational.svg)](CHANGELOG.md)
-[![Geprüft](https://img.shields.io/badge/Gepr%C3%BCft-2026--09--29-brightgreen.svg)](CHANGELOG.md)
+[![Audit](https://img.shields.io/badge/Gepr%C3%BCft-2026--10--08-informational.svg)](CHANGELOG.md)
+[![Geprüft](https://img.shields.io/badge/Gepr%C3%BCft-2026--10--08-brightgreen.svg)](CHANGELOG.md)
 
 [English](README.md) · [Deutsch](README.de.md)
 
@@ -117,6 +119,57 @@ flowchart TD
     CLI --> APPX
 ```
 
+### Visuelle Vier-Sichten-Architekturtopologie
+
+```text
++==================================================================================================+
+|                        CARECENTER FOR CODEX — VIER-SICHTEN-TOPOLOGIE                             |
++==================================================================================================+
+|                                                                                                  |
+|  [SICHT 1: NUTZER-, TRAY-, CLI- & PRÄSENTATIONSEBENE]                                            |
+|  • PySide6 System-Tray (start.bat / debug.bat) mit reaktiven asynchronen QThread-Workern         |
+|  • Mehrsprachige UI (DE / EN / ES): Vollständiger 322-Schlüssel Tier-2 Übersetzungskatalog       |
+|  • Live-Tray-Statusfenster mit Echtzeit-Fortschrittsanzeige, Protokollen und Abbruch-Gates       |
+|  • Unprivilegierter CLI-Router (`codex-logwartung status`, `doctor`, `run-safe`, `run-fast`)    |
+|  • Multi-Resolution Icon-Suite: 7-Layer Windows-ICO (16px..256px), 1024px Master, PWA & Store   |
+|                                                                                                  |
++--------------------------------------------------------------------------------------------------+
+|                                                                                                  |
+|  [SICHT 2: WÄCHTER-, SCHEDULER- & ORCHESTRIERUNGSEBENE]                                          |
+|  • Hintergrund-Wächter: Blockierungsfreie 60s-Schleife zur Erkennung von Blocker- & Waisen-Reste|
+|  • Loop-Modus Scheduler: Konfigurierbare Intervalle (2h..24h) mit automatischem Fast/Safe-Fallback|
+|  • Thread-Postfachpflege: Altersbasierte Lese-/Archivierungslogik; 300s Karenz für leere Threads|
+|  • Konfigurations-Auditor: Dreistufige Prüfung (off/notify/auto) für redundante MCPs & Plugins   |
+|  • Safe-Start-Koordinator: Pausiert Automatisierungen, dämpft Startwellen, gestaffelter Start (60s)|
+|  • Zombie-Killer-Tray Bridge: Subprozess-Integration für Daemon-Tracking, PID & Ereignis-Log     |
+|                                                                                                  |
++--------------------------------------------------------------------------------------------------+
+|                                                                                                  |
+|  [SICHT 3: SICHERHEITS-GUARDS & PROZESSISOLATIONSEBENE]                                          |
+|  • Prozessbaum-Scanner: Präzise Erkennung von `Codex.exe`- und `ChatGPT.exe`-Store-Bäumen        |
+|  • Fail-Closed Ghost Reaper: Behebt blockierende Singleton-Locks ohne Unterbrechung aktiver Arbeit|
+|  • Runtime-MCP-Reaper: Entfernt veraltete Starter-Generationen unter Erhalt der aktiven Kohorte  |
+|  • Waisenprozess-Reaper: Erfordert toten Parent, 30m Karenzzeit und zweifache CPU-Idle-Messung   |
+|  • CLI-Sitzungs-Immunität (INV-SESSIM-04): Node-CLI und abgelöste `codex exec` strikt geschützt  |
+|  • Unprivilegierte Grenze (INV-NOELEV-02): Standard-Nutzermodus (RunAsInvoker), keine UAC-Prompts|
+|                                                                                                  |
++--------------------------------------------------------------------------------------------------+
+|                                                                                                  |
+|  [SICHT 4: SPEICHER- & INTEGRITÄTSEBENE]                                                         |
+|  • SQLite-Statusdatenbank: `state_5.sqlite` mit Gesprächsverläufen und Ausführungszustand        |
+|  • Pre-Mutation-Snapshots (INV-ATOMIC-05): Atomares Backup von DB + WAL + SHM Journaldateien     |
+|  • Kryptografisches Gate (INV-CRYPTO-06): Verbindliche `PRAGMA integrity_check`-Validierung      |
+|  • Datenbank-Optimierung: Sauberer WAL-Checkpoint & VACUUM-Kompaktierung                         |
+|  • JSON-Zustandssynchronisation: Transaktionales Verwalten ungelesener IDs im globalen State    |
+|                                                                                                  |
++==================================================================================================+
+|  [OFFLINE- & GOVERNANCE-PERIMETER]                                                               |
+|  • INV-LOCAL-01: 100% Zero-Egress lokale Ausführung      • INV-SLA-10: 487+ Tests grün & 48h SLA|
+|  • Level 1 SBOM Text-Begleitdatei (Stand 2026-10-08)     • Gesetzlicher Hinweis § 521 BGB        |
++==================================================================================================+
+```
+
+
 <a id="sec-03"></a><a id="complete-lifecycle-sequence"></a><a id="vollstaendiger-lebenszyklus-ablauf"></a><a id="vollständiger-lebenszyklus-ablauf"></a>
 ## Vollständiger Lebenszyklus-Ablauf
 
@@ -181,7 +234,7 @@ sequenceDiagram
 | **7. INV-GRACE-07 (Verbindliche Schutz-Karenzzeiten)**| Neue Prozesse und leere Threads erhalten garantierte Zeit zur Initialisierung | Feste 30-Minuten-Karenz für Waisen; 300s Mindestkarenz für leere Threads | Frühe Initialisierungsphasen werden niemals als hängende Reste fehlinterpretiert |
 | **8. INV-STAGGER-08 (Gestaffeltes Wiederanlaufen)** | System-Erholung überflutet Codex nicht mit gleichzeitigen Automationsstarts | Konfigurierbare Verzögerung (Standard: 60s-Fenster) via Safe-Start-Koordinator | Verhindert API-Rate-Limit-Überschreitungen und lokale CPU-Lastspitzen |
 | **9. INV-NONDEST-09 (Zerstörungsfreie AppX-Behebung)**| Microsoft-Store-Paketbehebung schützt persönliche Benutzerdaten | Begrenzte Eskalation: No-Admin-Bereinigung -> Admin-Vorschlag -> Store-Neuinstallationsseite | Automatische destruktive Resets oder Paket-Löschungen sind strikt untersagt |
-| **10. INV-SLA-10 (Strikte Verifikations-Parität)** | 100% grüne Testsuite, saubere Linter und synchrone Metadatenverträge | Automatisierte CI-Matrix, Pytest-Suite (391+ bestanden), Ruff und compileall | Jede Änderung erfordert vollständige fehlerfreie Verifikation vor Commit |
+| **10. INV-SLA-10 (Strikte Verifikations-Parität)** | 100% grüne Testsuite, saubere Linter und synchrone Metadatenverträge | Automatisierte CI-Matrix, Pytest-Suite (487+ bestanden | 100% grün), Ruff und compileall | Jede Änderung erfordert vollständige fehlerfreie Verifikation vor Commit |
 
 <a id="sec-05"></a><a id="target-personas--discoverability"></a><a id="zielgruppen--auffindbarkeit"></a>
 ## Zielgruppen & Auffindbarkeit
@@ -190,7 +243,7 @@ CareCenter for Codex ist für vier primäre Nutzergruppen im Windows-Desktop-Ent
 
 | Zielgruppe / Persona | Profil & Absicht | Primäres Problem | CareCenter-Lösung & Workflows |
 |---|---|---|---|
-| **1. Solo-Entwickler & KI-Ingenieure** | Power-User, die iterative Programmierzyklen mit OpenAI Codex Desktop unter Windows 10/11 durchführen. | Die App startet nach dem Schließen des Fensters lautlos nicht mehr, da blockierende Singleton-Locks oder Ghost-Prozesse hängen. | 1-Klick-Tray-Reparatur, automatische Bereinigung hängender Ghost-Prozesse (`Codex.exe` / `ChatGPT.exe`) und sicherer Neustart ohne Verlust des Arbeitskontexts. |
+| **1. Solo-Entwickler & KI-Ingenieure** | Power-User, die iterative Programmierzyklen mit OpenAI Codex Desktop unter Windows 10/11 durchführen. Mehrsprachige Teams (Deutsch, Englisch, Spanisch). | Die App startet nach dem Schließen des Fensters lautlos nicht mehr, da blockierende Singleton-Locks oder Ghost-Prozesse hängen. | 1-Klick-Tray-Reparatur, automatische Bereinigung hängender Ghost-Prozesse (`Codex.exe` / `ChatGPT.exe`), Tier-2 mehrsprachige Benutzeroberfläche und sicherer Neustart ohne Verlust des Arbeitskontexts. |
 | **2. DevOps & Tooling-Integratoren** | Ingenieure, die Entwicklerumgebungen, CI-Runner und Workstation-Wartungsskripte automatisieren. | Manuelles Beenden unterbricht laufende CLI-Sitzungen; UAC-Eingabeaufforderungen blockieren automatisierte Hintergrundläufe. | Unprivilegierte User-Mode-CLI (`codex-logwartung`), Fail-Closed CLI-Schutz (`INV-SESSIM-04`) und konsistenter Daemon-Loop. |
 | **3. Lokal-Erstmals- & Datenschutz-Verfechter** | Sicherheitsbewusste Entwickler, die vollständige Datenkontrolle und strikte lokale Ausführungsgrenzen verlangen. | Drittanbieter-Cleaner mit Telemetrie, invasiven Treibern und undurchsichtigen Cloud-Abhängigkeiten. | Strikte Zero-Egress-Architektur (`INV-LOCAL-01`), kein Netzwerkverkehr, vollständig transparente SQLite-VACUUM- und WAL-Checkpoints. |
 | **4. IT-Support & Systemadministratoren** | IT-Fachkräfte, die Windows-Entwickler-Workstations mit Store-Apps betreuen. | Beschädigte Store-AppX-Paketzustände, überlaufende Thread-Speicher (`state_5.sqlite`) und verwaiste Hintergrundprozesse. | Bounded Store-Reparatur-Eskalation, Pre-Mutation-Datenbank-Snapshots (`INV-ATOMIC-05`) und prüffähige Startup-Receipts. |
@@ -198,6 +251,7 @@ CareCenter for Codex ist für vier primäre Nutzergruppen im Windows-Desktop-Ent
 #### Suchbegriffe & Auffindbarkeit (High-Intent Keywords)
 - **Deutsch:** `OpenAI Codex Reparatur Windows`, `Codex Desktop startet nicht`, `Codex Singleton Lock bereinigen`, `hängende Codex Prozesse beenden`, `Codex SQLite Datenbank Wartung`, `PySide6 System Tray Werkzeug`, `Codex Hintergrundprozess Wächter`, `Lokal-Erstmals Desktop Werkzeug`
 - **Englisch:** `openai codex repair windows`, `codex desktop failed to start`, `codex singleton lock cleanup`, `kill hung codex process`, `codex sqlite vacuum maintenance`, `pyside6 tray developer tools`, `codex desktop background reaper`, `local-first zero-telemetry tray`
+- **Spanisch:** `reparación openai codex windows`, `codex desktop no inicia`, `limpiar bloqueo singleton codex`, `terminar procesos colgados codex`, `mantenimiento sqlite codex vacuum`, `utilidad bandeja pyside6`, `guardián procesos segundo plano codex`
 
 <a id="sec-06"></a><a id="comparative-matrix--alternatives"></a><a id="vergleichsmatrix--alternativen"></a>
 ## Vergleichsmatrix & Alternativen
@@ -215,7 +269,7 @@ Die folgende Matrix vergleicht CareCenter for Codex mit alternativen Betriebsans
 | **7. Safe-Start-Fallback & Start-Gating** | **Integriert** (`safe-start-for-codex`) | ❌ Keiner | ❌ Keiner | ❌ Keiner | ❌ Keiner |
 | **8. Asynchrones PySide6-Tray-UI** | **Reaktive QThread-Architektur** | Einfache Task-Manager-Ansicht | ❌ Nur Headless / Konsole | Proprietäre Schwergewichts-UI | Windows Store UI |
 | **9. MS Store AppX-Reparaturpfad** | **Begrenzte Eskalation & Diagnose** | Nur Beenden / Zurücksetzen | Manuelle PowerShell AppX-Befehle | ❌ Nicht unterstützt | Vollständige Store-Neuinstallation |
-| **10. Sicherheits-SLA & Vertragstests** | **48h SLA & 391+ Pytest-Suite** | Nicht zutreffend | ❌ Kein Test-Harnisch | ❌ Proprietärer Closed-Source | Closed-Source Binärdatei |
+| **10. Sicherheits-SLA & Vertragstests** | **48h SLA & 487+ Pytest-Suite (100% Grün)** | Nicht zutreffend | ❌ Kein Test-Harnisch | ❌ Proprietärer Closed-Source | Closed-Source Binärdatei |
 
 <a id="sec-07"></a><a id="sibling-ecosystem--partner-tools"></a><a id="geschwisterwerkzeuge--partner-oekosystem"></a><a id="geschwisterwerkzeuge--partner-ökosystem"></a>
 ## Geschwisterwerkzeuge & Partner-Ökosystem
@@ -239,7 +293,9 @@ Die folgende Matrix vergleicht CareCenter for Codex mit alternativen Betriebsans
 ## Funktionen
 
 - Hintergrund-Wächter: prüft alle 60 Sekunden auf alte Startblocker, abgelöste Runtime-Waisen und doppelte Runtime-MCP-Prozessgenerationen. Die Waisenbereinigung verlangt einen toten Parent, eine feste Karenzzeit von 30 Minuten und zwei CPU-Messpunkte. Allowlist-basierte MCP-Nodes und gängige Language-Server werden erfasst. Abgelöste `codex exec`-Läufe bleiben geschützt, solange CPU-Zeit wächst, ein Session-Rollout jünger als zwei Minuten ist oder ihr `--output-last-message`-Ziel noch fehlt. Jeder erfolgreiche Kill beendet den vollständigen Prozessbaum (`taskkill /T`) und schreibt Kind, letzte bekannte Parent-Identität und Kriterium in `app.log`. Eine lebende Parent-Beziehung bedeutet aktive Cohort und ist immer ein Nicht-Kill.
-- Spracheinstellung im Tray: Im Bereich Einstellungen kann zwischen Deutsch und Englisch gewechselt werden. Die Auswahl wird in `config.json` gespeichert und die sichtbare Tray-Oberfläche wird sofort neu beschriftet.
+- Mehrsprachige Spracheinstellung im Tray & Tier-2 Spanisch-Lokalisierung: Im Bereich Einstellungen kann zwischen Deutsch, Englisch und Spanisch gewechselt werden. Der Tier-2 Spanisch-Katalog (`es`) deckt alle 322 UI-Schlüssel mit einer 4-stufigen Fallback-Kette ab (`aktive Sprache -> en -> de -> Schlüssel`). Die Auswahl wird in `config.json` gespeichert und die sichtbare Tray-Oberfläche wird sofort neu beschriftet. Übersetzungs-Parität wird über das CLI `manage_translations.py` gesichert.
+- Multi-Resolution App-Icon- & Asset-Suite: Authentische 7-Layer Windows-ICO (16x16 bis 256x256 @ 32bpp RGBA), 1024x1024 Master-PNG, PWA Mobile-Suite (`icon-192.png`, `icon-512.png`, maskierbare Icons) und Microsoft Store Kacheln, sauber geladen über die Laufzeitkomponente `app_icon_loader.py` mit sicherem Headless-Fallback.
+- Zombie-Killer-Tray Daemon-Bridge: Integriert mit `zombie-killer-tray` für daemonisierte Hintergrundprozess-Überwachung, Schutz gegen nicht-positive PIDs und Ereignisprotokollierung ohne Administrator-Rechte.
 - Automatisierungssteuerung im Tray: alle aktuell aktiven Codex-Automatisierungen ausschalten, nur von CCC ausgeschaltete Automatisierungen wieder aktivieren oder Automatisierungen sofort beziehungsweise gestaffelt nacheinander einschalten. Der Abstand ist über `automation_stagger_delay_seconds` konfigurierbar (Standard: 60 Sekunden).
 - Thread-Postfachpflege: alle als gelesen markieren, ungelesene Threads älter als X Tage markieren und Threads nach einem getrennt einstellbaren Alter automatisch archivieren. Der Empty-Thread-Autofix wartet mindestens 300 Sekunden, damit neue CLI-/Desktop-Threads ihren ersten Schreibvorgang abschließen können. Änderungen werden bei Desktop- oder npm-Codex-CLI-Aktivität blockiert, unmittelbar vor Backup/Move erneut geprüft und nur mit Backups, atomarem State-Schreiben und transaktionaler Archivierung ausgeführt.
 - Die Audit-Bereinigung besitzt drei getrennte Modi `off` / `notify` / `auto` für doppelte MCP-Konfigurationseinträge, unter Windows unbrauchbare Plugins und leere Threads. Der manuelle Audit startet zusätzlich den konservativen Runtime-MCP-Reaper, auch wenn der Desktop-Renderer läuft; Änderungen an Konfiguration und Threads bleiben bis zum Schließen von Codex aufgeschoben.
@@ -451,7 +507,7 @@ CareCenter for Codex gewährleistet vollständige Lizenztransparenz und strikte 
 - **GUI-Subsystem:** Entwickelt mit **PySide6** (`>=6.7`), dynamisch eingebunden unter vollständiger Einhaltung der **GNU Lesser General Public License v3 (LGPL-3.0-only)**. Es werden keine Qt6/PySide6-Quelltexte modifiziert oder in proprietärer Form verteilt. Nutzer behalten die Freiheit, die installierten PySide6-Laufzeitbibliotheken zu ersetzen oder neu zu binden.
 - **Konfigurations-Engine:** Basiert auf **tomlkit** unter der **MIT-Lizenz**.
 - **Build- & Integrationswerkzeuge:** Safe-Start-Integration (`safe-start-for-codex`, MIT), zombie-killer-tray-Integration (`zombie-killer-tray`, MIT), PyInstaller-Kompilierung (GPLv2 mit PyInstaller-Ausnahme) und Hatchling (MIT).
-- **Audit- & Invarianten-Dokumentation:** Ein detaillierter Prüfbericht aller Laufzeit-, Entwicklungs- und Standardbibliotheks-Abhängigkeiten sowie der 10 Governance- und Sicherheits-Laufzeitinvarianten ist in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) dokumentiert. Das historische Textformat wird in [THIRD_PARTY_LICENSES.txt](THIRD_PARTY_LICENSES.txt) weitergeführt.
+- **Audit- & Invarianten-Dokumentation:** Ein detaillierter Prüfbericht aller Laufzeit-, Entwicklungs- und Standardbibliotheks-Abhängigkeiten sowie der 10 Governance- und Sicherheits-Laufzeitinvarianten ist in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) (Stand 2026-10-08) dokumentiert. Die kanonische Level 1 SBOM Text-Begleitdatei wird in [THIRD_PARTY_LICENSES.txt](THIRD_PARTY_LICENSES.txt) (Stand 2026-10-08) geführt.
 
 <a id="sec-17"></a><a id="development--license"></a><a id="entwicklung--lizenz"></a>
 ## Entwicklung & Lizenz
@@ -465,7 +521,7 @@ python -m ruff check src tests
 python -m compileall src tests
 ```
 
-Die Testsuite deckt Wartungssicherheit, Reparatur-Eskalation, Safe-Start-Integration, Automatisierungssteuerung, Store-Materialprüfung, Konfigurationsladen, i18n und persistente Tray-Sprachumschaltung ab.
+Die Testsuite deckt Wartungssicherheit, Reparatur-Eskalation, Safe-Start-Integration, Zombie-Killer-Tray-Überwachung, Automatisierungssteuerung, Store-Materialprüfung, Konfigurationsladen, Tier-2 i18n & Spanisch-Katalogparität, Multi-Resolution Asset-Laden und persistente Tray-Sprachumschaltung ab (487+ Tests bestanden | 100% grün).
 
 ### Lizenz
 

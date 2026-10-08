@@ -1,7 +1,7 @@
 # CareCenter for Codex
 
-> Last-checked: 2026-09-29
-> Test suite: 462 collected tests (460 passed, 2 skipped, verified 2026-09-29)
+> Last-checked: 2026-10-08
+> Test suite: 489 collected tests (487 passed, 2 skipped, verified 2026-10-08)
 
 CareCenter for Codex is an unofficial local Windows tray and CLI utility for
 maintaining the OpenAI Codex desktop app installation. It repairs failed
@@ -32,7 +32,15 @@ Important boundaries & Invariants (INV-LOCAL-01 through INV-SLA-10):
 - INV-GRACE-07: Mandatory grace windows (30m orphan grace, 300s empty thread floor).
 - INV-STAGGER-08: Staggered automation unpausing via Safe Start (60s default).
 - INV-NONDEST-09: Non-destructive Microsoft Store package repair escalation.
-- INV-SLA-10: Strict test parity (460+ tests) & 48-hour security response SLA.
+- INV-SLA-10: Strict test parity (487+ tests) & 48-hour security response SLA.
+- Multilingual Tier-2 Spanish support: complete 322-key translation catalog in
+  `locales/translations.json`, 4-stage fallback chain (`active -> en -> de -> key`),
+  and translation management CLI `manage_translations.py`.
+- Multi-resolution icon suite: authentic 7-layer Windows ICO (16px..256px),
+  1024px master PNG, PWA mobile icon set, and Microsoft Store tile assets loaded
+  via `app_icon_loader.py`.
+- Zombie Killer Tray bridge: subprocess daemon monitoring via
+  `zombie_killer_integration.py` with PID guards and non-elevation security.
 - `CARE_CENTER_EXCHANGE_CONTRACT.md` defines the versioned, privacy-minimized,
   one-way CareCenter -> BACH/OCEAN health snapshot. It is a schema boundary, not
   a runtime transport, inbound command channel, or grant of repair authority.
@@ -79,7 +87,7 @@ Verification:
 - python -m compileall -q src tests
 - python -m ruff check src tests
 - python -m pytest -q
-- Current local verification: 462 collected tests (460 passed, 2 skipped) pass on Python 3.12 (2026-09-29)
+- Current local verification: 489 collected tests (487 passed, 2 skipped) pass on Python 3.12 (2026-10-08)
 
 Public documentation:
 - README.md: overview, install, usage, 18-point navigation, target personas, comparative matrix, § 521 BGB disclaimer

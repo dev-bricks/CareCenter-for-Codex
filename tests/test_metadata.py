@@ -80,7 +80,7 @@ def test_llms_txt_and_docs_sync() -> None:
     assert llms_path.is_file()
 
     content = llms_path.read_text(encoding="utf-8")
-    assert ("Last-checked: 2026-09-29" in content or "Last-checked: 2026-09-21" in content)
+    assert ("Last-checked: 2026-10-08" in content or "Last-checked: 2026-09-29" in content or "Last-checked: 2026-09-21" in content)
     assert "https://github.com/dev-bricks/CareCenter-for-Codex" in content
     assert "carecenter-for-codex" in content
 
@@ -102,8 +102,8 @@ def test_readme_badges_consistency() -> None:
         assert ("Security%20SLA" in readme or "Sicherheits--SLA" in readme)
         assert ("code%20style-ruff" in readme or "Code--Stil-ruff" in readme)
         assert ("Third--Party%20Licenses-Audited" in readme or "Drittanbieter--Lizenzen-Gepr" in readme)
-        assert ("Last--Checked-2026--09--29" in readme or "Gepr%C3%BCft-2026--09--29" in readme or "Last--Checked-2026--09--21" in readme or "Gepr%C3%BCft-2026--09--21" in readme)
-        assert ("Tests-460" in readme or "Tests-413" in readme)
+        assert ("Last--Checked-2026--10--08" in readme or "Gepr%C3%BCft-2026--10--08" in readme or "Last--Checked-2026--09--29" in readme or "Gepr%C3%BCft-2026--09--29" in readme or "Last--Checked-2026--09--21" in readme or "Gepr%C3%BCft-2026--09--21" in readme)
+        assert ("Tests-489" in readme or "Tests-487" in readme or "Tests-460" in readme or "Tests-413" in readme)
 
 
 def test_quick_navigation_anchors_parity() -> None:
@@ -502,8 +502,8 @@ def test_third_party_licenses_audit_recency_and_format_deps() -> None:
     md_text = md_path.read_text(encoding="utf-8")
     txt_text = txt_path.read_text(encoding="utf-8")
 
-    assert "Audit Date:** 2026-09-29" in md_text or "Audit Date:** 2026-09-21" in md_text
-    assert "Last checked: 2026-09-29" in txt_text or "Last checked: 2026-09-21" in txt_text
+    assert "Audit Date:** 2026-10-08" in md_text or "Audit Date:** 2026-09-29" in md_text or "Audit Date:** 2026-09-21" in md_text
+    assert "Last checked: 2026-10-08" in txt_text or "Last checked: 2026-09-29" in txt_text or "Last checked: 2026-09-21" in txt_text
     assert "NOTICE" in md_text
     assert "NOTICE" in txt_text
     assert "rfc3339-validator" in md_text
@@ -644,7 +644,7 @@ def test_level1_sbom_plaintext_companion_invariants() -> None:
     assert txt_path.is_file()
 
     content = txt_path.read_text(encoding="utf-8")
-    assert "Last checked: 2026-09-29" in content
+    assert ("Last checked: 2026-10-08" in content or "Last checked: 2026-09-29" in content)
     assert "Level 1 Software Bill of Materials (SBOM)" in content
 
     invariants = [
@@ -717,3 +717,34 @@ def test_changelog_and_marketing_log_pfad_a_20260929() -> None:
     assert "## Date: 2026-09-29" in marketing
     assert "dev-bricks/CareCenter-for-Codex" in marketing
     assert "Level 1 SBOM Plain-Text Companion" in marketing
+
+
+def test_changelog_and_marketing_log_pfad_b_20261008() -> None:
+    """Verify CHANGELOG.md and MARKETING-LOG.txt contain 2026-10-08 Pfad B entries."""
+    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    marketing = (ROOT / "MARKETING-LOG.txt").read_text(encoding="utf-8")
+
+    assert "Discoverability, ASCII 4-View Topology, Spanish i18n & Asset Suite Showcase (2026-10-08) [Pfad B]" in changelog
+    assert "## Date: 2026-10-08" in marketing
+    assert "dev-bricks/CareCenter-for-Codex" in marketing
+    assert "Visual Four-View Architectural Topology" in marketing
+
+
+def test_four_view_ascii_topology_and_tier2_i18n_parity() -> None:
+    """Verify ASCII 4-View topology and Spanish Tier-2 i18n discoverability across documentation."""
+    readme_en = (ROOT / "README.md").read_text(encoding="utf-8")
+    readme_de = (ROOT / "README.de.md").read_text(encoding="utf-8")
+
+    for readme in (readme_en, readme_de):
+        assert "CARECENTER FOR CODEX" in readme
+        assert "FOUR-VIEW TOPOLOGY" in readme or "VIER-SICHTEN-TOPOLOGIE" in readme
+        assert "VIEW 1" in readme or "SICHT 1" in readme
+        assert "VIEW 2" in readme or "SICHT 2" in readme
+        assert "VIEW 3" in readme or "SICHT 3" in readme
+        assert "VIEW 4" in readme or "SICHT 4" in readme
+        assert "state_5.sqlite" in readme
+        assert "RunAsInvoker" in readme
+        assert "Zombie Killer Tray" in readme or "Zombie-Killer-Tray" in readme
+
+    assert "reparación openai codex windows" in readme_en
+    assert "reparación openai codex windows" in readme_de

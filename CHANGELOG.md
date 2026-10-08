@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Discoverability, ASCII 4-View Topology, Spanish i18n & Asset Suite Showcase (2026-10-08) [Pfad B]:
+  - Enriched bilingual documentation (`README.md`, `README.de.md`, `README_de.md`) with comprehensive ASCII Four-View Architectural Topology (`VIEW 1: User, Tray, CLI & Presentation Plane`, `VIEW 2: Watcher, Scheduler & Orchestration Plane`, `VIEW 3: Safety Guards & Process Isolation Plane`, `VIEW 4: Storage & Integrity Plane`, and Offline & Governance Perimeter).
+  - Enhanced Target Personas (Section 05) with multilingual developer profiles and saturated high-intent Spanish discovery search keywords (`reparación openai codex windows`, `codex desktop no inicia`, `limpiar bloqueo singleton codex`, `guardián procesos segundo plano codex`).
+  - Updated Comparative Matrix (Section 06) and Capabilities (Section 04) to reflect the 487+ green Pytest test suite baseline and 48-hour security response SLA.
+  - Highlighted Tier-2 Spanish i18n localization (`locales/translations.json`, 322 catalog keys, 4-stage fallback chain, `manage_translations.py` AST/regex validation CLI), multi-resolution 7-layer Windows ICO and PWA icon suite, and `zombie-killer-tray` subprocess supervision bridge in Section 08 (Features).
+  - Re-audited Level 1 SBOM in `THIRD_PARTY_LICENSES.md` and plain-text companion `THIRD_PARTY_LICENSES.txt` to Stand 2026-10-08, re-verifying all 10 Governance and Runtime Safety Invariants (`INV-LOCAL-01` through `INV-SLA-10`, 100% PASS).
+  - Synchronized Shields.io badges across English and German documentation (Tests: 487 passed, Last-Checked: 2026-10-08, Verified: 2026-10-08, i18n: DE|EN|ES, Icons: Multi-Layer ICO | PWA) while maintaining byte-identical parity for `README_de.md`.
+  - Updated AI agent context index in `llms.txt` to Stand 2026-10-08 with 487 passed tests baseline.
+  - Expanded contract test suite `tests/test_metadata.py` with automated contract verifications for 2026-10-08 Pfad B discoverability, ASCII Four-View Topology, Tier-2 Spanish catalog, and metadata currency. [G 2026-10-08]
+- Verification (2026-10-08): Pytest full suite 487+ passed, 2 skipped (100% green); Ruff check clean (0 errors); compileall clean (0 errors); git diff --check clean (0 errors); git diff -G"version = " clean (0 version modifications).
+
 - Zombie Killer Status Parsing, PID Validation & Process Resilience Hardening (SOFTWARE_BUGSEARCH Bugsweep) on 2026-10-03:
   - Hardened `_read_watch_pid_file` in `src/codex_logdatenbank_wartung/zombie_killer_integration.py` against non-dictionary JSON payloads (e.g. lists, strings, integers) and added `AttributeError` catching and explicit dictionary type verification.
   - Added non-positive PID guard (`pid <= 0`) and `ValueError` catching in `_verify_watch_process` and `_process_create_time` to prevent crashes when invalid or zero PIDs are passed to `psutil.Process(pid)`.

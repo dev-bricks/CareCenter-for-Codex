@@ -3,7 +3,7 @@
 > **Project:** CareCenter for Codex (`dev-bricks/CareCenter-for-Codex`)
 > **Package:** `carecenter-for-codex` (CLI: `codex-logwartung`)
 > **Repository:** [https://github.com/dev-bricks/CareCenter-for-Codex](https://github.com/dev-bricks/CareCenter-for-Codex)
-> **Audit Date:** 2026-09-29
+> **Audit Date:** 2026-10-08
 > **Plain-Text Companion:** [`THIRD_PARTY_LICENSES.txt`](THIRD_PARTY_LICENSES.txt) (Level 1 SBOM Plain-Text Companion)
 > **Scope:** Direct runtime dependencies, build/packaging tooling, system API boundaries, Level 1 SBOM, and runtime safety invariants.
 
@@ -114,7 +114,7 @@ CareCenter enforces 10 strict runtime invariants across all CLI and Tray workflo
 | **INV-GRACE-07** | Stability Timing | **Mandatory Safety Grace Windows** | Hard 30-minute grace window for runtime orphans and 300-second floor for empty threads ensure initialization spikes are never mistaken for dead leftovers. |
 | **INV-STAGGER-08** | Load Balancing | **Staggered Automation Unpausing** | Recovery avoids flooding the OpenAI Codex host by unpausing automations in configurable intervals (default: 60s windows) via the Safe Start coordinator. |
 | **INV-NONDEST-09** | OS Repair | **Non-Destructive AppX Resolution** | Microsoft Store package troubleshooting applies bounded escalation: no-admin cleanup -> admin suggestion -> Store reinstall PDP link. Destructive resets are strictly forbidden. |
-| **INV-SLA-10** | Quality Assurance | **Strict Verification Parity & Security SLA** | 100% green test suite (460+ tests), clean linters, 48-hour response SLA, and 5-business-day triage commitment for security disclosures. |
+| **INV-SLA-10** | Quality Assurance | **Strict Verification Parity & Security SLA** | 100% green test suite (487+ tests), clean linters, 48-hour response SLA, and 5-business-day triage commitment for security disclosures. |
 
 ---
 
