@@ -37,7 +37,7 @@ Windows-Werkzeug.
 - Keine Verwaltung der Codex-CLI außerhalb der dafür sicheren Prüfpfade
 
 ### Schlüsselwörter
-Codex, Windows, Tray, Store, SQLite, Wartung, Reparatur, AppX, Offline, Developer Tools
+codex, tray, sqlite, wartung, reparatur, prozess, offline
 
 ### Kategorie
 Developer Tools
@@ -79,7 +79,7 @@ focused Windows utility, not a cross-platform tray clone.
 - No unsafe manipulation of the Codex CLI
 
 ### Keywords
-Codex, Windows, tray, Store, SQLite, maintenance, repair, AppX, offline, developer tools
+codex, tray, sqlite, maintenance, repair, process, offline
 
 ### Category
 Developer Tools

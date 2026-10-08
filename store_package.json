@@ -6,9 +6,21 @@
   "version": "0.8.0.0",
   "description": "Lokales Windows-Tray- und CLI-Werkzeug zur Offline-Reparatur und Wartung der Codex-Desktop-App.",
   "executable": "CareCenterForCodex.exe",
+  "execution_alias": "carecenter.exe",
   "capabilities": "runFullTrust",
   "category": "Developer Tools",
   "age_rating": "3+",
+  "license": "MIT",
+  "languages": [
+    "de-DE",
+    "en-US",
+    "es-ES",
+    "zh-CN",
+    "ja-JP",
+    "ru-RU"
+  ],
   "privacy_url": "https://dev-bricks.github.io/CareCenter-for-Codex/privacy",
-  "support_url": "https://dev-bricks.github.io/CareCenter-for-Codex/support"
+  "support_url": "https://dev-bricks.github.io/CareCenter-for-Codex/support",
+  "logo": "store_assets/StoreLogo.png",
+  "store_assets_dir": "store_assets"
 }

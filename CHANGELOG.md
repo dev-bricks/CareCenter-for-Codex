@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- Windows Store Readiness Audit & Packaging Staging (SOFTWARE_STORE_READINESS_CHECK) on 2026-10-08:
+  - Hardened `store_package.json` with execution alias `carecenter.exe`, `license: MIT`, Tier-2 6 languages (`de-DE`, `en-US`, `es-ES`, `zh-CN`, `ja-JP`, `ru-RU`), canonical logo `store_assets/StoreLogo.png`, and `store_assets_dir`.
+  - Hardened Desktop-Bridge `AppxManifest.xml` (root and `store_package/CareCenter for Codex/AppxManifest.xml`) with canonical 50x50 `<Logo>icons\\StoreLogo.png</Logo>`, `TargetDeviceFamily Windows.Desktop` (MinVersion `10.0.17763.0`, MaxVersionTested `10.0.26100.0`), execution alias `carecenter.exe`, and 6-language resources.
+  - Updated `src/codex_logdatenbank_wartung/store_release.py` manifest generator to dynamically support `StoreLogo.png`, execution alias, and multi-language resource blocks while preserving backward compatibility.
+  - Harmonized `STORE_LISTING.md` keywords to strictly 7 per language adhering to Microsoft Store Policy 10.1.3 (DE: `codex, tray, sqlite, wartung, reparatur, prozess, offline`; EN: `codex, tray, sqlite, maintenance, repair, process, offline`) with authentic German umlauts and zero trademark violations.
+  - Built complete release packaging staging under `releases/windowsstore/` (`BUILD.md`, `WACK_PROTOCOL.md`, `store_settings.json`, `store_listing_de.md`, `store_listing_en.md`, `StoreLogo.png`, multi-resolution tile set, screenshots, and test reports).
+  - Generated 4 full-HD 1920x1080 (16:9) Store presentation screenshots (`01_dashboard_status.png`, `02_database_maintenance.png`, `03_process_cleanup.png`, `04_audit_settings.png` plus dash and shot aliases) under `releases/windowsstore/screenshots/` and `screenshots/store/`.
+  - Implemented WACK runner `scripts/run_windows_wack.py` and generated hermetic WACK preflight report (`wack_preflight_20261008.xml` and `.json`, 6 PASS / 0 FAIL / 0 WARNING).
+  - Implemented 6-stage preflight auditor `scripts/check_store_readiness.py` (AUDIT PASSED, 6/6 checks OK).
+  - Implemented comprehensive contract test suite `tests/test_store_materials.py` (11/11 passed, 100% green).
+  - Updated `WINDOWS_STORE_PREP.md` with complete audit status, packaging staging documentation, and next submission steps. [G 2026-10-08]
+- Verification (2026-10-08): Pytest full suite 500 passed, 2 skipped (100% green); Ruff check clean (0 errors); compileall clean (0 errors); git diff --check clean (0 errors).
+
 - Discoverability, ASCII 4-View Topology, Spanish i18n & Asset Suite Showcase (2026-10-08) [Pfad B]:
   - Enriched bilingual documentation (`README.md`, `README.de.md`, `README_de.md`) with comprehensive ASCII Four-View Architectural Topology (`VIEW 1: User, Tray, CLI & Presentation Plane`, `VIEW 2: Watcher, Scheduler & Orchestration Plane`, `VIEW 3: Safety Guards & Process Isolation Plane`, `VIEW 4: Storage & Integrity Plane`, and Offline & Governance Perimeter).
   - Enhanced Target Personas (Section 05) with multilingual developer profiles and saturated high-intent Spanish discovery search keywords (`reparación openai codex windows`, `codex desktop no inicia`, `limpiar bloqueo singleton codex`, `guardián procesos segundo plano codex`).

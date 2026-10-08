@@ -1,0 +1,46 @@
+{
+  "app_name": "CareCenter for Codex",
+  "msix_name": "CareCenterForCodex.msix",
+  "publisher": "CN=52596601-BAB4-4F3F-B182-E8F3F273B202",
+  "publisher_display": "Lukas Geiger",
+  "identity_name": "LukasGeiger.CareCenterForCodex",
+  "version": "0.8.0.0",
+  "package_version": "0.8.0.0",
+  "executable": "CareCenterForCodex.exe",
+  "execution_alias": "carecenter.exe",
+  "capabilities": "runFullTrust",
+  "category": "Developer Tools",
+  "age_rating": "3+",
+  "license": "MIT",
+  "pricing": "free",
+  "languages": [
+    "de-DE",
+    "en-US",
+    "es-ES",
+    "zh-CN",
+    "ja-JP",
+    "ru-RU"
+  ],
+  "privacy_url": "https://dev-bricks.github.io/CareCenter-for-Codex/privacy",
+  "support_url": "https://dev-bricks.github.io/CareCenter-for-Codex/support",
+  "store_assets_dir": "store_assets",
+  "manifest_template": "store_package/CareCenter for Codex/AppxManifest.xml",
+  "keywords_de": [
+    "codex",
+    "tray",
+    "sqlite",
+    "wartung",
+    "reparatur",
+    "prozess",
+    "offline"
+  ],
+  "keywords_en": [
+    "codex",
+    "tray",
+    "sqlite",
+    "maintenance",
+    "repair",
+    "process",
+    "offline"
+  ]
+}

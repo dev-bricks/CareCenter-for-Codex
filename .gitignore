@@ -1,7 +1,9 @@
 # --- Build / packaging artifacts ---
 build/
 dist/
-store_package/
+releases/*.msix
+releases/*.exe
+releases/*.zip
 _site/
 *.spec
 *.py[cod]

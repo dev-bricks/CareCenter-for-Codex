@@ -13,18 +13,22 @@
   <Properties>
     <DisplayName>CareCenter for Codex</DisplayName>
     <PublisherDisplayName>Lukas Geiger</PublisherDisplayName>
-    <Logo>icons\Square150x150Logo.png</Logo>
+    <Logo>icons\StoreLogo.png</Logo>
     <Description>Lokales Windows-Tray- und CLI-Werkzeug zur Offline-Reparatur und Wartung der Codex-Desktop-App.</Description>
   </Properties>
   <Resources>
     <Resource Language="de-DE" />
     <Resource Language="en-US" />
+    <Resource Language="es-ES" />
+    <Resource Language="zh-CN" />
+    <Resource Language="ja-JP" />
+    <Resource Language="ru-RU" />
   </Resources>
   <Dependencies>
     <TargetDeviceFamily
       Name="Windows.Desktop"
       MinVersion="10.0.17763.0"
-      MaxVersionTested="10.0.22621.0" />
+      MaxVersionTested="10.0.26100.0" />
   </Dependencies>
   <Capabilities>
     <rescap:Capability Name="runFullTrust" />
@@ -44,6 +48,11 @@
           Wide310x150Logo="icons\Wide310x150Logo.png"
           Square310x310Logo="icons\Square310x310Logo.png" />
       </uap:VisualElements>
+      <Extensions>
+        <desktop:Extension Category="windows.executionAlias">
+          <desktop:ExecutionAlias Executable="CareCenterForCodex.exe" Alias="carecenter.exe" />
+        </desktop:Extension>
+      </Extensions>
     </Application>
   </Applications>
 </Package>

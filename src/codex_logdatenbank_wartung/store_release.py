@@ -653,6 +653,22 @@ def generate_appx_manifest(
     publisher_display = xml_value("publisher_display")
     description = xml_value("description")
     executable = xml_value("executable")
+    execution_alias = xml_value("execution_alias")
+    logo_filename = "StoreLogo.png" if (project_root / STORE_ASSET_SOURCE_DIR / "StoreLogo.png").exists() else "Square150x150Logo.png"
+    configured_langs = payload.get("languages")
+    if isinstance(configured_langs, list) and configured_langs:
+        resources_xml = "\n".join(f'    <Resource Language="{escape(str(lang))}" />' for lang in configured_langs)
+    else:
+        resources_xml = '    <Resource Language="de-DE" />\n    <Resource Language="en-US" />'
+
+    extensions_block = ""
+    if execution_alias:
+        extensions_block = f"""      <Extensions>
+        <desktop:Extension Category="windows.executionAlias">
+          <desktop:ExecutionAlias Executable="{executable}" Alias="{execution_alias}" />
+        </desktop:Extension>
+      </Extensions>
+"""
 
     manifest_xml = f"""<?xml version="1.0" encoding="utf-8"?>
 <Package
@@ -669,18 +685,17 @@ def generate_appx_manifest(
   <Properties>
     <DisplayName>{app_name}</DisplayName>
     <PublisherDisplayName>{publisher_display}</PublisherDisplayName>
-    <Logo>icons\\Square150x150Logo.png</Logo>
+    <Logo>icons\\{logo_filename}</Logo>
     <Description>{description}</Description>
   </Properties>
   <Resources>
-    <Resource Language="de-DE" />
-    <Resource Language="en-US" />
+{resources_xml}
   </Resources>
   <Dependencies>
     <TargetDeviceFamily
       Name="Windows.Desktop"
       MinVersion="10.0.17763.0"
-      MaxVersionTested="10.0.22621.0" />
+      MaxVersionTested="10.0.26100.0" />
   </Dependencies>
   <Capabilities>
     <rescap:Capability Name="runFullTrust" />
@@ -700,7 +715,7 @@ def generate_appx_manifest(
           Wide310x150Logo="icons\\Wide310x150Logo.png"
           Square310x310Logo="icons\\Square310x310Logo.png" />
       </uap:VisualElements>
-    </Application>
+{extensions_block}    </Application>
   </Applications>
 </Package>
 """
