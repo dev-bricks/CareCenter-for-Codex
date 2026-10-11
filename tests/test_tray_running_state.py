@@ -40,6 +40,8 @@ def _mock_pyside6():
     qt_gui = mocks["PySide6.QtGui"]
     qt_gui.QAction = MagicMock
     qt_gui.QIcon = MagicMock
+    qt_gui.QKeySequence = MagicMock
+    qt_gui.QShortcut = MagicMock
 
     qt_widgets = mocks["PySide6.QtWidgets"]
     qt_widgets.QApplication = MagicMock
@@ -51,12 +53,16 @@ def _mock_pyside6():
     qt_widgets.QMenu = MagicMock
     qt_widgets.QProgressBar = MagicMock
     qt_widgets.QPushButton = MagicMock
+    qt_widgets.QAbstractItemView = MagicMock
+    qt_widgets.QDialog = _FakeQObject
     qt_widgets.QSpinBox = MagicMock
     qt_widgets.QStyle = MagicMock()
     fake_tray_icon = MagicMock()
     fake_tray_icon.MessageIcon = MagicMock()
     fake_tray_icon.ActivationReason = MagicMock()
     qt_widgets.QSystemTrayIcon = fake_tray_icon
+    qt_widgets.QTreeWidget = MagicMock
+    qt_widgets.QTreeWidgetItem = MagicMock
     qt_widgets.QVBoxLayout = MagicMock
     qt_widgets.QWidget = _FakeQObject
 

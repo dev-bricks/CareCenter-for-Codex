@@ -1626,5 +1626,165 @@
     "de": "Codex gestartet, aber Fenster (Renderer) nicht innerhalb {seconds}s erkannt. {message}",
     "en": "Codex started, but no window (renderer) appeared within {seconds}s. {message}",
     "es": "Codex iniciado, pero no se detectó ventana (renderer) en {seconds}s. {message}"
+  },
+  "shortcuts_dialog_title": {
+    "de": "Tastaturkürzel & Barrierefreiheit (WCAG 2.1 AA / BITV 2.0)",
+    "en": "Keyboard Shortcuts & Accessibility (WCAG 2.1 AA / BITV 2.0)",
+    "es": "Atajos de teclado y accesibilidad (WCAG 2.1 AA / BITV 2.0)",
+    "zh": "键盘快捷键与无障碍 (WCAG 2.1 AA / BITV 2.0)",
+    "ja": "キーボードショートカットとアクセシビリティ (WCAG 2.1 AA / BITV 2.0)",
+    "ru": "Сочетания клавиш и доступность (WCAG 2.1 AA / BITV 2.0)"
+  },
+  "shortcuts_dialog_desc": {
+    "de": "Übersicht aller verfügbaren Tastenkombinationen und Barrierefreiheitsfunktionen.",
+    "en": "Overview of all available key combinations and accessibility features.",
+    "es": "Resumen de todas las combinaciones de teclas y funciones de accesibilidad disponibles.",
+    "zh": "所有可用键组合和无障碍功能概览。",
+    "ja": "利用可能なすべてのキーの組み合わせとアクセシビリティ機能の概要。",
+    "ru": "Обзор всех доступных комбинаций клавиш и функций доступности."
+  },
+  "shortcuts_action_header": {
+    "de": "Aktion",
+    "en": "Action",
+    "es": "Acción",
+    "zh": "操作",
+    "ja": "アクション",
+    "ru": "Действие"
+  },
+  "shortcuts_key_header": {
+    "de": "Tastenkürzel",
+    "en": "Shortcut",
+    "es": "Atajo",
+    "zh": "快捷键",
+    "ja": "ショートカット",
+    "ru": "Сочетание клавиш"
+  },
+  "shortcuts_cat_nav": {
+    "de": "Navigation & Fenster",
+    "en": "Navigation & Window",
+    "es": "Navegación y ventana",
+    "zh": "导航与窗口",
+    "ja": "ナビゲーションとウィンドウ",
+    "ru": "Навигация и окно"
+  },
+  "shortcuts_cat_repair": {
+    "de": "Reparatur & Diagnose",
+    "en": "Repair & Diagnosis",
+    "es": "Reparación y diagnóstico",
+    "zh": "修复与诊断",
+    "ja": "修復と診断",
+    "ru": "Восстановление и диагностика"
+  },
+  "shortcuts_cat_maint": {
+    "de": "Wartung & Automatisierung",
+    "en": "Maintenance & Automation",
+    "es": "Mantenimiento y automatización",
+    "zh": "维护与自动化",
+    "ja": "メンテナンスと自動化",
+    "ru": "Обслуживание и автоматизация"
+  },
+  "shortcuts_cat_config": {
+    "de": "Einstellungen & Audit",
+    "en": "Settings & Audit",
+    "es": "Configuración y auditoría",
+    "zh": "设置与审核",
+    "ja": "設定と監査",
+    "ru": "Настройки и аудит"
+  },
+  "shortcuts_a11y_notice": {
+    "de": "Barrierefreiheit nach WCAG 2.1 AA und BITV 2.0: Volle Tastaturbedienbarkeit, Screenreader-Unterstützung (Accessible Names & Descriptions), Kontrastoptimierung und Tab-Fokusnavigation.",
+    "en": "Accessibility conforming to WCAG 2.1 AA and BITV 2.0: Full keyboard operability, screen reader support (Accessible Names & Descriptions), contrast optimization, and Tab focus navigation.",
+    "es": "Accesibilidad conforme a WCAG 2.1 AA y BITV 2.0: Operabilidad total por teclado, soporte de lector de pantalla, optimización de contraste y navegación Tab.",
+    "zh": "符合 WCAG 2.1 AA 和 BITV 2.0 无障碍标准：全键盘操作、屏幕朗读器支持、对比度优化和 Tab 焦点导航。",
+    "ja": "WCAG 2.1 AA および BITV 2.0 準拠のアクセシビリティ：完全なキーボード操作、スクリーンリーダー対応、コントラスト最適化、Tabフォーカスナビゲーション。",
+    "ru": "Доступность по стандартам WCAG 2.1 AA и BITV 2.0: Полное управление с клавиатуры, поддержка программ чтения с экрана, оптимизация контраста и навигация Tab."
+  },
+  "shortcuts_btn_close": {
+    "de": "Schließen",
+    "en": "Close",
+    "es": "Cerrar",
+    "zh": "关闭",
+    "ja": "閉じる",
+    "ru": "Закрыть"
+  },
+  "shortcuts_btn_help": {
+    "de": "Tastenkürzel & Hilfe",
+    "en": "Shortcuts & Help",
+    "es": "Atajos y ayuda",
+    "zh": "快捷键与帮助",
+    "ja": "ショートカットとヘルプ",
+    "ru": "Сочетания и справка"
+  },
+  "shortcuts_btn_help_tooltip": {
+    "de": "Öffnet die Übersicht aller Tastenkürzel und Barrierefreiheitsfunktionen (F1).",
+    "en": "Opens the overview of all keyboard shortcuts and accessibility features (F1).",
+    "es": "Abre la vista general de todos los atajos de teclado y funciones de accesibilidad (F1).",
+    "zh": "打开所有键盘快捷键和无障碍功能概览 (F1)。",
+    "ja": "すべてのキーボードショートカットとアクセシビリティ機能の概要を開きます (F1)。",
+    "ru": "Открывает обзор всех сочетаний клавиш и функций доступности (F1)."
+  },
+  "about_dialog_title": {
+    "de": "Über CareCenter for Codex",
+    "en": "About CareCenter for Codex",
+    "es": "Acerca de CareCenter for Codex",
+    "zh": "关于 CareCenter for Codex",
+    "ja": "CareCenter for Codex について",
+    "ru": "О программе CareCenter for Codex"
+  },
+  "about_dialog_text": {
+    "de": "CareCenter for Codex (Version {version})\n\nLokales Wartungs-, Diagnose- und Reparaturzentrum für OpenAI Codex auf Windows.\n\n• Local-First & Zero-Egress Architektur\n• Barrierefreiheit nach WCAG 2.1 AA & BITV 2.0\n• Lizenz: MIT-Lizenz (Open Source)\n• Autor: Lukas Geiger (support@lukasgeiger.com)",
+    "en": "CareCenter for Codex (Version {version})\n\nLocal maintenance, diagnosis and repair utility for OpenAI Codex on Windows.\n\n• Local-First & Zero-Egress Architecture\n• Accessibility according to WCAG 2.1 AA & BITV 2.0\n• License: MIT License (Open Source)\n• Author: Lukas Geiger (support@lukasgeiger.com)",
+    "es": "CareCenter for Codex (Versión {version})\n\nCentro local de mantenimiento, diagnóstico y reparación para OpenAI Codex en Windows.\n\n• Arquitectura Local-First y Zero-Egress\n• Accesibilidad según WCAG 2.1 AA y BITV 2.0\n• Licencia: Licencia MIT (Código abierto)\n• Autor: Lukas Geiger (support@lukasgeiger.com)",
+    "zh": "CareCenter for Codex (版本 {version})\n\nWindows 上 OpenAI Codex 的本地维护、诊断与修复中心。\n\n• 本地优先与零外发架构\n• 符合 WCAG 2.1 AA 和 BITV 2.0 无障碍标准\n• 许可证：MIT 许可证 (开源)\n• 作者：Lukas Geiger (support@lukasgeiger.com)",
+    "ja": "CareCenter for Codex (バージョン {version})\n\nWindows 上の OpenAI Codex 向けローカルメンテナンス・診断・修復ツール。\n\n• ローカルファースト＆ゼロエグレス アーキテクチャ\n• WCAG 2.1 AA および BITV 2.0 準拠のアクセシビリティ\n• ライセンス：MIT ライセンス (オープンソース)\n• 開発者：Lukas Geiger (support@lukasgeiger.com)",
+    "ru": "CareCenter for Codex (Версия {version})\n\nЛокальный центр обслуживания, диагностики и восстановления OpenAI Codex для Windows.\n\n• Архитектура Local-First и Zero-Egress\n• Доступность по стандартам WCAG 2.1 AA и BITV 2.0\n• Лицензия: MIT License (Open Source)\n• Автор: Lukas Geiger (support@lukasgeiger.com)"
+  },
+  "progress_bar_a11y_name": {
+    "de": "Fortschrittsbalken",
+    "en": "Progress bar",
+    "es": "Barra de progreso",
+    "zh": "进度条",
+    "ja": "プログレスバー",
+    "ru": "Индикатор выполнения"
+  },
+  "progress_bar_a11y_desc": {
+    "de": "Zeigt den aktuellen Fortschritt des laufenden Wartungs- oder Reparaturvorgangs an.",
+    "en": "Displays the current progress of the ongoing maintenance or repair operation.",
+    "es": "Muestra el progreso actual de la operación de mantenimiento o reparación en curso.",
+    "zh": "显示当前正在进行的维护或修复操作的进度。",
+    "ja": "進行中のメンテナンスまたは修復操作の現在の進捗状況を表示します。",
+    "ru": "Отображает текущий ход выполняемой операции обслуживания или восстановления."
+  },
+  "state_label_a11y_name": {
+    "de": "Aktueller Systemstatus",
+    "en": "Current system status",
+    "es": "Estado actual del sistema",
+    "zh": "当前系统状态",
+    "ja": "現在のシステム状態",
+    "ru": "Текущее состояние системы"
+  },
+  "zombie_label_a11y_name": {
+    "de": "Codex-Prozesszähler",
+    "en": "Codex process counter",
+    "es": "Contador de procesos de Codex",
+    "zh": "Codex 进程计数器",
+    "ja": "Codex プロセスカウンター",
+    "ru": "Счётчик процессов Codex"
+  },
+  "detail_label_a11y_name": {
+    "de": "Fortschrittsdetails",
+    "en": "Progress details",
+    "es": "Detalles del progreso",
+    "zh": "进度详情",
+    "ja": "進捗の詳細",
+    "ru": "Подробности выполнения"
+  },
+  "result_label_a11y_name": {
+    "de": "Letztes Operationsergebnis",
+    "en": "Last operation result",
+    "es": "Resultado de la última operación",
+    "zh": "上次操作结果",
+    "ja": "前回の操作結果",
+    "ru": "Результат последней операции"
   }
 }

@@ -6,15 +6,24 @@ Aktionsknöpfen und Einstellungsbereich bereit.
 
 from __future__ import annotations
 
+import os
+import re
+
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
+    QAbstractItemView,
+    QApplication,
     QComboBox,
+    QDialog,
     QGroupBox,
     QHBoxLayout,
     QLabel,
     QProgressBar,
     QPushButton,
     QSpinBox,
+    QTreeWidget,
+    QTreeWidgetItem,
     QVBoxLayout,
     QWidget,
 )
@@ -69,11 +78,11 @@ class StatusWindow(QWidget):
 
         layout = QVBoxLayout(self)
         self.state_label = QLabel(t("ready"))
-        self.state_label.setStyleSheet("font-weight: bold;")
+        self.state_label.setStyleSheet("font-weight: bold; font-size: 13px;")
         layout.addWidget(self.state_label)
 
         self.zombie_label = QLabel(_zombie_text(0))
-        self.zombie_label.setStyleSheet("color: #2a7a4a;")
+        self.zombie_label.setStyleSheet("color: #1d6f42; font-weight: 500;")
         layout.addWidget(self.zombie_label)
 
         self.progress = QProgressBar()
@@ -87,7 +96,7 @@ class StatusWindow(QWidget):
 
         self.result_label = QLabel("")
         self.result_label.setWordWrap(True)
-        self.result_label.setStyleSheet("color: #555;")
+        self.result_label.setStyleSheet("color: #2b2b2b;")
         layout.addWidget(self.result_label)
 
         # Haupt-Aktion: EINE zusammengefasste Codex-Start-Reparatur (Eskalation, Stopp bei Erfolg).
@@ -224,9 +233,48 @@ class StatusWindow(QWidget):
 
         layout.addWidget(self.settings_group)
 
+        bottom_row = QHBoxLayout()
+        self.help_button = QPushButton()
+        self.help_button.clicked.connect(self.show_shortcuts_dialog)
         self.close_button = QPushButton()
         self.close_button.clicked.connect(self.hide)
-        layout.addWidget(self.close_button)
+        bottom_row.addWidget(self.help_button)
+        bottom_row.addWidget(self.close_button)
+        layout.addLayout(bottom_row)
+
+        for widget in (
+            self.repair_button,
+            self.diagnose_button,
+            self.safe_button,
+            self.fast_button,
+            self.cancel_auto_button,
+            self.loop_interval_combo,
+            self.loop_start_button,
+            self.loop_stop_button,
+            self.store_button,
+            self.store_reinstall_button,
+            self.safe_start_report_button,
+            self.safe_start_install_button,
+            self.language_combo,
+            self.mcp_combo,
+            self.plugin_combo,
+            self.empty_threads_combo,
+            self.thread_archive_days,
+            self.thread_read_days,
+            self.audit_button,
+            self.help_button,
+            self.close_button,
+        ):
+            widget.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+
+        self.setStyleSheet("""
+            QPushButton:focus, QComboBox:focus, QSpinBox:focus {
+                outline: 2px solid #005a9e;
+            }
+        """)
+
+        self._shortcuts: list[QShortcut] = []
+        self._setup_shortcuts()
         self.retranslate()
 
     def request_audit(self) -> None:
@@ -315,27 +363,222 @@ class StatusWindow(QWidget):
         widget.setAccessibleName(self._accessible_label_text(label))
         widget.setAccessibleDescription(description)
 
+    @staticmethod
+    def _set_accessible_button(button: QPushButton, name: str, description: str) -> None:
+        clean_name = re.sub(r"&([a-zA-Z0-9])", r"\1", name).strip()
+        button.setAccessibleName(clean_name)
+        button.setAccessibleDescription(description)
+
+    def _setup_shortcuts(self) -> None:
+        """Richtet Tastaturkürzel zur barrierefreien Einhand- und Tastaturbedienung ein."""
+        try:
+            self._shortcuts = [
+                QShortcut(QKeySequence(Qt.Key.Key_Escape), self, self.hide),
+                QShortcut(QKeySequence("Ctrl+W"), self, self.hide),
+                QShortcut(QKeySequence(Qt.Key.Key_F1), self, self.show_shortcuts_dialog),
+                QShortcut(QKeySequence("Shift+F1"), self, self.show_about_dialog),
+                QShortcut(QKeySequence(Qt.Key.Key_F5), self, self.request_diagnose.emit),
+                QShortcut(QKeySequence("Alt+R"), self, self.request_codex_repair.emit),
+                QShortcut(QKeySequence("Alt+D"), self, self.request_diagnose.emit),
+                QShortcut(QKeySequence("Alt+S"), self, self.request_safe.emit),
+                QShortcut(QKeySequence("Alt+F"), self, self.request_fast.emit),
+                QShortcut(QKeySequence("Alt+A"), self, self.request_cancel_auto.emit),
+                QShortcut(QKeySequence("Alt+P"), self, self.request_audit),
+                QShortcut(QKeySequence("Alt+L"), self, self._emit_loop_start),
+                QShortcut(QKeySequence("Alt+O"), self, self.request_loop_stop.emit),
+                QShortcut(QKeySequence("Alt+C"), self, self.hide),
+                QShortcut(QKeySequence("Alt+H"), self, self.show_shortcuts_dialog),
+            ]
+        except Exception:
+            self._shortcuts = []
+
+    def keyPressEvent(self, event) -> None:
+        if event.key() == Qt.Key.Key_Escape:
+            self.hide()
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
+    def show_shortcuts_dialog(self) -> QDialog:
+        """Öffnet den barrierefreien Dialog für Tastaturkürzel und Barrierefreiheit (WCAG 2.1 AA / BITV 2.0)."""
+        dialog = QDialog(self)
+        dialog.setWindowTitle(t("shortcuts_dialog_title"))
+        dialog.setAccessibleName(t("shortcuts_dialog_title"))
+        dialog.setAccessibleDescription(t("shortcuts_dialog_desc"))
+        dialog.setModal(True)
+        dialog.resize(640, 480)
+
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setSpacing(10)
+
+        header = QLabel(f"<h3>{t('shortcuts_dialog_title')}</h3>", dialog)
+        header.setAccessibleName(t("shortcuts_dialog_title"))
+        layout.addWidget(header)
+
+        tree = QTreeWidget(dialog)
+        tree.setHeaderLabels([t("shortcuts_action_header"), t("shortcuts_key_header")])
+        tree.setAccessibleName(t("shortcuts_dialog_title"))
+        tree.setAccessibleDescription(t("shortcuts_dialog_desc"))
+        tree.setColumnWidth(0, 380)
+        tree.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        tree.setAlternatingRowColors(True)
+
+        shortcut_groups = {
+            t("shortcuts_cat_nav"): [
+                (t("window_close"), "Esc / Ctrl+W / Alt+C"),
+                (t("shortcuts_btn_help"), "F1 / Alt+H"),
+                (t("about_dialog_title"), "Shift+F1"),
+                ("Fokus wechseln", "Tab / Shift+Tab"),
+            ],
+            t("shortcuts_cat_repair"): [
+                (t("repair_codex"), "Alt+R"),
+                (t("diagnose"), "F5 / Alt+D"),
+            ],
+            t("shortcuts_cat_maint"): [
+                (t("maintenance_safe_button"), "Alt+S"),
+                (t("maintenance_fast_button"), "Alt+F"),
+                (t("maintenance_cancel_button"), "Alt+A"),
+            ],
+            t("shortcuts_cat_config"): [
+                (t("fast_loop_start"), "Alt+L"),
+                (t("fast_loop_stop"), "Alt+O"),
+                (t("settings_audit_now"), "Alt+P"),
+            ],
+        }
+
+        for category, items in shortcut_groups.items():
+            cat_item = QTreeWidgetItem([category])
+            cat_item.setExpanded(True)
+            for action_text, key_seq in items:
+                child = QTreeWidgetItem([action_text, key_seq])
+                cat_item.addChild(child)
+            tree.addTopLevelItem(cat_item)
+
+        layout.addWidget(tree)
+
+        a11y_info = QLabel(f"<p style='color: #444;'><i>{t('shortcuts_a11y_notice')}</i></p>", dialog)
+        a11y_info.setWordWrap(True)
+        layout.addWidget(a11y_info)
+
+        footer_layout = QHBoxLayout()
+        footer_layout.addStretch()
+
+        btn_close = QPushButton(t("shortcuts_btn_close"), dialog)
+        btn_close.setDefault(True)
+        btn_close.setToolTip(f"{t('shortcuts_btn_close')} (Esc / Enter)")
+        btn_close.setAccessibleName(t("shortcuts_btn_close"))
+        btn_close.clicked.connect(dialog.accept)
+        footer_layout.addWidget(btn_close)
+
+        layout.addLayout(footer_layout)
+
+        if os.environ.get("QT_QPA_PLATFORM") == "offscreen":
+            dialog.show()
+            QApplication.processEvents()
+            return dialog
+
+        dialog.exec()
+        return dialog
+
+    def show_about_dialog(self) -> QDialog:
+        """Zeigt den barrierefreien Über-Dialog mit Version, Lizenz und Invarianten."""
+        from .build_info import load_build_info
+
+        info = load_build_info()
+        dialog = QDialog(self)
+        dialog.setWindowTitle(t("about_dialog_title"))
+        dialog.setAccessibleName(t("about_dialog_title"))
+        dialog.setModal(True)
+        dialog.resize(520, 280)
+
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setSpacing(10)
+
+        text = t("about_dialog_text", version=info.version)
+        lbl = QLabel(text, dialog)
+        lbl.setWordWrap(True)
+        lbl.setAccessibleName(t("about_dialog_title"))
+        layout.addWidget(lbl)
+
+        footer_layout = QHBoxLayout()
+        footer_layout.addStretch()
+
+        btn_close = QPushButton(t("shortcuts_btn_close"), dialog)
+        btn_close.setDefault(True)
+        btn_close.setAccessibleName(t("shortcuts_btn_close"))
+        btn_close.clicked.connect(dialog.accept)
+        footer_layout.addWidget(btn_close)
+
+        layout.addLayout(footer_layout)
+
+        if os.environ.get("QT_QPA_PLATFORM") == "offscreen":
+            dialog.show()
+            QApplication.processEvents()
+            return dialog
+
+        dialog.exec()
+        return dialog
+
     def retranslate(self) -> None:
         """Aktualisiert alle statischen UI-Texte nach einem Sprachwechsel."""
         self.repair_button.setText(t("repair_codex"))
         self.repair_button.setToolTip(t("repair_codex_tooltip"))
+        self._set_accessible_button(
+            self.repair_button, t("repair_codex"), t("repair_codex_tooltip")
+        )
+
         self.diagnose_button.setText(t("diagnose"))
         self.diagnose_button.setToolTip(t("diagnose_tooltip"))
+        self._set_accessible_button(
+            self.diagnose_button, t("diagnose"), t("diagnose_tooltip")
+        )
+
         self.safe_button.setText(t("maintenance_safe_button"))
         self.safe_button.setToolTip(t("maintenance_safe_tooltip"))
+        self._set_accessible_button(
+            self.safe_button, t("maintenance_safe_button"), t("maintenance_safe_tooltip")
+        )
+
         self.fast_button.setText(t("maintenance_fast_button"))
         self.fast_button.setToolTip(t("maintenance_fast_tooltip"))
+        self._set_accessible_button(
+            self.fast_button, t("maintenance_fast_button"), t("maintenance_fast_tooltip")
+        )
+
         self.cancel_auto_button.setText(t("maintenance_cancel_button"))
         self.cancel_auto_button.setToolTip(t("maintenance_cancel_tooltip"))
+        self._set_accessible_button(
+            self.cancel_auto_button, t("maintenance_cancel_button"), t("maintenance_cancel_tooltip")
+        )
+
         self.store_button.setText(t("store_repair"))
         self.store_button.setToolTip(t("store_repair_tooltip"))
+        self._set_accessible_button(
+            self.store_button, t("store_repair"), t("store_repair_tooltip")
+        )
+
         self.store_reinstall_button.setText(t("store_reinstall"))
         self.store_reinstall_button.setToolTip(t("store_reinstall_tooltip"))
+        self._set_accessible_button(
+            self.store_reinstall_button, t("store_reinstall"), t("store_reinstall_tooltip")
+        )
+
         self.safe_start_report_button.setText(t("safe_start_check"))
         self.safe_start_report_button.setToolTip(t("safe_start_tooltip"))
+        self._set_accessible_button(
+            self.safe_start_report_button, t("safe_start_check"), t("safe_start_tooltip")
+        )
+
         self.safe_start_install_button.setText(t("safe_start_install"))
         self.safe_start_install_button.setToolTip(t("safe_start_install_tooltip"))
+        self._set_accessible_button(
+            self.safe_start_install_button, t("safe_start_install"), t("safe_start_install_tooltip")
+        )
+
         self.loop_group.setTitle(t("fast_loop_group"))
+        self.loop_group.setAccessibleName(t("fast_loop_group"))
         self.loop_interval_label.setText(t("fast_loop_interval"))
         self.loop_interval_combo.blockSignals(True)
         for index in range(self.loop_interval_combo.count()):
@@ -346,11 +589,22 @@ class StatusWindow(QWidget):
             )
         self.loop_interval_combo.blockSignals(False)
         self.loop_interval_combo.setToolTip(t("fast_loop_interval_tooltip"))
+
         self.loop_start_button.setText(t("fast_loop_start"))
         self.loop_start_button.setToolTip(t("fast_loop_start_tooltip"))
+        self._set_accessible_button(
+            self.loop_start_button, t("fast_loop_start"), t("fast_loop_start_tooltip")
+        )
+
         self.loop_stop_button.setText(t("fast_loop_stop"))
         self.loop_stop_button.setToolTip(t("fast_loop_stop_tooltip"))
+        self._set_accessible_button(
+            self.loop_stop_button, t("fast_loop_stop"), t("fast_loop_stop_tooltip")
+        )
+
         self.settings_group.setTitle(f"{t('settings_group')}: {t('settings_config_audit')}")
+        self.settings_group.setAccessibleName(t("settings_group"))
+
         self.language_label_widget.setText(t("settings_language"))
         self.language_combo.setToolTip(t("settings_language_tooltip"))
         self.language_combo.blockSignals(True)
@@ -358,6 +612,7 @@ class StatusWindow(QWidget):
             if index < self.language_combo.count():
                 self.language_combo.setItemText(index, language_label(language))
         self.language_combo.blockSignals(False)
+
         self.mcp_label.setText(t("settings_mcp_duplicates"))
         self.plugin_label.setText(t("settings_unused_plugins"))
         self.empty_threads_label.setText(t("settings_empty_threads"))
@@ -368,6 +623,7 @@ class StatusWindow(QWidget):
         self.empty_threads_combo.setToolTip(t("settings_empty_threads_tooltip"))
         self.thread_archive_days.setToolTip(t("settings_auto_archive_days_tooltip"))
         self.thread_read_days.setToolTip(t("settings_auto_mark_read_days_tooltip"))
+
         self._set_accessible_context(
             self.loop_interval_combo,
             self.loop_interval_label,
@@ -403,13 +659,36 @@ class StatusWindow(QWidget):
             self.thread_read_label,
             t("settings_auto_mark_read_days_tooltip"),
         )
+
         self.audit_button.setText(t("settings_audit_now"))
         self.audit_button.setToolTip(t("settings_audit_now_tooltip"))
+        self._set_accessible_button(
+            self.audit_button, t("settings_audit_now"), t("settings_audit_now_tooltip")
+        )
+
+        self.help_button.setText(t("shortcuts_btn_help"))
+        self.help_button.setToolTip(t("shortcuts_btn_help_tooltip"))
+        self._set_accessible_button(
+            self.help_button, t("shortcuts_btn_help"), t("shortcuts_btn_help_tooltip")
+        )
+
         self.close_button.setText(t("window_close"))
         self.close_button.setToolTip(t("window_close_tooltip"))
+        self._set_accessible_button(
+            self.close_button, t("window_close"), t("window_close_tooltip")
+        )
+
+        self.progress.setAccessibleName(t("progress_bar_a11y_name"))
+        self.progress.setAccessibleDescription(t("progress_bar_a11y_desc"))
+        self.state_label.setAccessibleName(t("state_label_a11y_name"))
+        self.zombie_label.setAccessibleName(t("zombie_label_a11y_name"))
+        self.detail_label.setAccessibleName(t("detail_label_a11y_name"))
+        self.result_label.setAccessibleName(t("result_label_a11y_name"))
 
     def set_zombie_count(self, count: int) -> None:
-        self.zombie_label.setText(_zombie_text(count))
+        txt = _zombie_text(count)
+        self.zombie_label.setText(txt)
+        self.zombie_label.setAccessibleDescription(txt)
 
     def set_running(self, running: bool, can_cancel: bool = False) -> None:
         for button in (
@@ -421,6 +700,7 @@ class StatusWindow(QWidget):
             self.store_reinstall_button,
             self.safe_start_report_button,
             self.safe_start_install_button,
+            self.audit_button,
         ):
             button.setEnabled(not running)
         self.cancel_auto_button.setEnabled(running and can_cancel)
@@ -434,16 +714,23 @@ class StatusWindow(QWidget):
     def set_progress(self, percent: int, message: str, indeterminate: bool) -> None:
         if indeterminate:
             self.progress.setRange(0, 0)
+            self.progress.setAccessibleDescription(message or "Wird ausgeführt...")
         else:
             self.progress.setRange(0, 100)
             self.progress.setValue(percent)
+            self.progress.setAccessibleDescription(
+                f"{percent}%: {message}" if message else f"{percent}%"
+            )
         if message:
             self.detail_label.setText(message)
+            self.detail_label.setAccessibleDescription(message)
 
     def set_state(self, text: str) -> None:
         self.state_label.setText(text)
+        self.state_label.setAccessibleDescription(text)
 
     def set_result(self, text: str) -> None:
         self.result_label.setText(text)
+        self.result_label.setAccessibleDescription(text)
 
 

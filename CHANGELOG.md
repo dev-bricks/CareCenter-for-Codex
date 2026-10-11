@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- WCAG 2.1 AA & BITV 2.0 Accessibility, Keyboard Navigation, Contrast & Screenreader Hardening (SOFTWARE_UX_AND_ACCESSIBILITY_REVIEW) on 2026-10-11:
+  - Focus and Contrast Hardening: Audited and adjusted status color contrast ratios in `StatusWindow` (`src/codex_logdatenbank_wartung/tray_status_window.py`) to conform to WCAG 2.1 AA standards (`zombie_label` `#1d6f42` > 5:1 contrast, `result_label` `#2b2b2b` > 12:1 contrast); added high-visibility focus indicator rings (`outline: 2px solid #005a9e;`).
+  - Explicit Focus Policy: Set `Qt.FocusPolicy.StrongFocus` on all 21 interactive controls across `StatusWindow` ensuring complete tab stop coverage.
+  - Keyboard Navigation & Ergonomics: Registered 15 accessible global shortcuts via `QShortcut` (`Esc`, `Ctrl+W`, `F1`, `Shift+F1`, `F5`, `Alt+R`, `Alt+D`, `Alt+S`, `Alt+F`, `Alt+A`, `Alt+P`, `Alt+L`, `Alt+O`, `Alt+C`, `Alt+H`) with `keyPressEvent` escape dismissal.
+  - Accessible Dialogs: Added accessible hierarchical keyboard shortcuts reference dialog (`show_shortcuts_dialog()`, `QTreeWidget` with 4 categorical sections and WCAG compliance note) and accessible About dialog (`show_about_dialog()`) with version, license, and Local-First / Zero-Egress details.
+  - Screenreader Attributes: Implemented `setAccessibleName` and `setAccessibleDescription` across all 14 interactive pushbuttons, groupboxes, comboboxes, spinboxes, labels, and progress bar with mnemonic ampersand stripping; dynamically updating live status descriptions on state, progress, and zombie count transitions.
+  - Tier-2 Multi-Language Parity (Policy P-006): Integrated 20 new catalog keys across 6 languages (`de`, `en`, `es`, `zh`, `ja`, `ru`) in `src/codex_logdatenbank_wartung/i18n.py` and exported to `locales/translations.json` with 100% genuine German umlauts.
+  - Contract Testing: Extended `tests/test_accessibility.py` to 9 hermetic contract tests covering contrast, focus policies, accessible names/descriptions, shortcut registration, dialog instantiation, mnemonic cleaning, and live updates; hardened `tests/test_tray_running_state.py` mock modules.
+- Verification (2026-10-11): Pytest full suite 508 passed, 2 skipped (100% green); Ruff check clean (0 errors); compileall clean (0 errors); manage_translations.py --check PASSED (342 keys); git diff --check clean. [G 2026-10-11]
+
 - Windows Store Readiness Audit & Packaging Staging (SOFTWARE_STORE_READINESS_CHECK) on 2026-10-08:
   - Hardened `store_package.json` with execution alias `carecenter.exe`, `license: MIT`, Tier-2 6 languages (`de-DE`, `en-US`, `es-ES`, `zh-CN`, `ja-JP`, `ru-RU`), canonical logo `store_assets/StoreLogo.png`, and `store_assets_dir`.
   - Hardened Desktop-Bridge `AppxManifest.xml` (root and `store_package/CareCenter for Codex/AppxManifest.xml`) with canonical 50x50 `<Logo>icons\\StoreLogo.png</Logo>`, `TargetDeviceFamily Windows.Desktop` (MinVersion `10.0.17763.0`, MaxVersionTested `10.0.26100.0`), execution alias `carecenter.exe`, and 6-language resources.
