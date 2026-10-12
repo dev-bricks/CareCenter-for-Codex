@@ -289,6 +289,13 @@ Die folgende Matrix vergleicht CareCenter for Codex mit alternativen Betriebsans
 | **[SoftwareCenter](https://github.com/file-bricks/SoftwareCenter)** | file-bricks | Zentraler PySide6-Softwarekatalog und Desktop-Verwaltung | Führt und startet Desktop-Tools inklusive CareCenter und Safe Start |
 | **[DokuZen](https://github.com/doc-bricks/DokuZen)** | doc-bricks | Dokumentenverarbeitung, OCR, automatische Schwärzung und PDF-Hygiene | Ergänzt lokale Workflows um netzwerkfreie, datensparsame Dokumentensicherheit |
 
+## Verwandte Werkzeuge
+
+Dies sind eigenständige Werkzeuge; CareCenter bleibt für die Wartung der Codex-Desktop-App zuständig.
+
+- [COMA](https://github.com/ellmos-ai/coma) unterstützt lokale, dateibasierte Koordination von Agentenjobs, Prozessstart und Statusabfrage.
+- [agent-ops-stack](https://github.com/ellmos-ai/agent-ops-stack) ist eine manifestbasierte Git-Fetch-Vorlage für lokale CLI-Agentenmodule; die Einrichtung steht in den Anweisungen des jeweiligen Moduls.
+
 <a id="sec-08"></a><a id="features"></a><a id="funktionen"></a>
 ## Funktionen
 
