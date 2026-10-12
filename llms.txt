@@ -101,3 +101,7 @@ Public documentation:
 - THIRD_PARTY_LICENSES.txt: Level 1 SBOM plain-text companion with Invariant Compliance Status table (INV-LOCAL-01..INV-SLA-10)
 - STORE_LISTING.md, PRIVACY_POLICY.md, SUPPORT.md: Store release materials
 - SECURITY.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md: community health files
+
+Related tools:
+- [COMA](https://github.com/ellmos-ai/coma): Independent local file-based agent job coordination, process startup, and status polling.
+- [agent-ops-stack](https://github.com/ellmos-ai/agent-ops-stack): Manifest-based Git-fetch blueprint for local CLI-agent modules; each module has its own setup instructions.
