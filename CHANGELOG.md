@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Correct the Store build guide: require Python 3.12+, explain the external build-scanner prerequisite and output override, use repository-relative SDK packaging paths, and distinguish static preflight from actual WACK execution and certification. Remove a private workstation command from the public instructions.
+
 - WCAG 2.1 AA & BITV 2.0 Accessibility, Keyboard Navigation, Contrast & Screenreader Hardening (SOFTWARE_UX_AND_ACCESSIBILITY_REVIEW) on 2026-10-11:
   - Focus and Contrast Hardening: Audited and adjusted status color contrast ratios in `StatusWindow` (`src/codex_logdatenbank_wartung/tray_status_window.py`) to conform to WCAG 2.1 AA standards (`zombie_label` `#1d6f42` > 5:1 contrast, `result_label` `#2b2b2b` > 12:1 contrast); added high-visibility focus indicator rings (`outline: 2px solid #005a9e;`).
   - Explicit Focus Policy: Set `Qt.FocusPolicy.StrongFocus` on all 21 interactive controls across `StatusWindow` ensuring complete tab stop coverage.
