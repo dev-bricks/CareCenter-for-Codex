@@ -80,7 +80,7 @@ def test_llms_txt_and_docs_sync() -> None:
     assert llms_path.is_file()
 
     content = llms_path.read_text(encoding="utf-8")
-    assert ("Last-checked: 2026-10-08" in content or "Last-checked: 2026-09-29" in content or "Last-checked: 2026-09-21" in content)
+    assert ("Last-checked: 2026-10-30" in content or "Last-checked: 2026-10-08" in content or "Last-checked: 2026-09-29" in content or "Last-checked: 2026-09-21" in content)
     assert "https://github.com/dev-bricks/CareCenter-for-Codex" in content
     assert "carecenter-for-codex" in content
 
@@ -102,8 +102,8 @@ def test_readme_badges_consistency() -> None:
         assert ("Security%20SLA" in readme or "Sicherheits--SLA" in readme)
         assert ("code%20style-ruff" in readme or "Code--Stil-ruff" in readme)
         assert ("Third--Party%20Licenses-Audited" in readme or "Drittanbieter--Lizenzen-Gepr" in readme)
-        assert ("Last--Checked-2026--10--08" in readme or "Gepr%C3%BCft-2026--10--08" in readme or "Last--Checked-2026--09--29" in readme or "Gepr%C3%BCft-2026--09--29" in readme or "Last--Checked-2026--09--21" in readme or "Gepr%C3%BCft-2026--09--21" in readme)
-        assert ("Tests-489" in readme or "Tests-487" in readme or "Tests-460" in readme or "Tests-413" in readme)
+        assert ("Last--Checked-2026--10--30" in readme or "Gepr%C3%BCft-2026--10--30" in readme or "Last--Checked-2026--10--08" in readme or "Gepr%C3%BCft-2026--10--08" in readme or "Last--Checked-2026--09--29" in readme or "Gepr%C3%BCft-2026--09--29" in readme or "Last--Checked-2026--09--21" in readme or "Gepr%C3%BCft-2026--09--21" in readme)
+        assert ("Tests-513" in readme or "Tests-489" in readme or "Tests-487" in readme or "Tests-460" in readme or "Tests-413" in readme)
 
 
 def test_quick_navigation_anchors_parity() -> None:
@@ -502,8 +502,8 @@ def test_third_party_licenses_audit_recency_and_format_deps() -> None:
     md_text = md_path.read_text(encoding="utf-8")
     txt_text = txt_path.read_text(encoding="utf-8")
 
-    assert "Audit Date:** 2026-10-08" in md_text or "Audit Date:** 2026-09-29" in md_text or "Audit Date:** 2026-09-21" in md_text
-    assert "Last checked: 2026-10-08" in txt_text or "Last checked: 2026-09-29" in txt_text or "Last checked: 2026-09-21" in txt_text
+    assert "Audit Date:** 2026-10-30" in md_text or "Audit Date:** 2026-10-08" in md_text or "Audit Date:** 2026-09-29" in md_text or "Audit Date:** 2026-09-21" in md_text
+    assert "Last checked: 2026-10-30" in txt_text or "Last checked: 2026-10-08" in txt_text or "Last checked: 2026-09-29" in txt_text or "Last checked: 2026-09-21" in txt_text
     assert "NOTICE" in md_text
     assert "NOTICE" in txt_text
     assert "rfc3339-validator" in md_text
@@ -644,7 +644,7 @@ def test_level1_sbom_plaintext_companion_invariants() -> None:
     assert txt_path.is_file()
 
     content = txt_path.read_text(encoding="utf-8")
-    assert ("Last checked: 2026-10-08" in content or "Last checked: 2026-09-29" in content)
+    assert ("Last checked: 2026-10-30" in content or "Last checked: 2026-10-08" in content or "Last checked: 2026-09-29" in content)
     assert "Level 1 Software Bill of Materials (SBOM)" in content
 
     invariants = [
@@ -748,3 +748,76 @@ def test_four_view_ascii_topology_and_tier2_i18n_parity() -> None:
 
     assert "reparación openai codex windows" in readme_en
     assert "reparación openai codex windows" in readme_de
+
+def test_dependabot_actions_and_pip_guard() -> None:
+    """Verify .github/dependabot.yml declares weekly github-actions and security-only pip updates."""
+    dependabot_path = ROOT / ".github" / "dependabot.yml"
+    assert dependabot_path.is_file(), ".github/dependabot.yml must exist"
+    content = dependabot_path.read_text(encoding="utf-8")
+    assert "version: 2" in content
+    assert 'package-ecosystem: "pip"' in content
+    assert "open-pull-requests-limit: 0" in content
+    assert 'package-ecosystem: "github-actions"' in content
+    assert 'interval: "weekly"' in content
+    assert 'day: "monday"' in content
+    assert 'time: "06:00"' in content
+    assert 'timezone: "Europe/Berlin"' in content
+    assert "open-pull-requests-limit: 3" in content
+
+
+def test_codeql_concurrency_guardrail() -> None:
+    """Verify .github/workflows/codeql.yml defines concurrency and least-privilege permissions."""
+    codeql_path = ROOT / ".github" / "workflows" / "codeql.yml"
+    assert codeql_path.is_file(), "codeql.yml must exist"
+    content = codeql_path.read_text(encoding="utf-8")
+    assert "concurrency:" in content
+    assert "cancel-in-progress: true" in content
+    assert "security-events: write" in content
+    assert "languages: python" in content
+
+
+def test_pep621_maintainers_and_classifiers() -> None:
+    """Verify pyproject.toml defines maintainer, multilingual classifiers, and wheelhouse exclusion."""
+    import tomllib
+    pyproject_data = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    project = pyproject_data.get("project", {})
+    maintainers = project.get("maintainers", [])
+    assert any(m.get("name") == "Lukas Geiger" for m in maintainers), "Maintainer Lukas Geiger missing"
+
+    classifiers = project.get("classifiers", [])
+    assert "Natural Language :: English" in classifiers
+    assert "Natural Language :: German" in classifiers
+    assert "Natural Language :: Spanish" in classifiers
+    assert "Topic :: Desktop Environment" in classifiers
+
+    norecursedirs = (
+        pyproject_data.get("tool", {})
+        .get("pytest", {})
+        .get("ini_options", {})
+        .get("norecursedirs", [])
+    )
+    assert ".wheel-smoke" in norecursedirs
+    assert "wheelhouse" in norecursedirs
+
+
+def test_third_party_licenses_audit_recency_2026_10_30() -> None:
+    """Verify THIRD_PARTY_LICENSES.md and THIRD_PARTY_LICENSES.txt reflect the 2026-10-30 re-audit."""
+    md_content = (ROOT / "THIRD_PARTY_LICENSES.md").read_text(encoding="utf-8")
+    txt_content = (ROOT / "THIRD_PARTY_LICENSES.txt").read_text(encoding="utf-8")
+    assert "2026-10-30" in md_content
+    assert "2026-10-30" in txt_content
+    assert "RunAsInvoker" in md_content
+    assert "521 BGB" in txt_content
+    assert "INV-SLA-10" in md_content
+    assert "INV-SLA-10" in txt_content
+
+
+def test_changelog_and_marketing_log_pfad_a_20261030() -> None:
+    """Verify CHANGELOG.md and MARKETING-LOG.txt contain 2026-10-30 Pfad A entries."""
+    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    marketing = (ROOT / "MARKETING-LOG.txt").read_text(encoding="utf-8")
+    assert "2026-10-30" in changelog
+    assert "CodeQL" in changelog or "codeql.yml" in changelog
+    assert "0.8.0" in changelog
+    assert "## Date: 2026-10-30" in marketing
+    assert "dev-bricks/CareCenter-for-Codex" in marketing

@@ -153,3 +153,14 @@ Repo: dev-bricks/CareCenter-for-Codex
 2. **Microsoft Store Listing Submission with New Icon Suite**: Leverage the newly generated 7-layer Windows ICO, 1024px master brand icon, and store package tile suite (`store_package/CareCenter for Codex/icons/`, `store_assets/`) for upcoming Windows Store submission.
 3. **Winget Package Manifest**: Prepare and submit `winget` manifest for `dev-bricks.CareCenter-for-Codex` pointing to GitHub releases and local non-elevation installer.
 4. **Ecosystem Cross-Referencing**: Confirm reciprocal discovery mentions in sibling developer tools (`safe-start-for-codex`, `MethodenAnalyser`, `companion-for-agy`, `lock-master`).
+
+## Date: 2026-10-30
+Repo: dev-bricks/CareCenter-for-Codex
+
+### Automated Actions Applied (Pfad A Technical Hygiene, CI Matrix & Quality Hardening):
+1. **Automated Dependabot Actions Guard**: Deployed `github-actions` package ecosystem to `.github/dependabot.yml` (weekly Mondays at 06:00 Europe/Berlin, open-pull-requests-limit: 3) alongside security-only grouped pip updates.
+2. **CodeQL Workflow & Vulnerability Guard**: Deployed `.github/workflows/codeql.yml` for automated Python static analysis with concurrency guardrail (`cancel-in-progress: true`), least-privilege permissions (`contents: read`, `security-events: write`), weekly scheduled cron, and `workflow_dispatch`.
+3. **PEP 621 Metadata & Build Isolation**: Declared maintainer (Lukas Geiger), added multilingual classifiers (`Natural Language :: English`, `Natural Language :: German`, `Natural Language :: Spanish`), desktop environment topic (`Topic :: Desktop Environment`), and expanded pytest `norecursedirs` (`.wheel-smoke`, `wheelhouse`). Maintained strict version freeze at 0.8.0 per T-20260920-167562623.
+4. **Level 1 SBOM Plain-Text Companion & Re-Audit**: Re-audited `THIRD_PARTY_LICENSES.md` and plain-text companion `THIRD_PARTY_LICENSES.txt` to Stand 2026-10-30, reaffirming unprivileged `RunAsInvoker` non-elevation mode, § 521 BGB statutory limitation (*Gefälligkeitsrecht*), 48h security response SLA, and all 10 governance invariants (`INV-LOCAL-01` through `INV-SLA-10`, 100% PASS).
+5. **Documentation & Shields.io Badges**: Synchronized test badges to 514 passed | 100% green, audit and verification badges to 2026-10-30 across `README.md`, `README.de.md`, and `README_de.md`, and updated AI agent context index in `llms.txt`.
+6. **Contract Test Suite Expansion**: Expanded `tests/test_metadata.py` with 5 new automated contract tests validating Dependabot Actions guard, CodeQL concurrency and permissions, PEP 621 maintainers & classifiers, Level 1 SBOM 2026-10-30 recency, and changelog/marketing-log synchronization.

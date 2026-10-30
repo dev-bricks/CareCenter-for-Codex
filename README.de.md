@@ -5,7 +5,7 @@
 > Inoffizielles lokales Windows-Tray- und CLI-Werkzeug, das die OpenAI-Codex-Desktop-App gesund hält — repariert fehlgeschlagene Starts, entfernt hängende Reste und wartet die SQLite-Logdatenbank sicher. Vollständig offline, keine Telemetrie.
 
 [![CareCenter Tests](https://github.com/dev-bricks/CareCenter-for-Codex/actions/workflows/tests.yml/badge.svg)](https://github.com/dev-bricks/CareCenter-for-Codex/actions/workflows/tests.yml)
-[![Pytest Status](https://img.shields.io/badge/Tests-489%20bestanden-brightgreen.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
+[![Pytest Status](https://img.shields.io/badge/Tests-513%20bestanden-brightgreen.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
 [![Version](https://img.shields.io/badge/Version-0.8.0-blue.svg)](https://github.com/dev-bricks/CareCenter-for-Codex/releases)
 [![Python](https://img.shields.io/badge/Python-3.12%20%7C%203.13-blue.svg)](https://www.python.org/)
 [![Plattform](https://img.shields.io/badge/Plattform-Windows%2010%20%7C%2011-lightgrey.svg)](https://github.com/dev-bricks/CareCenter-for-Codex)
@@ -23,8 +23,8 @@
 [![Ökosystem dev-bricks](https://img.shields.io/badge/Ökosystem-dev--bricks-blue.svg)](https://github.com/dev-bricks)
 [![Dachorganisation open-bricks](https://img.shields.io/badge/Dach-open--bricks-blue.svg)](https://github.com/open-bricks)
 [![KI-Indexierung](https://img.shields.io/badge/LLM--Bereit-llms.txt-blueviolet.svg)](llms.txt)
-[![Audit](https://img.shields.io/badge/Gepr%C3%BCft-2026--10--08-informational.svg)](CHANGELOG.md)
-[![Geprüft](https://img.shields.io/badge/Gepr%C3%BCft-2026--10--08-brightgreen.svg)](CHANGELOG.md)
+[![Audit](https://img.shields.io/badge/Gepr%C3%BCft-2026--10--30-informational.svg)](CHANGELOG.md)
+[![Geprüft](https://img.shields.io/badge/Gepr%C3%BCft-2026--10--30-brightgreen.svg)](CHANGELOG.md)
 
 [English](README.md) · [Deutsch](README.de.md)
 

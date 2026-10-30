@@ -9,6 +9,9 @@ license = { text = "MIT" }
 authors = [
     { name = "Lukas Geiger", email = "support@lukasgeiger.com" }
 ]
+maintainers = [
+    { name = "Lukas Geiger", email = "support@lukasgeiger.com" }
+]
 keywords = [
     "carecenter",
     "codex",
@@ -35,10 +38,14 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Natural Language :: English",
+    "Natural Language :: German",
+    "Natural Language :: Spanish",
     "Operating System :: Microsoft :: Windows",
     "License :: OSI Approved :: MIT License",
     "Intended Audience :: Developers",
     "Topic :: System :: Systems Administration",
+    "Topic :: Desktop Environment",
     "Environment :: Win32 (MS Windows)",
 ]
 
@@ -127,4 +134,4 @@ pythonpath = ["src"]
 markers = [
     "timeout: test timeout marker",
 ]
-norecursedirs = [".git", ".pytest_cache", ".pytest_temp", ".pytest_tmp*", "__pycache__", "build", "dist", ".venv", "backups", "logs", "store_package", ".hypothesis", ".turbo", ".nyc_output", ".tox"]
+norecursedirs = [".git", ".pytest_cache", ".pytest_temp", ".pytest_tmp*", "__pycache__", "build", "dist", ".venv", "backups", "logs", "store_package", ".hypothesis", ".turbo", ".nyc_output", ".tox", ".wheel-smoke", "wheelhouse"]

@@ -3,7 +3,7 @@
 > **Project:** CareCenter for Codex (`dev-bricks/CareCenter-for-Codex`)
 > **Package:** `carecenter-for-codex` (CLI: `codex-logwartung`)
 > **Repository:** [https://github.com/dev-bricks/CareCenter-for-Codex](https://github.com/dev-bricks/CareCenter-for-Codex)
-> **Audit Date:** 2026-10-08
+> **Audit Date:** 2026-10-30 (Pfad A Repository Hygiene, Dependabot Actions Guard, CodeQL Workflow Defense, Level 1 SBOM Re-Audit & PEP 621 Metadata Expansion; prior: 2026-10-08 Pfad B, 2026-09-29 Pfad A, 2026-09-21 Pfad A)
 > **Plain-Text Companion:** [`THIRD_PARTY_LICENSES.txt`](THIRD_PARTY_LICENSES.txt) (Level 1 SBOM Plain-Text Companion)
 > **Scope:** Direct runtime dependencies, build/packaging tooling, system API boundaries, Level 1 SBOM, and runtime safety invariants.
 

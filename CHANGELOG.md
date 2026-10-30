@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Repository Hygiene, Dependabot Actions Guard, CodeQL Workflow Defense, Level 1 SBOM Re-Audit & PEP 621 Metadata Expansion (Pfad A) on 2026-10-30:
+  - Strikte Version-Freeze-Disziplin (T-20260920-167562623): Version `0.8.0` strikt unberührt in `pyproject.toml`, Quellcode und Manifesten belassen (Release-Vorgang bleibt separater Autorisierung vorbehalten).
+  - Automated Dependabot Actions & Security Guard: Erweiterung von `.github/dependabot.yml` um wöchentliche Updates für `github-actions` (Montags 06:00 Europe/Berlin Zeit, Open-PRs-Limit: 3) neben sicherheitszentrierten `pip` Updates (`open-pull-requests-limit: 0`).
+  - CodeQL Workflow & Vulnerability Guard: Bereitstellung von `.github/workflows/codeql.yml` für automatisierte statische Sicherheitsanalyse in Python mit Concurrency Guardrail (`cancel-in-progress: true`), Least-Privilege Berechtigungen (`contents: read`, `security-events: write`), wöchentlichem Cron-Schedule und `workflow_dispatch`.
+  - PEP 621 Metadaten- & Build-Isolation-Erweiterung (`pyproject.toml`): Deklaration des Maintainers (Lukas Geiger), Erweiterung der Sprach- und Themen-Classifiers (`Natural Language :: English`, `Natural Language :: German`, `Natural Language :: Spanish`, `Topic :: Desktop Environment`) sowie Ergänzung von `.wheel-smoke` und `wheelhouse` in pytest `norecursedirs`.
+  - Level 1 SBOM Companion Re-Audit Stand 2026-10-30: `THIRD_PARTY_LICENSES.md` und Plain-Text Begleitdatei `THIRD_PARTY_LICENSES.txt` Stand 2026-10-30 re-auditiert mit formaler Bestätigung aller 10 Governance- und Laufzeitinvarianten (`INV-LOCAL-01` bis `INV-SLA-10`), `RunAsInvoker` Non-Elevation Modus, gesetzlicher Haftungsbeschränkung (§ 521 BGB Gefälligkeitsrecht) und 48h Security Response SLA.
+  - Dokumentations-, Badge- & Kontext-Parität: Shields.io Badges in `README.md`, `README.de.md` und `README_de.md` auf Stand `2026-10-30` synchronisiert unter Erhalt aller 18 Schnellnavigations-Anker `sec-01`..`sec-18` und der ASCII Vier-Ansichten-Topologie; `llms.txt` Timestamp auf `2026-10-30` und Test-Baseline aktualisiert.
+  - Vertragstest-Erweiterung (`tests/test_metadata.py`): Neue automatisierte Contract-Tests für Dependabot Actions Guard, CodeQL Workflow Concurrency Guardrail, PEP 621 Maintainer & Classifiers, Level 1 SBOM Re-Audit Stand `2026-10-30` mit § 521 BGB, sowie Changelog und Marketing-Log Recency implementiert. [G 2026-10-30]
+
 - Correct the Store build guide: require Python 3.12+, explain the external build-scanner prerequisite and output override, use repository-relative SDK packaging paths, and distinguish static preflight from actual WACK execution and certification. Remove a private workstation command from the public instructions.
 
 - WCAG 2.1 AA & BITV 2.0 Accessibility, Keyboard Navigation, Contrast & Screenreader Hardening (SOFTWARE_UX_AND_ACCESSIBILITY_REVIEW) on 2026-10-11:
