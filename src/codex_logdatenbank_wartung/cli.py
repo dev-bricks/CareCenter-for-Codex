@@ -12,6 +12,7 @@ from .config import MaintenanceConfig, default_config_path, local_root
 from .i18n import normalize_language, set_language, t
 from .maintenance import MaintenanceRunner
 from .processes import describe_processes, find_codex_processes
+from .runtime.app_logging import ensure_console_encoding
 
 
 class _RepairLogResult(Protocol):
@@ -742,6 +743,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    ensure_console_encoding()
     parser = build_parser()
     args = parser.parse_args(argv)
 

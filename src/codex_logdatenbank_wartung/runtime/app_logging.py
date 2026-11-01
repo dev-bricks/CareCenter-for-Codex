@@ -31,6 +31,18 @@ def _has_console() -> bool:
     return stream is not None and hasattr(stream, "write")
 
 
+def ensure_console_encoding() -> None:
+    """Rekonfiguriere sys.stdout und sys.stderr defensiv auf UTF-8 mit Fehler-Ersetzung.
+
+    Verhindert UnicodeEncodeError unter Windows (z. B. cp1252) bei der Ausgabe
+    von CJK- (Chinesisch, Japanisch) und kyrillischen Zeichen.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        if stream is not None and hasattr(stream, "reconfigure"):
+            with contextlib.suppress(AttributeError, ValueError, OSError):
+                stream.reconfigure(encoding="utf-8", errors="replace")
+
+
 def setup_logging(
     level: int = logging.INFO,
     app_slug: str = DEFAULT_DATA_DIR_NAME,
@@ -63,8 +75,7 @@ def setup_logging(
 
     use_console = _has_console() if console is None else console
     if use_console and _has_console():
-        with contextlib.suppress(AttributeError, ValueError):
-            sys.stderr.reconfigure(errors="replace")
+        ensure_console_encoding()
         stream_handler = logging.StreamHandler()
         stream_handler.setFormatter(formatter)
         stream_handler._app_logging = True  # type: ignore[attr-defined]

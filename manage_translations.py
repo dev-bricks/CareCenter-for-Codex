@@ -30,6 +30,7 @@ from codex_logdatenbank_wartung.i18n import (  # noqa: E402
     export_translations_json,
     load_translations_file,
 )
+from codex_logdatenbank_wartung.runtime.app_logging import ensure_console_encoding  # noqa: E402
 
 T_CALL_PATTERN = re.compile(r'\bt\(\s*["\']([a-zA-Z0-9_]+)["\']')
 PLACEHOLDER_PATTERN = re.compile(r"\{([a-zA-Z0-9_]+)")
@@ -156,6 +157,7 @@ def sync_translations(verbose: bool = True) -> int:
 
 
 def main() -> int:
+    ensure_console_encoding()
     parser = argparse.ArgumentParser(
         description="CareCenter for Codex i18n management and validation CLI."
     )

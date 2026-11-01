@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- CJK (ZH, JA) & Cyrillic (RU) Console/File Encoding & Qt Font Rendering Hardening (CCC-I18N-05) on 2026-11-01:
+  - Console & Logging Resilience: Implemented `ensure_console_encoding()` in `src/codex_logdatenbank_wartung/runtime/app_logging.py` (defensively reconfigures `sys.stdout` and `sys.stderr` to UTF-8 with `errors="replace"` under exception guards against Windows `cp1252` console crashes).
+  - CLI & Translation Management Integration: Wired `ensure_console_encoding()` into `cli.main()`, `app_logging.setup_logging()`, and `manage_translations.main()` for zero-crash console output on East Asian (Chinese `zh`, Japanese `ja`) and Cyrillic (`ru`) strings.
+  - Qt6 / PySide6 Font Metric Verification: Verified that Windows Segoe UI and Qt font linking correctly compute non-zero horizontal advances (`horizontalAdvance > 0`) for CJK and Cyrillic glyphs across `QMenu`, `QAction`, `QLabel`, `QPushButton`, and `QComboBox`.
+  - i18n Fallback & Parameter Formatting: Validated the 4-stage fallback chain (`zh/ja/ru -> en -> de -> key`) and dynamic parameter interpolation with CJK/Cyrillic file paths and payloads.
+  - Comprehensive Test Suite: Added 10 hermetic unit and integration tests in `tests/test_cjk_cyrillic_encoding_and_rendering.py` (10/10 passed). [G 2026-11-01]
+
 - Repository Hygiene, Dependabot Actions Guard, CodeQL Workflow Defense, Level 1 SBOM Re-Audit & PEP 621 Metadata Expansion (Pfad A) on 2026-10-30:
   - Strikte Version-Freeze-Disziplin (T-20260920-167562623): Version `0.8.0` strikt unberührt in `pyproject.toml`, Quellcode und Manifesten belassen (Release-Vorgang bleibt separater Autorisierung vorbehalten).
   - Automated Dependabot Actions & Security Guard: Erweiterung von `.github/dependabot.yml` um wöchentliche Updates für `github-actions` (Montags 06:00 Europe/Berlin Zeit, Open-PRs-Limit: 3) neben sicherheitszentrierten `pip` Updates (`open-pull-requests-limit: 0`).
