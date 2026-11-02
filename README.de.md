@@ -26,7 +26,7 @@
 [![Audit](https://img.shields.io/badge/Gepr%C3%BCft-2026--10--30-informational.svg)](CHANGELOG.md)
 [![Geprüft](https://img.shields.io/badge/Gepr%C3%BCft-2026--10--30-brightgreen.svg)](CHANGELOG.md)
 
-[English](README.md) · [Deutsch](README.de.md)
+[English](README.md) · [Deutsch](README.de.md) · [Español](README.es.md)
 
 > [!NOTE]
 > Maschinenlesbare Architektur, CLI-Befehle und Sicherheitsregeln sind für KI-Agenten in [llms.txt](llms.txt) hinterlegt.

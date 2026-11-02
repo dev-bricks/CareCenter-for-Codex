@@ -36,6 +36,8 @@ Important boundaries & Invariants (INV-LOCAL-01 through INV-SLA-10):
 - Multilingual Tier-2 Spanish support: complete 322-key translation catalog in
   `locales/translations.json`, 4-stage fallback chain (`active -> en -> de -> key`),
   and translation management CLI `manage_translations.py`.
+- Spanish documentation parity: full README.es.md with 1:1 section, diagram,
+  and quick navigation parity to README.md and README.de.md.
 - Multi-resolution icon suite: authentic 7-layer Windows ICO (16px..256px),
   1024px master PNG, PWA mobile icon set, and Microsoft Store tile assets loaded
   via `app_icon_loader.py`.

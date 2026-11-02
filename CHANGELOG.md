@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Spanish Documentation Parity & Contract Verification (CCC-I18N-04) on 2026-11-02:
+  - 1:1 Spanish Documentation (README.es.md & README_es.md): Authored complete, high-quality Spanish documentation matching README.md and README.de.md section by section across all 18 numbered quick navigation anchors (sec-01..sec-18).
+  - Translated Architectural Diagrams: Translated both Mermaid system flowcharts (user interfaces, watcher daemon, process safety guards, SQLite storage, Windows OS/Store bridge) and complete lifecycle sequence diagrams into authentic Spanish technical terminology (utonumber, state_5.sqlite, PRAGMA integrity_check, VACUUM).
+  - ASCII 4-View Topology: Translated the visual Four-View Architectural Topology into Spanish (CARECENTER FOR CODEX — TOPOLOGÍA DE CUATRO VISTAS, VISTA 1 through VISTA 4, and PERÍMETRO DE SEGURIDAD LOCAL Y GOBERNANZA).
+  - Trilingual Language Switcher: Updated navigation headers across README.md, README.de.md, README_de.md, and README.es.md to [English](README.md) · [Deutsch](README.de.md) · [Español](README.es.md).
+  - LLM Indexing & Context Synchronization: Updated llms.txt to index README.es.md under documentation and runtime boundaries.
+  - Automated Contract Testing: Expanded 	ests/test_docs_contracts.py (README.es.md in ACTIVE_DOCS) and 	ests/test_metadata.py (added full verification for 18 Spanish quick navigation anchors, Shields.io badges consistency, dual Mermaid syntax and keywords, 10 governance invariants, 12 sibling ecosystem partner tools, authentic Spanish accents/UTF-8 integrity without replacement corruptions, target personas, comparative matrix, README.es.md / README_es.md file parity, and § 521 BGB statutory disclaimer with 48h SLA). [G 2026-11-02]
+
 - CJK (ZH, JA) & Cyrillic (RU) Console/File Encoding & Qt Font Rendering Hardening (CCC-I18N-05) on 2026-11-01:
   - Console & Logging Resilience: Implemented `ensure_console_encoding()` in `src/codex_logdatenbank_wartung/runtime/app_logging.py` (defensively reconfigures `sys.stdout` and `sys.stderr` to UTF-8 with `errors="replace"` under exception guards against Windows `cp1252` console crashes).
   - CLI & Translation Management Integration: Wired `ensure_console_encoding()` into `cli.main()`, `app_logging.setup_logging()`, and `manage_translations.main()` for zero-crash console output on East Asian (Chinese `zh`, Japanese `ja`) and Cyrillic (`ru`) strings.

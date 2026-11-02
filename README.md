@@ -26,7 +26,7 @@
 [![Audit](https://img.shields.io/badge/Last--Checked-2026--10--30-informational.svg)](CHANGELOG.md)
 [![Verified](https://img.shields.io/badge/Verified-2026--10--30-brightgreen.svg)](CHANGELOG.md)
 
-[English](README.md) · [Deutsch](README.de.md)
+[English](README.md) · [Deutsch](README.de.md) · [Español](README.es.md)
 
 > [!NOTE]
 > Machine-readable architecture, CLI entry points, and safety rules are indexed for AI agents in [llms.txt](llms.txt).

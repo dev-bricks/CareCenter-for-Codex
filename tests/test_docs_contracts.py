@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 ACTIVE_DOCS = (
     ROOT / "README.md",
     ROOT / "README.de.md",
+    ROOT / "README.es.md",
     ROOT / "SECURITY.md",
     ROOT / "PRIVACY_POLICY.md",
     ROOT / "SUPPORT.md",

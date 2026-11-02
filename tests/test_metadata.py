@@ -86,11 +86,12 @@ def test_llms_txt_and_docs_sync() -> None:
 
 
 def test_readme_badges_consistency() -> None:
-    """Verify essential shields.io badges are present across English and German READMEs."""
+    """Verify essential shields.io badges are present across English, German, and Spanish READMEs."""
     readme_en = (ROOT / "README.md").read_text(encoding="utf-8")
     readme_de = (ROOT / "README.de.md").read_text(encoding="utf-8")
+    readme_es = (ROOT / "README.es.md").read_text(encoding="utf-8")
 
-    for readme in (readme_en, readme_de):
+    for readme in (readme_en, readme_de, readme_es):
         assert "actions/workflows/tests.yml/badge.svg" in readme
         assert "badge/Python-3.12" in readme
         assert ("badge/Platform-Windows" in readme or "badge/Plattform-Windows" in readme)
@@ -156,19 +157,50 @@ def test_quick_navigation_anchors_parity() -> None:
     for heading in en_expected_headings:
         assert f"## {heading}" in readme_en, f"Missing English heading: ## {heading}"
 
+    es_expected_headings = [
+        "Por qué y planteamiento del problema",
+        "Arquitectura y flujo del sistema",
+        "Secuencia completa del ciclo de vida",
+        "Capacidades clave e invariantes de seguridad",
+        "Perfiles destinatarios y detectabilidad",
+        "Matriz comparativa y alternativas",
+        "Herramientas hermanas y ecosistema asociado",
+        "Características",
+        "Captura de pantalla",
+        "Requisitos",
+        "Instalación y ejecución",
+        "Uso de la CLI",
+        "Configuración",
+        "Modelo de seguridad e invariantes",
+        "Materiales de Microsoft Store",
+        "Licencias de terceros y transparencia",
+        "Desarrollo y licencia",
+        "Aviso legal (§ 521 BGB) y exención de responsabilidad",
+    ]
+
+    readme_es = (ROOT / "README.es.md").read_text(encoding="utf-8")
+
+    for heading in en_expected_headings:
+        assert f"## {heading}" in readme_en, f"Missing English heading: ## {heading}"
+
     for heading in de_expected_headings:
         assert f"## {heading}" in readme_de, f"Missing German heading: ## {heading}"
 
+    for heading in es_expected_headings:
+        assert f"## {heading}" in readme_es, f"Missing Spanish heading: ## {heading}"
+
     assert "🧭 Quick Navigation" in readme_en
     assert "🧭 Schnellnavigation" in readme_de
+    assert "🧭 Navegación rápida" in readme_es
 
 
 def test_mermaid_dual_diagrams_syntax_and_parity() -> None:
-    """Verify both READMEs include valid Flowchart and Sequence diagrams with core components."""
+    """Verify English, German, and Spanish READMEs include valid Flowchart and Sequence diagrams."""
     readme_en = (ROOT / "README.md").read_text(encoding="utf-8")
     readme_de = (ROOT / "README.de.md").read_text(encoding="utf-8")
+    readme_es = (ROOT / "README.es.md").read_text(encoding="utf-8")
 
-    for readme in (readme_en, readme_de):
+    for readme in (readme_en, readme_de, readme_es):
         assert "```mermaid\nflowchart TD" in readme
         assert "```mermaid\nsequenceDiagram" in readme
         assert "autonumber" in readme
@@ -178,13 +210,15 @@ def test_mermaid_dual_diagrams_syntax_and_parity() -> None:
 
 
 def test_governance_invariants_table_parity() -> None:
-    """Verify both READMEs define all 10 runtime safety invariants."""
+    """Verify English, German, and Spanish READMEs define all 10 runtime safety invariants."""
     readme_en = (ROOT / "README.md").read_text(encoding="utf-8")
     readme_de = (ROOT / "README.de.md").read_text(encoding="utf-8")
+    readme_es = (ROOT / "README.es.md").read_text(encoding="utf-8")
 
     for i in range(1, 11):
         assert f"**{i}." in readme_en, f"Missing invariant {i} in English README"
         assert f"**{i}." in readme_de, f"Missing invariant {i} in German README"
+        assert f"**{i}." in readme_es, f"Missing invariant {i} in Spanish README"
 
 
 def test_sibling_ecosystem_matrix_parity() -> None:
@@ -207,9 +241,12 @@ def test_sibling_ecosystem_matrix_parity() -> None:
         "DokuZen",
     ]
 
+    readme_es = (ROOT / "README.es.md").read_text(encoding="utf-8")
+
     for partner in partners:
         assert f"[{partner}]" in readme_en, f"Missing partner {partner} in English README"
         assert f"[{partner}]" in readme_de, f"Missing partner {partner} in German README"
+        assert f"[{partner}]" in readme_es, f"Missing partner {partner} in Spanish README"
 
 
 def test_changelog_release_entry_present() -> None:
@@ -235,6 +272,19 @@ def test_german_umlauts_utf8_integrity() -> None:
 
     # No unescaped Unicode replacement characters
     assert "\ufffd" not in readme_de
+
+
+def test_spanish_utf8_and_punctuation_integrity() -> None:
+    """Verify README.es.md uses native Spanish accents, inverted punctuation, and valid UTF-8."""
+    readme_es = (ROOT / "README.es.md").read_text(encoding="utf-8")
+
+    assert "á" in readme_es
+    assert "é" in readme_es
+    assert "í" in readme_es
+    assert "ó" in readme_es
+    assert "ú" in readme_es
+    assert "ñ" in readme_es
+    assert "\ufffd" not in readme_es
 
 
 def test_gitignore_hygiene() -> None:
@@ -335,6 +385,14 @@ def test_target_personas_bilingual_sections() -> None:
     assert "IT-Support & Systemadministratoren" in readme_de
     assert "Suchbegriffe & Auffindbarkeit" in readme_de
 
+    readme_es = (ROOT / "README.es.md").read_text(encoding="utf-8")
+    assert "## Perfiles destinatarios y detectabilidad" in readme_es
+    assert "Desarrolladores individuales e ingenieros de IA" in readme_es
+    assert "Integradores de DevOps y herramientas" in readme_es
+    assert "Defensores de privacidad y Local-First" in readme_es
+    assert "Soporte de TI y administradores de sistemas" in readme_es
+    assert "Palabras clave de búsqueda y detectabilidad" in readme_es
+
 
 def test_comparative_matrix_sections() -> None:
     """Verify that both READMEs contain the 10-dimension 5-way comparative matrix."""
@@ -352,6 +410,13 @@ def test_comparative_matrix_sections() -> None:
     assert "Ad-Hoc Skripte (Batch/PS)" in readme_de
     assert "Generische Cleaner (CCleaner)" in readme_de
     assert "Codex-Neuinstallation" in readme_de
+
+    readme_es = (ROOT / "README.es.md").read_text(encoding="utf-8")
+    assert "## Matriz comparativa y alternativas" in readme_es
+    assert "Administrador de tareas de Windows" in readme_es
+    assert "Scripts ad-hoc (Batch/PS)" in readme_es
+    assert "Limpiadores genéricos (CCleaner)" in readme_es
+    assert "Reinstalación de Codex" in readme_es
 
 
 def test_third_party_licenses_audit_and_transparency() -> None:
@@ -401,17 +466,24 @@ def test_governance_invariants_canonical_codes() -> None:
 
 
 def test_readme_de_files_parity() -> None:
-    """Verify that README.de.md and README_de.md both exist and are identical."""
+    """Verify that README.de.md / README_de.md and README.es.md / README_es.md exist and match."""
     de_dot = ROOT / "README.de.md"
     de_underscore = ROOT / "README_de.md"
+    es_dot = ROOT / "README.es.md"
+    es_underscore = ROOT / "README_es.md"
 
     assert de_dot.is_file()
     assert de_underscore.is_file()
+    assert es_dot.is_file()
+    assert es_underscore.is_file()
 
-    content_dot = de_dot.read_text(encoding="utf-8")
-    content_underscore = de_underscore.read_text(encoding="utf-8")
+    content_dot_de = de_dot.read_text(encoding="utf-8")
+    content_underscore_de = de_underscore.read_text(encoding="utf-8")
+    assert content_dot_de == content_underscore_de, "README.de.md and README_de.md diverged"
 
-    assert content_dot == content_underscore, "README.de.md and README_de.md diverged"
+    content_dot_es = es_dot.read_text(encoding="utf-8")
+    content_underscore_es = es_underscore.read_text(encoding="utf-8")
+    assert content_dot_es == content_underscore_es, "README.es.md and README_es.md diverged"
 
 
 def test_lifecycle_workflows_present() -> None:
@@ -583,6 +655,11 @@ def test_statutory_notice_521_bgb_bilingual() -> None:
     assert "§ 521 BGB" in readme_de
     assert "48 Stunden" in readme_de
 
+    readme_es = (ROOT / "README.es.md").read_text(encoding="utf-8")
+    assert "## Aviso legal (§ 521 BGB) y exención de responsabilidad" in readme_es
+    assert "§ 521 BGB" in readme_es
+    assert "48 horas" in readme_es
+
     assert "§ 521 BGB" in llms_txt
     assert "INV-SLA-10" in llms_txt
 
@@ -734,20 +811,22 @@ def test_four_view_ascii_topology_and_tier2_i18n_parity() -> None:
     """Verify ASCII 4-View topology and Spanish Tier-2 i18n discoverability across documentation."""
     readme_en = (ROOT / "README.md").read_text(encoding="utf-8")
     readme_de = (ROOT / "README.de.md").read_text(encoding="utf-8")
+    readme_es = (ROOT / "README.es.md").read_text(encoding="utf-8")
 
-    for readme in (readme_en, readme_de):
+    for readme in (readme_en, readme_de, readme_es):
         assert "CARECENTER FOR CODEX" in readme
-        assert "FOUR-VIEW TOPOLOGY" in readme or "VIER-SICHTEN-TOPOLOGIE" in readme
-        assert "VIEW 1" in readme or "SICHT 1" in readme
-        assert "VIEW 2" in readme or "SICHT 2" in readme
-        assert "VIEW 3" in readme or "SICHT 3" in readme
-        assert "VIEW 4" in readme or "SICHT 4" in readme
+        assert any(top in readme for top in ("FOUR-VIEW TOPOLOGY", "VIER-SICHTEN-TOPOLOGIE", "TOPOLOGÍA DE CUATRO VISTAS"))
+        assert any(v in readme for v in ("VIEW 1", "SICHT 1", "VISTA 1"))
+        assert any(v in readme for v in ("VIEW 2", "SICHT 2", "VISTA 2"))
+        assert any(v in readme for v in ("VIEW 3", "SICHT 3", "VISTA 3"))
+        assert any(v in readme for v in ("VIEW 4", "SICHT 4", "VISTA 4"))
         assert "state_5.sqlite" in readme
         assert "RunAsInvoker" in readme
         assert "Zombie Killer Tray" in readme or "Zombie-Killer-Tray" in readme
 
     assert "reparación openai codex windows" in readme_en
     assert "reparación openai codex windows" in readme_de
+    assert "reparación openai codex windows" in readme_es
 
 def test_dependabot_actions_and_pip_guard() -> None:
     """Verify .github/dependabot.yml declares weekly github-actions and security-only pip updates."""
