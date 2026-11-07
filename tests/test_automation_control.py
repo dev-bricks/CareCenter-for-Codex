@@ -563,7 +563,7 @@ def test_status_change_writes_through_a_symlink_and_keeps_the_link(tmp_path: Pat
 
     assert result.status == "ok"
     assert link.is_symlink(), "der Link darf nicht durch eine normale Datei ersetzt werden"
-    assert Path(os.readlink(link)) == target
+    assert link.resolve() == target.resolve() and os.path.samefile(link, target)  # readlink liefert unter Windows ein Praefix
     assert read_status(target) == "PAUSED"
     assert sorted(item.name for item in real_dir.iterdir()) == ["job.toml"], "keine tmp-Datei zurueckgelassen"
 
