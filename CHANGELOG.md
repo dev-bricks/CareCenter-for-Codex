@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Automation control no longer treats an empty or id-less `automation.toml` as a readable record (T-20261107-490692877) on 2026-11-07:
+  - A truncated file parses as valid TOML. It used to count as a record with status `UNKNOWN`, and `activate-all` would have written `status = "ACTIVE"` into it, "repairing" a broken definition with a status. Now an empty file, a file with only a comment or whitespace, a missing, empty or non-string `id`, and an `id` that differs from the folder name are unparseable with their own message (`empty`, `missing id`, `id mismatch`). Pause, restore and activate-all never write into them; `_set_status()` checks the file again right before writing.
+  - `find_automation_anomalies()` reports empty and id-less files as unreadable too; an `id` that differs from the folder name stays a normal finding there (duplicate-id detection).
+  - `_write_toml()` copies the permissions of the original to the temp file before `os.replace` (`mkstemp` creates 0600) and writes through a link: the target is replaced, the link stays.
+  - Tests: `tests/test_automation_control.py` (45 new; the POSIX-mode and symlink tests are skipped on Windows without the right and were run on Linux).
+
 - Automation control no longer hides unreadable `automation.toml` files and writes them atomically (T-20261101-844031160) on 2026-11-07:
   - Unreadable definitions are reported, not skipped: `scan_automations()` returns them next to the readable records (`UnparseableAutomation`: folder name, path, error text), `find_automation_anomalies()` has a new `unparseable` category, and `diagnose()` lists them in the report (`unparseable_automations`, shown by `to_text()`) without a new issue code, so the public health exchange contract v1 stays unchanged. `load_automations()` keeps its signature and still returns only the readable records. This matters for the duplicate `model`/`reasoning_effort` keys of 2026-10-31, which tomlkit rejects as `ParseError`: 94 of 113 files would have been invisible to pause, restore and the anomaly check.
   - Pause, restore and activate-all list every unreadable definition (folder, path, error) in `errors` and in the new `unparseable_ids`, so `status` is never `ok` and the tray and the orchestrator show it as partial or failed. IDs that CareCenter paused earlier stay remembered while their file is unreadable; an unreadable file CareCenter never paused is not adopted, so a later restore cannot activate something the user paused.
