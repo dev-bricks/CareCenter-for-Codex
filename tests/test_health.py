@@ -228,6 +228,23 @@ def test_diagnose_clean_automations_no_warning(tmp_path: Path) -> None:
     assert not any(issue.code == "automation-id-duplikat" for issue in report.issues)
     assert report.nested_automations == []
     assert report.duplicate_automation_ids == []
+    assert report.unparseable_automations == []
+
+
+def test_diagnose_lists_unreadable_automation_in_the_report(tmp_path: Path) -> None:
+    config = make_config(tmp_path)
+    write_automation(tmp_path, ("good",), "good")
+    folder = tmp_path / "automations" / "broken"
+    folder.mkdir(parents=True)
+    broken = folder / "automation.toml"
+    broken.write_text('id = "broken"\nmodel = "a"\nmodel = "a"\n', encoding="utf-8")
+
+    report = diagnose(config, lambda: [])
+
+    assert report.unparseable_automations == [str(broken)]
+    assert f"Nicht lesbare Automationen: {broken}" in report.to_text()
+    # Kein neuer Issue-Code: der oeffentliche Health-Exchange-Vertrag v1 bleibt unveraendert.
+    assert not any("lesbar" in issue.code for issue in report.issues)
 
 
 def test_repair_clears_stale_lockfile_on_execute(tmp_path: Path) -> None:

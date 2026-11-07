@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Automation control no longer hides unreadable `automation.toml` files and writes them atomically (T-20261101-844031160) on 2026-11-07:
+  - Unreadable definitions are reported, not skipped: `scan_automations()` returns them next to the readable records (`UnparseableAutomation`: folder name, path, error text), `find_automation_anomalies()` has a new `unparseable` category, and `diagnose()` lists them in the report (`unparseable_automations`, shown by `to_text()`) without a new issue code, so the public health exchange contract v1 stays unchanged. `load_automations()` keeps its signature and still returns only the readable records. This matters for the duplicate `model`/`reasoning_effort` keys of 2026-10-31, which tomlkit rejects as `ParseError`: 94 of 113 files would have been invisible to pause, restore and the anomaly check.
+  - Pause, restore and activate-all list every unreadable definition (folder, path, error) in `errors` and in the new `unparseable_ids`, so `status` is never `ok` and the tray and the orchestrator show it as partial or failed. IDs that CareCenter paused earlier stay remembered while their file is unreadable; an unreadable file CareCenter never paused is not adopted, so a later restore cannot activate something the user paused.
+  - `_write_toml()` is atomic: encode first, temp file in the same folder, `fsync`, `os.replace`; an interrupted write leaves the original unchanged and removes the temp file. Reading keeps the line endings (CRLF stays CRLF) and is strict UTF-8: undecodable bytes are reported instead of being rewritten as replacement characters.
+  - Tests: `tests/test_automation_control.py` and `tests/test_health.py`.
+
 - Spanish Documentation Parity & Contract Verification (CCC-I18N-04) on 2026-11-02:
   - 1:1 Spanish Documentation (README.es.md & README_es.md): Authored complete, high-quality Spanish documentation matching README.md and README.de.md section by section across all 18 numbered quick navigation anchors (sec-01..sec-18).
   - Translated Architectural Diagrams: Translated both Mermaid system flowcharts (user interfaces, watcher daemon, process safety guards, SQLite storage, Windows OS/Store bridge) and complete lifecycle sequence diagrams into authentic Spanish technical terminology (utonumber, state_5.sqlite, PRAGMA integrity_check, VACUUM).
