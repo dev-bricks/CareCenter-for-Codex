@@ -540,6 +540,26 @@ def test_status_change_applies_the_mode_of_the_original_to_the_temp_file(
     assert calls == [("chmod", original_mode, True), ("replace", 0, False)]
 
 
+@pytest.mark.skipif(os.name != "nt", reason="nur unter Windows scheitert os.replace an einer schreibgeschuetzten Datei")
+def test_read_only_original_fails_cleanly_without_leftovers(tmp_path: Path) -> None:
+    """r1-Befund PR #10: die tmp-Datei erbte das Nur-Lesen-Attribut, das Aufraeumen scheiterte ebenfalls,
+    es blieb ``automation.toml.<x>.tmp`` liegen und die Meldung nannte nur diese tmp-Datei."""
+    config = make_config(tmp_path)
+    path = write_automation(config.codex_home, "job", "ACTIVE")
+    path.chmod(stat.S_IREAD)
+    try:
+        result = pause_active_automations(config)
+    finally:
+        path.chmod(stat.S_IWRITE | stat.S_IREAD)
+
+    assert result.status == "failed"
+    assert read_status(path) == "ACTIVE", "das Original bleibt unveraendert"
+    assert list(path.parent.glob("*.tmp")) == [], "keine tmp-Reste"
+    (error,) = result.errors
+    # Fehlertext von os.replace(tmp -> Ziel) endet mit dem Zielpfad; der des Aufraeumens (unlink) nennt nur die tmp-Datei.
+    assert error.endswith("automation.toml'"), error
+
+
 def _symlink_or_skip(link: Path, target: Path) -> None:
     try:
         link.symlink_to(target)
