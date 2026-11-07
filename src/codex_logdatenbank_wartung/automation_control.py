@@ -9,6 +9,8 @@ Automatisierungen nicht versehentlich wieder aktiviert werden.
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 import time
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
@@ -33,6 +35,10 @@ AutomationAction = Literal[
 ProgressCallback = Callable[[int, int, str], None]
 Sleeper = Callable[[float], None]
 
+# Was beim Lesen einer automation.toml schiefgehen kann: Ein-/Ausgabe, kein gueltiges UTF-8
+# oder ein TOML-Fehler (tomlkit meldet doppelte Schluessel als ParseError).
+_UNREADABLE = (OSError, UnicodeDecodeError, tomlkit.exceptions.TOMLKitError)
+
 
 @dataclass(slots=True)
 class AutomationRecord:
@@ -40,6 +46,19 @@ class AutomationRecord:
     name: str
     path: Path
     status: str
+
+
+@dataclass(slots=True)
+class UnparseableAutomation:
+    """Eine ``automation.toml``, die sich nicht lesen laesst.
+
+    CareCenter kann sie weder sehen noch aendern. ``id`` ist der Ordnername, denn die
+    ``id`` steht in der unlesbaren Datei selbst.
+    """
+
+    id: str
+    path: Path
+    error: str
 
 
 @dataclass(slots=True)
@@ -70,14 +89,15 @@ class DuplicateAutomationId:
 
 @dataclass(slots=True)
 class AutomationAnomalyReport:
-    """Read-only Befund ueber verschachtelte und id-duplizierte Automationen."""
+    """Read-only Befund ueber verschachtelte, id-duplizierte und unlesbare Automationen."""
 
     nested: list[NestedAutomation] = field(default_factory=list)
     duplicate_ids: list[DuplicateAutomationId] = field(default_factory=list)
+    unparseable: list[UnparseableAutomation] = field(default_factory=list)
 
     @property
     def has_anomalies(self) -> bool:
-        return bool(self.nested) or bool(self.duplicate_ids)
+        return bool(self.nested) or bool(self.duplicate_ids) or bool(self.unparseable)
 
 
 @dataclass(slots=True)
@@ -90,10 +110,17 @@ class AutomationControlResult:
     missing_ids: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
     delay_seconds: int = 0
+    # Ordnernamen der Definitionen, die nicht lesbar waren und daher NICHT verarbeitet wurden.
+    # Jede steht zusaetzlich mit Pfad und Fehlertext in ``errors``, damit ``status`` nie "ok" ist.
+    unparseable_ids: list[str] = field(default_factory=list)
 
     @property
     def changed_count(self) -> int:
         return len(self.changed_ids)
+
+    @property
+    def unparseable_count(self) -> int:
+        return len(self.unparseable_ids)
 
     def to_dict(self) -> dict[str, object]:
         return asdict(self)
@@ -120,27 +147,63 @@ def _now_ms() -> int:
 
 
 def _read_toml(path: Path) -> tomlkit.TOMLDocument:
-    return tomlkit.parse(path.read_text(encoding="utf-8", errors="replace"))
+    # Bytes statt read_text: Zeilenenden (CRLF) bleiben erhalten, damit der Rueckschreibweg die
+    # Datei nicht umformatiert. Strikt UTF-8: ersetzte Zeichen wuerden sonst beim Speichern
+    # still in die Datei geschrieben.
+    return tomlkit.parse(path.read_bytes().decode("utf-8"))
 
 
 def _write_toml(path: Path, document: tomlkit.TOMLDocument) -> None:
-    path.write_text(tomlkit.dumps(document), encoding="utf-8", newline="")
+    """Schreibt atomar: erst vollstaendig kodieren, dann tmp im selben Ordner, fsync, ``os.replace``.
+
+    Bricht der Vorgang ab, bleibt die Originaldatei unveraendert und die tmp-Datei wird entfernt.
+    """
+    payload = tomlkit.dumps(document).encode("utf-8")
+    descriptor, tmp_name = tempfile.mkstemp(dir=path.parent, prefix=f"{path.name}.", suffix=".tmp")
+    temporary = Path(tmp_name)
+    try:
+        with os.fdopen(descriptor, "wb") as handle:
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
 
 
 def _quoted_string(value: object) -> str:
     return str(value or "")
 
 
-def load_automations(config: MaintenanceConfig) -> list[AutomationRecord]:
+def _unreadable_text(exc: Exception) -> str:
+    return f"{type(exc).__name__}: {' '.join(str(exc).split())}"[:300]
+
+
+def scan_automations(
+    config: MaintenanceConfig,
+) -> tuple[list[AutomationRecord], list[UnparseableAutomation]]:
+    """Liest alle Tiefe-1-Automationen; unlesbare Dateien kommen als eigene Liste zurueck.
+
+    Eine ``automation.toml`` mit TOML-Fehler (etwa doppelten ``model``-Schluesseln) darf
+    nicht still aus der Verwaltung fallen: Pausieren und Wiederherstellen wuerden sie sonst
+    nie sehen und trotzdem Erfolg melden.
+    """
     root = automations_dir(config)
     if not root.exists():
-        return []
+        return [], []
 
     records: list[AutomationRecord] = []
+    unparseable: list[UnparseableAutomation] = []
     for toml_path in sorted(root.glob("*/automation.toml")):
         try:
             data = _read_toml(toml_path)
-        except (OSError, tomlkit.exceptions.ParseError):
+        except _UNREADABLE as exc:
+            unparseable.append(
+                UnparseableAutomation(
+                    id=toml_path.parent.name, path=toml_path, error=_unreadable_text(exc)
+                )
+            )
             continue
         automation_id = _quoted_string(data.get("id")) or toml_path.parent.name
         records.append(
@@ -151,11 +214,16 @@ def load_automations(config: MaintenanceConfig) -> list[AutomationRecord]:
                 status=_quoted_string(data.get("status")).strip().upper() or "UNKNOWN",
             )
         )
-    return records
+    return records, unparseable
+
+
+def load_automations(config: MaintenanceConfig) -> list[AutomationRecord]:
+    """Nur die lesbaren Definitionen; die unlesbaren liefert ``scan_automations``."""
+    return scan_automations(config)[0]
 
 
 def find_automation_anomalies(config: MaintenanceConfig) -> AutomationAnomalyReport:
-    """Read-only Detektor fuer verschachtelte und id-duplizierte Automationen.
+    """Read-only Detektor fuer verschachtelte, id-duplizierte und unlesbare Automationen.
 
     Sucht ALLE ``automation.toml`` unter ``automations/`` (rekursiv, robust gegen
     beliebige Verschachtelung), bestimmt ihre Tiefe und gruppiert die ``id``-Werte:
@@ -166,6 +234,8 @@ def find_automation_anomalies(config: MaintenanceConfig) -> AutomationAnomalyRep
     * **doppelte id** = derselbe ``id``-Wert in mehreren ``automation.toml`` (ueber
       alle Tiefenebenen). Ein rekursiver Scan in der Codex-App zaehlt die Automation
       dadurch doppelt.
+    * **unlesbar** = ``automation.toml`` mit TOML- oder Kodierungsfehler (Pfad und Fehlertext
+      im Befund). Sie zaehlt weder bei Verschachtelung noch bei Duplikaten mit.
 
     Aendert nichts auf der Platte und laesst ``load_automations`` (Tiefe 1) unberuehrt.
     """
@@ -178,7 +248,12 @@ def find_automation_anomalies(config: MaintenanceConfig) -> AutomationAnomalyRep
     for toml_path in sorted(root.rglob("automation.toml")):
         try:
             data = _read_toml(toml_path)
-        except (OSError, tomlkit.exceptions.ParseError):
+        except _UNREADABLE as exc:
+            report.unparseable.append(
+                UnparseableAutomation(
+                    id=toml_path.parent.name, path=toml_path, error=_unreadable_text(exc)
+                )
+            )
             continue
         try:
             depth = len(toml_path.parent.relative_to(root).parts)
@@ -252,6 +327,20 @@ def _set_status(record: AutomationRecord, status: str) -> bool:
     return True
 
 
+def _record_unparseable(
+    result: AutomationControlResult, unparseable: list[UnparseableAutomation]
+) -> None:
+    """Unlesbare Definitionen sind unverarbeitet: als Fehler mit Pfad und Text ausweisen.
+
+    Der Fehlereintrag beginnt mit dem Ordnernamen, so wie ``activate_carecenter_paused_automations``
+    ihn fuer die noch offenen IDs erwartet; ``result.status`` wird dadurch nie "ok".
+    """
+    result.unparseable_ids = [item.id for item in unparseable]
+    result.errors.extend(
+        f"{item.id}: nicht lesbar ({item.path}): {item.error}" for item in unparseable
+    )
+
+
 def _activate_records(
     records: list[AutomationRecord],
     *,
@@ -260,6 +349,7 @@ def _activate_records(
     delay_seconds: int,
     sleeper: Sleeper,
     progress: ProgressCallback | None,
+    unparseable: list[UnparseableAutomation] | None = None,
 ) -> AutomationControlResult:
     result = AutomationControlResult(
         action=action,
@@ -272,7 +362,7 @@ def _activate_records(
     for index, record in enumerate(targets, start=1):
         try:
             changed = _set_status(record, ACTIVE)
-        except (OSError, tomlkit.exceptions.ParseError) as exc:
+        except _UNREADABLE as exc:
             result.errors.append(f"{record.id}: {exc}")
             continue
         if changed:
@@ -286,13 +376,14 @@ def _activate_records(
 
     already_active = [record.id for record in records if record.status == ACTIVE]
     result.skipped_ids.extend(already_active)
+    _record_unparseable(result, unparseable or [])
     if result.errors:
         result.status = "partial" if result.changed_ids else "failed"
     return result
 
 
 def pause_active_automations(config: MaintenanceConfig) -> AutomationControlResult:
-    records = load_automations(config)
+    records, unparseable = scan_automations(config)
     active_records = [record for record in records if record.status == ACTIVE]
     result = AutomationControlResult(
         action="pause-active",
@@ -307,8 +398,9 @@ def pause_active_automations(config: MaintenanceConfig) -> AutomationControlResu
                 carecenter_ids.add(record.id)
             else:
                 result.skipped_ids.append(record.id)
-        except (OSError, tomlkit.exceptions.ParseError) as exc:
+        except _UNREADABLE as exc:
             result.errors.append(f"{record.id}: {exc}")
+    _record_unparseable(result, unparseable)
     if result.errors:
         result.status = "partial" if result.changed_ids else "failed"
     _save_carecenter_paused_ids(config, carecenter_ids)
@@ -324,11 +416,12 @@ def activate_carecenter_paused_automations(
     sleeper: Sleeper = time.sleep,
     progress: ProgressCallback | None = None,
 ) -> AutomationControlResult:
-    records = load_automations(config)
+    records, unparseable = scan_automations(config)
     by_id = {record.id: record for record in records}
     carecenter_ids = set(load_carecenter_paused_ids(config))
     target_ids = sorted(carecenter_ids)
-    missing_ids = sorted(carecenter_ids - set(by_id))
+    # Eine unlesbare Definition ist nicht "fehlend": ihre ID bleibt gemerkt (siehe ``failed`` unten).
+    missing_ids = sorted(carecenter_ids - set(by_id) - {item.id for item in unparseable})
     target_records = [by_id[item] for item in target_ids if item in by_id]
     action: AutomationAction = "restore-ccc-staggered" if staggered else "restore-ccc"
     result = _activate_records(
@@ -338,6 +431,7 @@ def activate_carecenter_paused_automations(
         delay_seconds=delay_seconds,
         sleeper=sleeper,
         progress=progress,
+        unparseable=unparseable,
     )
     result.missing_ids = missing_ids
     completed = set(result.changed_ids) | set(result.skipped_ids) | set(missing_ids)
@@ -346,6 +440,9 @@ def activate_carecenter_paused_automations(
         for error in result.errors
         if ":" in error
     }
+    # Eine unlesbare Definition, die CareCenter nie pausiert hat, wird NICHT vorgemerkt: sonst
+    # wuerde ein spaeterer Restore sie nach der Reparatur aktivieren, obwohl der Nutzer sie pausiert hatte.
+    failed -= {item.id for item in unparseable} - carecenter_ids
     _save_carecenter_paused_ids(config, failed | (carecenter_ids - completed))
     _append_event(config, result)
     return result
@@ -360,13 +457,15 @@ def activate_all_automations(
     progress: ProgressCallback | None = None,
 ) -> AutomationControlResult:
     action: AutomationAction = "activate-all-staggered" if staggered else "activate-all"
+    records, unparseable = scan_automations(config)
     result = _activate_records(
-        load_automations(config),
+        records,
         action=action,
         staggered=staggered,
         delay_seconds=delay_seconds,
         sleeper=sleeper,
         progress=progress,
+        unparseable=unparseable,
     )
     if not result.errors:
         _save_carecenter_paused_ids(config, set())

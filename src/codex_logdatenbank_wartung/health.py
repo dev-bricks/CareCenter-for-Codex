@@ -73,6 +73,7 @@ class HealthReport:
     update_leftovers: list[str] = field(default_factory=list)
     nested_automations: list[str] = field(default_factory=list)
     duplicate_automation_ids: list[str] = field(default_factory=list)
+    unparseable_automations: list[str] = field(default_factory=list)
     issues: list[HealthIssue] = field(default_factory=list)
 
     def add(self, code: str, severity: Severity, message: str, *, fixable: bool = False) -> None:
@@ -103,6 +104,8 @@ class HealthReport:
             lines.append(f"Verschachtelte Automationen: {', '.join(self.nested_automations)}")
         if self.duplicate_automation_ids:
             lines.append(f"Doppelte Automations-IDs: {', '.join(self.duplicate_automation_ids)}")
+        if self.unparseable_automations:
+            lines.append(f"Nicht lesbare Automationen: {', '.join(self.unparseable_automations)}")
         lines.append("Befunde:")
         if self.issues:
             for issue in self.issues:
@@ -200,6 +203,7 @@ def diagnose(
     anomalies = find_automation_anomalies(config)
     nested_automations = [str(item.path) for item in anomalies.nested]
     duplicate_automation_ids = [item.id for item in anomalies.duplicate_ids]
+    unparseable_automations = [str(item.path) for item in anomalies.unparseable]
 
     report = HealthReport(
         status="ok",
@@ -218,6 +222,7 @@ def diagnose(
         update_leftovers=update_leftovers,
         nested_automations=nested_automations,
         duplicate_automation_ids=duplicate_automation_ids,
+        unparseable_automations=unparseable_automations,
     )
 
     if zombie_main_pids:
