@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import stat
 from pathlib import Path
 
 import pytest
@@ -406,3 +407,191 @@ def test_undecodable_bytes_are_reported_not_silently_rewritten(tmp_path: Path) -
     assert result.unparseable_ids == ["latin1-job"]
     assert result.status == "failed"
     assert path.read_bytes() == before
+
+
+# --- Leere und id-lose Definitionen sind keine lesbaren Datensaetze (T-20261107-490692877) ---------
+# Eine leere (etwa abgeschnittene) automation.toml parst als leeres TOML. Ohne diese Pruefung galt sie als
+# Datensatz mit Status UNKNOWN, und activate-all haette ``status = "ACTIVE"`` hineingeschrieben: eine kaputte
+# Definition waere mit einem Status "repariert" worden.
+
+BAD_DEFINITIONS = [
+    pytest.param(b"", "empty", id="leere-datei"),
+    pytest.param(b"# abgeschnitten, nur ein Kommentar\n", "empty", id="nur-kommentar"),
+    pytest.param(b" \r\n\t\n  \n", "empty", id="nur-leerraum"),
+    pytest.param(b'name = "x"\nstatus = "ACTIVE"\n', "missing id", id="id-fehlt"),
+    pytest.param(b'id = ""\nname = "x"\nstatus = "ACTIVE"\n', "missing id", id="id-leer"),
+    pytest.param(b'id = "   "\nname = "x"\nstatus = "ACTIVE"\n', "missing id", id="id-nur-leerraum"),
+    pytest.param(b'id = 5\nname = "x"\nstatus = "ACTIVE"\n', "missing id", id="id-keine-zeichenkette"),
+    pytest.param(b'[section]\nstatus = "ACTIVE"\n', "missing id", id="nur-tabelle"),
+    pytest.param(b'id = "other-job"\nname = "x"\nstatus = "ACTIVE"\n', "id mismatch", id="id-weicht-vom-ordner-ab"),
+]
+
+
+def write_bad(codex_home: Path, folder_name: str, payload: bytes) -> Path:
+    folder = codex_home / "automations" / folder_name
+    folder.mkdir(parents=True)
+    path = folder / "automation.toml"
+    path.write_bytes(payload)
+    return path
+
+
+@pytest.mark.parametrize(("payload", "token"), BAD_DEFINITIONS)
+def test_empty_or_id_less_definition_is_unparseable_with_its_own_message(
+    tmp_path: Path, payload: bytes, token: str
+) -> None:
+    config = make_config(tmp_path)
+    good = write_automation(config.codex_home, "good-job", "PAUSED")
+    bad = write_bad(config.codex_home, "bad-job", payload)
+
+    records, unparseable = scan_automations(config)
+
+    assert [record.path for record in records] == [good], "nicht als lesbarer Datensatz (UNKNOWN) fuehren"
+    assert [(item.id, item.path) for item in unparseable] == [("bad-job", bad)]
+    assert token in unparseable[0].error
+    assert [record.id for record in load_automations(config)] == ["good-job"]
+
+
+@pytest.mark.parametrize(("payload", "token"), BAD_DEFINITIONS)
+@pytest.mark.parametrize("action", ["pause-active", "activate-all", "restore-ccc"])
+def test_no_action_ever_writes_into_an_empty_or_id_less_definition(
+    tmp_path: Path, payload: bytes, token: str, action: str
+) -> None:
+    config = make_config(tmp_path)
+    bad = write_bad(config.codex_home, "bad-job", payload)
+    write_carecenter_state(config, ["bad-job"])
+
+    result = run_automation_action(config, action)  # type: ignore[arg-type]
+
+    assert bad.read_bytes() == payload, "die kaputte Definition darf nie ueberschrieben werden"
+    assert result.unparseable_ids == ["bad-job"]
+    assert result.status != "ok"
+    assert any("bad-job" in error and token in error for error in result.errors)
+    assert [item.name for item in bad.parent.iterdir()] == ["automation.toml"], "keine tmp-Datei"
+
+
+def test_status_change_revalidates_the_file_right_before_writing(tmp_path: Path) -> None:
+    """Zwischen Scan und Schreiben abgeschnittene Datei: weder ueberschreiben noch als lesbar behandeln."""
+    config = make_config(tmp_path)
+    path = write_automation(config.codex_home, "job", "PAUSED")
+    record = scan_automations(config)[0][0]
+    path.write_bytes(b"")
+
+    with pytest.raises(automation_control._UNREADABLE):
+        automation_control._set_status(record, "ACTIVE")
+
+    assert path.read_bytes() == b""
+
+
+def test_anomaly_scan_reports_empty_and_id_less_files_but_keeps_duplicate_detection(tmp_path: Path) -> None:
+    config = make_config(tmp_path)
+    empty = write_bad(config.codex_home, "empty-job", b"")
+    no_id = write_bad(config.codex_home, "no-id-job", b'name = "x"\n')
+    first = write_automation_at(config.codex_home, ("folder-a",), "dupe")
+    second = write_automation_at(config.codex_home, ("folder-b",), "dupe")
+
+    report = find_automation_anomalies(config)
+
+    assert sorted(item.path for item in report.unparseable) == sorted([empty, no_id])
+    assert any("empty" in item.error for item in report.unparseable)
+    assert any("missing id" in item.error for item in report.unparseable)
+    # id und Ordnername duerfen hier abweichen: sonst waere die Doppel-id-Erkennung nicht mehr moeglich.
+    assert [item.paths for item in report.duplicate_ids] == [sorted([first, second])]
+
+
+# --- Rechte und Symlinks beim atomaren Schreiben ---------------------------------------------------
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX-Dateirechte")
+@pytest.mark.parametrize("mode", [0o644, 0o664, 0o640, 0o600])
+def test_status_change_keeps_the_permissions_of_the_original(tmp_path: Path, mode: int) -> None:
+    config = make_config(tmp_path)
+    path = write_automation(config.codex_home, "job", "ACTIVE")
+    path.chmod(mode)
+
+    pause_active_automations(config)
+
+    assert stat.S_IMODE(path.stat().st_mode) == mode, "mkstemp macht 0600; die Rechte des Originals uebernehmen"
+    assert read_status(path) == "PAUSED"
+
+
+def test_status_change_applies_the_mode_of_the_original_to_the_temp_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Plattformunabhaengig: der Aufruf muss vor dem os.replace auf der tmp-Datei erfolgen."""
+    config = make_config(tmp_path)
+    path = write_automation(config.codex_home, "job", "ACTIVE")
+    original_mode = stat.S_IMODE(path.stat().st_mode)
+    calls: list[tuple[str, int, bool]] = []
+    real_chmod, real_replace = os.chmod, os.replace
+
+    def spy_chmod(target: object, mode: int, *args: object, **kwargs: object) -> None:
+        calls.append(("chmod", mode, str(target).endswith(".tmp")))
+        real_chmod(target, mode, *args, **kwargs)  # type: ignore[arg-type]
+
+    def spy_replace(src: object, dst: object) -> None:
+        calls.append(("replace", 0, False))
+        real_replace(src, dst)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(automation_control.os, "chmod", spy_chmod)
+    monkeypatch.setattr(automation_control.os, "replace", spy_replace)
+
+    pause_active_automations(config)
+
+    assert calls == [("chmod", original_mode, True), ("replace", 0, False)]
+
+
+def _symlink_or_skip(link: Path, target: Path) -> None:
+    try:
+        link.symlink_to(target)
+    except (OSError, NotImplementedError):
+        pytest.skip("Symlinks sind hier nicht erlaubt (unter Windows: Entwicklermodus oder Administrator)")
+
+
+def test_status_change_writes_through_a_symlink_and_keeps_the_link(tmp_path: Path) -> None:
+    config = make_config(tmp_path)
+    real_dir = tmp_path / "synced"
+    real_dir.mkdir()
+    target = write_automation(tmp_path / "elsewhere", "job", "ACTIVE")
+    target.replace(real_dir / "job.toml")
+    target = real_dir / "job.toml"
+    folder = config.codex_home / "automations" / "job"
+    folder.mkdir(parents=True)
+    link = folder / "automation.toml"
+    _symlink_or_skip(link, target)
+
+    result = pause_active_automations(config)
+
+    assert result.status == "ok"
+    assert link.is_symlink(), "der Link darf nicht durch eine normale Datei ersetzt werden"
+    assert Path(os.readlink(link)) == target
+    assert read_status(target) == "PAUSED"
+    assert sorted(item.name for item in real_dir.iterdir()) == ["job.toml"], "keine tmp-Datei zurueckgelassen"
+
+
+def test_write_toml_writes_to_the_resolved_target_of_a_link(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Auch ohne Symlink-Recht pruefbar: aufgeloest wird der Pfad wie bei einem Symlink, geschrieben wird dort."""
+    config = make_config(tmp_path)
+    link_path = write_automation(config.codex_home, "job", "ACTIVE")
+    real_dir = tmp_path / "synced"
+    real_dir.mkdir()
+    target = real_dir / "job.toml"
+    target.write_bytes(link_path.read_bytes())
+    link_before = link_path.read_bytes()
+    real_realpath = os.path.realpath
+
+    def fake_realpath(value: object, *args: object, **kwargs: object) -> str:
+        if Path(str(value)) == link_path:
+            return str(target)
+        return real_realpath(value, *args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(automation_control.os.path, "realpath", fake_realpath)
+
+    document = tomlkit.parse(target.read_text(encoding="utf-8"))
+    document["status"] = "PAUSED"
+    automation_control._write_toml(link_path, document)
+
+    assert read_status(target) == "PAUSED"
+    assert link_path.read_bytes() == link_before, "der Link-Pfad selbst bleibt unberuehrt"
+    assert sorted(item.name for item in real_dir.iterdir()) == ["job.toml"]
