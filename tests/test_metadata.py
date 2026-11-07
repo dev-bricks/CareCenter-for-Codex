@@ -844,15 +844,16 @@ def test_dependabot_actions_and_pip_guard() -> None:
     assert "open-pull-requests-limit: 3" in content
 
 
-def test_codeql_concurrency_guardrail() -> None:
-    """Verify .github/workflows/codeql.yml defines concurrency and least-privilege permissions."""
-    codeql_path = ROOT / ".github" / "workflows" / "codeql.yml"
-    assert codeql_path.is_file(), "codeql.yml must exist"
-    content = codeql_path.read_text(encoding="utf-8")
-    assert "concurrency:" in content
-    assert "cancel-in-progress: true" in content
-    assert "security-events: write" in content
-    assert "languages: python" in content
+def test_codeql_runs_through_the_github_default_setup_only() -> None:
+    """Das Repo nutzt das GitHub-Default-Setup fuer Code-Scanning (python, actions, woechentlich).
+
+    Ein eigener CodeQL-Workflow waere eine zweite Konfiguration und liesse den Check ``analyze`` bei jedem
+    Lauf scheitern ("advanced configurations cannot be processed when the default setup is enabled").
+    """
+    workflows = ROOT / ".github" / "workflows"
+    assert not (workflows / "codeql.yml").exists(), "codeql.yml doppelt die Default-Konfiguration"
+    for workflow in sorted(workflows.glob("*.y*ml")):
+        assert "github/codeql-action/" not in workflow.read_text(encoding="utf-8"), workflow.name
 
 
 def test_pep621_maintainers_and_classifiers() -> None:

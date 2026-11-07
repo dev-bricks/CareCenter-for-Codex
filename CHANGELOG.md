@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- CodeQL runs through the GitHub default setup only; the own workflow `.github/workflows/codeql.yml` is removed (T-20261107-558181168) on 2026-11-07:
+  - The repository has the GitHub default setup for code scanning (python and actions, weekly, default query suite, configured since 2026-07-22). The workflow from 2026-10-30 was a second, "advanced" configuration, and its `analyze` job failed on every run (push, pull request, schedule) with "advanced configurations cannot be processed when the default setup is enabled". The default setup already covers Python and GitHub Actions; no coverage is lost.
+  - `tests/test_metadata.py`: the contract test that required the workflow now forbids it and any `github/codeql-action` step. To switch to an advanced setup later, change the repository setting first and add the workflow in the same step.
+
 - Automation control no longer hides unreadable `automation.toml` files and writes them atomically (T-20261101-844031160) on 2026-11-07:
   - Unreadable definitions are reported, not skipped: `scan_automations()` returns them next to the readable records (`UnparseableAutomation`: folder name, path, error text), `find_automation_anomalies()` has a new `unparseable` category, and `diagnose()` lists them in the report (`unparseable_automations`, shown by `to_text()`) without a new issue code, so the public health exchange contract v1 stays unchanged. `load_automations()` keeps its signature and still returns only the readable records. This matters for the duplicate `model`/`reasoning_effort` keys of 2026-10-31, which tomlkit rejects as `ParseError`: 94 of 113 files would have been invisible to pause, restore and the anomaly check.
   - Pause, restore and activate-all list every unreadable definition (folder, path, error) in `errors` and in the new `unparseable_ids`, so `status` is never `ok` and the tray and the orchestrator show it as partial or failed. IDs that CareCenter paused earlier stay remembered while their file is unreadable; an unreadable file CareCenter never paused is not adopted, so a later restore cannot activate something the user paused.
