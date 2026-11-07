@@ -188,7 +188,8 @@ def _read_automation(path: Path, *, match_folder: bool = True) -> tomlkit.TOMLDo
 def _write_toml(path: Path, document: tomlkit.TOMLDocument) -> None:
     """Schreibt atomar: erst vollstaendig kodieren, dann tmp im selben Ordner, fsync, ``os.replace``.
 
-    Bricht der Vorgang ab, bleibt die Originaldatei unveraendert und die tmp-Datei wird entfernt.
+    Bricht der Vorgang ab, bleibt die Originaldatei unveraendert und die tmp-Datei wird entfernt (auch eine
+    schreibgeschuetzte); der urspruengliche Fehler wird nicht durch einen Aufraeumfehler ersetzt.
     ``mkstemp`` legt die Datei mit 0600 an: die Rechte des Originals kommen vor dem Austausch auf die tmp-Datei.
     Ist ``path`` ein Link, wird sein Ziel ersetzt und der Link bleibt bestehen.
     """
@@ -205,7 +206,13 @@ def _write_toml(path: Path, document: tomlkit.TOMLDocument) -> None:
         os.chmod(temporary, mode)
         os.replace(temporary, target)
     except BaseException:
-        temporary.unlink(missing_ok=True)
+        # Die tmp-Datei kann das Nur-Lesen-Attribut des Originals tragen (Windows): ohne chmod scheitert unlink,
+        # laesst die Datei liegen und ueberdeckt den eigentlichen Fehler. Dessen Text bleibt der, der zaehlt.
+        try:
+            os.chmod(temporary, stat.S_IWRITE | stat.S_IREAD)
+            temporary.unlink(missing_ok=True)
+        except OSError:
+            pass
         raise
 
 
