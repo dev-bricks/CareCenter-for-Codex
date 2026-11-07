@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import stat
 import tempfile
 import time
 from collections.abc import Callable
@@ -35,9 +36,18 @@ AutomationAction = Literal[
 ProgressCallback = Callable[[int, int, str], None]
 Sleeper = Callable[[float], None]
 
-# Was beim Lesen einer automation.toml schiefgehen kann: Ein-/Ausgabe, kein gueltiges UTF-8
-# oder ein TOML-Fehler (tomlkit meldet doppelte Schluessel als ParseError).
-_UNREADABLE = (OSError, UnicodeDecodeError, tomlkit.exceptions.TOMLKitError)
+
+
+class AutomationDefinitionError(ValueError):
+    """Die Datei ist gueltiges TOML, aber keine brauchbare Automations-Definition.
+
+    Die Meldung beginnt mit ``empty``, ``missing id`` oder ``id mismatch``.
+    """
+
+
+# Was beim Lesen einer automation.toml schiefgehen kann: Ein-/Ausgabe, kein gueltiges UTF-8,
+# ein TOML-Fehler (tomlkit meldet doppelte Schluessel als ParseError) oder eine leere bzw. id-lose Definition.
+_UNREADABLE = (OSError, UnicodeDecodeError, tomlkit.exceptions.TOMLKitError, AutomationDefinitionError)
 
 
 @dataclass(slots=True)
@@ -153,22 +163,56 @@ def _read_toml(path: Path) -> tomlkit.TOMLDocument:
     return tomlkit.parse(path.read_bytes().decode("utf-8"))
 
 
+def _read_automation(path: Path, *, match_folder: bool = True) -> tomlkit.TOMLDocument:
+    """Liest eine ``automation.toml`` und verlangt eine brauchbare Definition.
+
+    Eine leere, abgeschnittene oder id-lose Datei parst als gueltiges TOML; ohne diese Pruefung galt sie
+    als Datensatz mit Status UNKNOWN, und ``activate-all`` haette ``status = "ACTIVE"`` hineingeschrieben.
+    ``match_folder=False`` laesst eine ``id`` zu, die vom Ordnernamen abweicht (die Doppel-id-Erkennung
+    braucht genau diesen Fall); alles, was Dateien aendert, verlangt die Uebereinstimmung.
+    """
+    data = _read_toml(path)
+    if not data:
+        raise AutomationDefinitionError("empty: keine Schluessel (leere Datei, nur Kommentar oder nur Leerraum)")
+    raw_id = data.get("id")
+    automation_id = raw_id.strip() if isinstance(raw_id, str) else ""
+    if not automation_id:
+        raise AutomationDefinitionError("missing id: 'id' fehlt, ist leer oder keine Zeichenkette")
+    if match_folder and automation_id.casefold() != path.parent.name.casefold():
+        raise AutomationDefinitionError(
+            f"id mismatch: id '{automation_id}' weicht vom Ordnernamen '{path.parent.name}' ab"
+        )
+    return data
+
+
 def _write_toml(path: Path, document: tomlkit.TOMLDocument) -> None:
     """Schreibt atomar: erst vollstaendig kodieren, dann tmp im selben Ordner, fsync, ``os.replace``.
 
-    Bricht der Vorgang ab, bleibt die Originaldatei unveraendert und die tmp-Datei wird entfernt.
+    Bricht der Vorgang ab, bleibt die Originaldatei unveraendert und die tmp-Datei wird entfernt (auch eine
+    schreibgeschuetzte); der urspruengliche Fehler wird nicht durch einen Aufraeumfehler ersetzt.
+    ``mkstemp`` legt die Datei mit 0600 an: die Rechte des Originals kommen vor dem Austausch auf die tmp-Datei.
+    Ist ``path`` ein Link, wird sein Ziel ersetzt und der Link bleibt bestehen.
     """
     payload = tomlkit.dumps(document).encode("utf-8")
-    descriptor, tmp_name = tempfile.mkstemp(dir=path.parent, prefix=f"{path.name}.", suffix=".tmp")
+    target = Path(os.path.realpath(path))
+    mode = stat.S_IMODE(target.stat().st_mode)
+    descriptor, tmp_name = tempfile.mkstemp(dir=target.parent, prefix=f"{target.name}.", suffix=".tmp")
     temporary = Path(tmp_name)
     try:
         with os.fdopen(descriptor, "wb") as handle:
             handle.write(payload)
             handle.flush()
             os.fsync(handle.fileno())
-        os.replace(temporary, path)
+        os.chmod(temporary, mode)
+        os.replace(temporary, target)
     except BaseException:
-        temporary.unlink(missing_ok=True)
+        # Die tmp-Datei kann das Nur-Lesen-Attribut des Originals tragen (Windows): ohne chmod scheitert unlink,
+        # laesst die Datei liegen und ueberdeckt den eigentlichen Fehler. Dessen Text bleibt der, der zaehlt.
+        try:
+            os.chmod(temporary, stat.S_IWRITE | stat.S_IREAD)
+            temporary.unlink(missing_ok=True)
+        except OSError:
+            pass
         raise
 
 
@@ -177,6 +221,8 @@ def _quoted_string(value: object) -> str:
 
 
 def _unreadable_text(exc: Exception) -> str:
+    if isinstance(exc, AutomationDefinitionError):
+        return " ".join(str(exc).split())[:300]  # beginnt mit empty / missing id / id mismatch
     return f"{type(exc).__name__}: {' '.join(str(exc).split())}"[:300]
 
 
@@ -197,7 +243,7 @@ def scan_automations(
     unparseable: list[UnparseableAutomation] = []
     for toml_path in sorted(root.glob("*/automation.toml")):
         try:
-            data = _read_toml(toml_path)
+            data = _read_automation(toml_path)
         except _UNREADABLE as exc:
             unparseable.append(
                 UnparseableAutomation(
@@ -205,7 +251,7 @@ def scan_automations(
                 )
             )
             continue
-        automation_id = _quoted_string(data.get("id")) or toml_path.parent.name
+        automation_id = _quoted_string(data.get("id")).strip()
         records.append(
             AutomationRecord(
                 id=automation_id,
@@ -234,8 +280,10 @@ def find_automation_anomalies(config: MaintenanceConfig) -> AutomationAnomalyRep
     * **doppelte id** = derselbe ``id``-Wert in mehreren ``automation.toml`` (ueber
       alle Tiefenebenen). Ein rekursiver Scan in der Codex-App zaehlt die Automation
       dadurch doppelt.
-    * **unlesbar** = ``automation.toml`` mit TOML- oder Kodierungsfehler (Pfad und Fehlertext
-      im Befund). Sie zaehlt weder bei Verschachtelung noch bei Duplikaten mit.
+    * **unlesbar** = ``automation.toml`` mit TOML- oder Kodierungsfehler oder ohne brauchbare
+      Definition (leer, nur Kommentar, ``id`` fehlt oder leer; Pfad und Fehlertext im Befund). Sie
+      zaehlt weder bei Verschachtelung noch bei Duplikaten mit. Eine ``id``, die vom Ordnernamen
+      abweicht, ist hier ein normaler Befund (Doppel-id), kein Lesefehler.
 
     Aendert nichts auf der Platte und laesst ``load_automations`` (Tiefe 1) unberuehrt.
     """
@@ -247,7 +295,7 @@ def find_automation_anomalies(config: MaintenanceConfig) -> AutomationAnomalyRep
     findings: list[AutomationFinding] = []
     for toml_path in sorted(root.rglob("automation.toml")):
         try:
-            data = _read_toml(toml_path)
+            data = _read_automation(toml_path, match_folder=False)
         except _UNREADABLE as exc:
             report.unparseable.append(
                 UnparseableAutomation(
@@ -259,7 +307,7 @@ def find_automation_anomalies(config: MaintenanceConfig) -> AutomationAnomalyRep
             depth = len(toml_path.parent.relative_to(root).parts)
         except ValueError:
             continue
-        automation_id = _quoted_string(data.get("id")) or toml_path.parent.name
+        automation_id = _quoted_string(data.get("id")).strip()
         findings.append(AutomationFinding(id=automation_id, path=toml_path, depth=depth))
 
     report.nested = [
@@ -316,7 +364,7 @@ def _append_event(config: MaintenanceConfig, result: AutomationControlResult) ->
 
 
 def _set_status(record: AutomationRecord, status: str) -> bool:
-    data = _read_toml(record.path)
+    data = _read_automation(record.path)  # erneut pruefen: die Datei kann seit dem Scan abgeschnitten worden sein
     current = _quoted_string(data.get("status")).strip().upper()
     if current == status.strip().upper():
         return False

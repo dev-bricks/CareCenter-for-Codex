@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Automation control no longer treats an empty or id-less `automation.toml` as a readable record (T-20261107-490692877) on 2026-11-07:
+  - A truncated file parses as valid TOML. It used to count as a record with status `UNKNOWN`, and `activate-all` would have written `status = "ACTIVE"` into it, "repairing" a broken definition with a status. Now an empty file, a file with only a comment or whitespace, a missing, empty or non-string `id`, and an `id` that differs from the folder name are unparseable with their own message (`empty`, `missing id`, `id mismatch`). Pause, restore and activate-all never write into them; `_set_status()` checks the file again right before writing.
+  - `find_automation_anomalies()` reports empty and id-less files as unreadable too; an `id` that differs from the folder name stays a normal finding there (duplicate-id detection).
+  - `_write_toml()` copies the permissions of the original to the temp file before `os.replace` (`mkstemp` creates 0600) and writes through a link: the target is replaced, the link stays.
+  - With a read-only original on Windows the temp file inherited the read-only attribute: `os.replace` failed (WinError 5), the cleanup failed too, `automation.toml.<x>.tmp` stayed behind, and the error text named only the temp file. The cleanup now makes the temp file writable first and never replaces the original error; the original stays unchanged and the error text ends with the target path (review finding on PR #10). The mode stays set before the replace on purpose, so the target never carries a wrong mode, not even briefly.
+  - Tests: `tests/test_automation_control.py` (46 new; the POSIX-mode and symlink tests are skipped on Windows without the right and were run on Linux).
+
 - CodeQL runs through the GitHub default setup only; the own workflow `.github/workflows/codeql.yml` is removed (T-20261107-558181168) on 2026-11-07:
   - The repository has the GitHub default setup for code scanning (python and actions, weekly, default query suite, configured since 2026-07-22). The workflow from 2026-10-30 was a second, "advanced" configuration, and its `analyze` job failed on every run (push, pull request, schedule) with "advanced configurations cannot be processed when the default setup is enabled". The default setup already covers Python and GitHub Actions; no coverage is lost.
   - `tests/test_metadata.py`: the contract test that required the workflow now forbids it and any `github/codeql-action` step. To switch to an advanced setup later, change the repository setting first and add the workflow in the same step.
