@@ -373,8 +373,9 @@ def test_write_toml_syncs_a_temp_file_in_the_same_folder_before_replacing(
 
     pause_active_automations(config)
 
-    assert [name for name, _ in events] == ["fsync", "replace"]
+    assert [name for name, _ in events] == ["fsync", "replace", "fsync", "replace"]
     assert events[1][1] == (path.parent, path)
+    assert events[3][1] == (control_state_dir(config), control_state_path(config))
     assert read_status(path) == "PAUSED"
 
 
@@ -537,7 +538,7 @@ def test_status_change_applies_the_mode_of_the_original_to_the_temp_file(
 
     pause_active_automations(config)
 
-    assert calls == [("chmod", original_mode, True), ("replace", 0, False)]
+    assert calls[:2] == [("chmod", original_mode, True), ("replace", 0, False)]
 
 
 @pytest.mark.skipif(os.name != "nt", reason="nur unter Windows scheitert os.replace an einer schreibgeschuetzten Datei")
@@ -615,3 +616,105 @@ def test_write_toml_writes_to_the_resolved_target_of_a_link(
     assert read_status(target) == "PAUSED"
     assert link_path.read_bytes() == link_before, "der Link-Pfad selbst bleibt unberuehrt"
     assert sorted(item.name for item in real_dir.iterdir()) == ["job.toml"]
+
+
+# --- Atomare Zustandsdateien & PermissionError-Retry (T-20261107-192001888) -------------------------
+
+
+def test_save_carecenter_paused_ids_is_atomic_and_syncs_in_same_folder(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config = make_config(tmp_path)
+    state_file = control_state_path(config)
+    state_dir = control_state_dir(config)
+    events: list[tuple[str, object]] = []
+    real_fsync, real_replace = os.fsync, os.replace
+
+    def spy_fsync(fd: int) -> None:
+        events.append(("fsync", fd))
+        real_fsync(fd)
+
+    def spy_replace(src: object, dst: object) -> None:
+        events.append(("replace", (Path(str(src)).parent, Path(str(dst)))))
+        real_replace(src, dst)
+
+    monkeypatch.setattr(automation_control.os, "fsync", spy_fsync)
+    monkeypatch.setattr(automation_control.os, "replace", spy_replace)
+
+    automation_control._save_carecenter_paused_ids(config, {"job-1", "job-2"})
+
+    assert [name for name, _ in events] == ["fsync", "replace"]
+    assert events[1][1] == (state_dir, state_file)
+    assert load_carecenter_paused_ids(config) == ["job-1", "job-2"]
+    # Es darf keine verwaiste temporaere Datei im Verzeichnis verbleiben
+    assert sorted(item.name for item in state_dir.iterdir()) == ["paused-by-carecenter.json"]
+
+
+def test_save_carecenter_paused_ids_retries_on_transient_permission_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config = make_config(tmp_path)
+    attempts = 0
+    real_replace = os.replace
+
+    def flaky_replace(src: object, dst: object) -> None:
+        nonlocal attempts
+        attempts += 1
+        if attempts < 3:
+            raise PermissionError("Access is denied (transient lock)")
+        real_replace(src, dst)
+
+    monkeypatch.setattr(automation_control.os, "replace", flaky_replace)
+    monkeypatch.setattr(automation_control.time, "sleep", lambda _s: None)
+
+    automation_control._save_carecenter_paused_ids(config, {"resilient-job"})
+
+    assert attempts == 3
+    assert load_carecenter_paused_ids(config) == ["resilient-job"]
+    assert sorted(item.name for item in control_state_dir(config).iterdir()) == ["paused-by-carecenter.json"]
+
+
+def test_save_carecenter_paused_ids_fails_cleanly_on_permanent_permission_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config = make_config(tmp_path)
+    state_file = control_state_path(config)
+    attempts = 0
+
+    def blocked_replace(src: object, dst: object) -> None:
+        nonlocal attempts
+        attempts += 1
+        raise PermissionError("Access is denied (permanent lock)")
+
+    monkeypatch.setattr(automation_control.os, "replace", blocked_replace)
+    monkeypatch.setattr(automation_control.time, "sleep", lambda _s: None)
+
+    with pytest.raises(PermissionError, match="permanent lock"):
+        automation_control._save_carecenter_paused_ids(config, {"failed-job"})
+
+    assert attempts == 5
+    # Tmp-Datei muss aufgeraeumt sein, kein Muell
+    state_dir = control_state_dir(config)
+    assert not state_file.exists()
+    assert list(state_dir.iterdir()) == []
+
+
+def test_save_carecenter_paused_ids_interrupted_leaves_previous_state_intact(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config = make_config(tmp_path)
+    automation_control._save_carecenter_paused_ids(config, {"initial-job"})
+    previous_bytes = control_state_path(config).read_bytes()
+
+    def crash_replace(src: object, dst: object) -> None:
+        raise OSError("unexpected crash during replace")
+
+    monkeypatch.setattr(automation_control.os, "replace", crash_replace)
+
+    with pytest.raises(OSError, match="unexpected crash"):
+        automation_control._save_carecenter_paused_ids(config, {"overwritten-job"})
+
+    assert control_state_path(config).read_bytes() == previous_bytes
+    assert load_carecenter_paused_ids(config) == ["initial-job"]
+    assert sorted(item.name for item in control_state_dir(config).iterdir()) == ["paused-by-carecenter.json"]
+
