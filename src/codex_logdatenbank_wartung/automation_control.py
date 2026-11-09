@@ -185,17 +185,29 @@ def _read_automation(path: Path, *, match_folder: bool = True) -> tomlkit.TOMLDo
     return data
 
 
-def _write_toml(path: Path, document: tomlkit.TOMLDocument) -> None:
+def _atomic_write_bytes(
+    path: Path,
+    payload: bytes,
+    *,
+    retries: int = 5,
+    retry_delay: float = 0.05,
+) -> None:
     """Schreibt atomar: erst vollstaendig kodieren, dann tmp im selben Ordner, fsync, ``os.replace``.
 
     Bricht der Vorgang ab, bleibt die Originaldatei unveraendert und die tmp-Datei wird entfernt (auch eine
     schreibgeschuetzte); der urspruengliche Fehler wird nicht durch einen Aufraeumfehler ersetzt.
-    ``mkstemp`` legt die Datei mit 0600 an: die Rechte des Originals kommen vor dem Austausch auf die tmp-Datei.
+    ``mkstemp`` legt die Datei mit 0600 an: die Rechte des Originals kommen vor dem Austausch auf die tmp-Datei,
+    sofern das Original bereits existiert.
     Ist ``path`` ein Link, wird sein Ziel ersetzt und der Link bleibt bestehen.
+    Unter Windows kann ``os.replace`` bei transienten Dateisperren (z. B. Virenscanner, Backup, Indexer) einen
+    ``PermissionError`` werfen. Dieser wird mit kurzem Retry und exponentiellem Backoff abgefangen.
     """
-    payload = tomlkit.dumps(document).encode("utf-8")
+    path.parent.mkdir(parents=True, exist_ok=True)
     target = Path(os.path.realpath(path))
-    mode = stat.S_IMODE(target.stat().st_mode)
+    try:
+        mode: int | None = stat.S_IMODE(target.stat().st_mode)
+    except OSError:
+        mode = None
     descriptor, tmp_name = tempfile.mkstemp(dir=target.parent, prefix=f"{target.name}.", suffix=".tmp")
     temporary = Path(tmp_name)
     try:
@@ -203,8 +215,16 @@ def _write_toml(path: Path, document: tomlkit.TOMLDocument) -> None:
             handle.write(payload)
             handle.flush()
             os.fsync(handle.fileno())
-        os.chmod(temporary, mode)
-        os.replace(temporary, target)
+        if mode is not None:
+            os.chmod(temporary, mode)
+        for attempt in range(max(1, retries)):
+            try:
+                os.replace(temporary, target)
+                break
+            except PermissionError:
+                if attempt >= retries - 1:
+                    raise
+                time.sleep(retry_delay * (2 ** attempt))
     except BaseException:
         # Die tmp-Datei kann das Nur-Lesen-Attribut des Originals tragen (Windows): ohne chmod scheitert unlink,
         # laesst die Datei liegen und ueberdeckt den eigentlichen Fehler. Dessen Text bleibt der, der zaehlt.
@@ -214,6 +234,25 @@ def _write_toml(path: Path, document: tomlkit.TOMLDocument) -> None:
         except OSError:
             pass
         raise
+
+
+def _atomic_write_json(
+    path: Path,
+    data: object,
+    *,
+    indent: int = 2,
+    retries: int = 5,
+    retry_delay: float = 0.05,
+) -> None:
+    """Schreibt ein JSON-Objekt atomar via ``_atomic_write_bytes``."""
+    payload = (json.dumps(data, ensure_ascii=False, indent=indent) + "\n").encode("utf-8")
+    _atomic_write_bytes(path, payload, retries=retries, retry_delay=retry_delay)
+
+
+def _write_toml(path: Path, document: tomlkit.TOMLDocument) -> None:
+    """Schreibt atomar: erst vollstaendig kodieren, dann tmp im selben Ordner, fsync, ``os.replace``."""
+    payload = tomlkit.dumps(document).encode("utf-8")
+    _atomic_write_bytes(path, payload)
 
 
 def _quoted_string(value: object) -> str:
@@ -343,13 +382,12 @@ def load_carecenter_paused_ids(config: MaintenanceConfig) -> list[str]:
 
 def _save_carecenter_paused_ids(config: MaintenanceConfig, ids: set[str]) -> None:
     path = control_state_path(config)
-    path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "tool": "CareCenter for Codex",
         "updated_at": _now_iso(),
         "paused_by_carecenter_ids": sorted(ids),
     }
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    _atomic_write_json(path, payload, indent=2)
 
 
 def _append_event(config: MaintenanceConfig, result: AutomationControlResult) -> None:
@@ -361,6 +399,7 @@ def _append_event(config: MaintenanceConfig, result: AutomationControlResult) ->
     }
     with path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
+        handle.flush()
 
 
 def _set_status(record: AutomationRecord, status: str) -> bool:
@@ -438,7 +477,8 @@ def pause_active_automations(config: MaintenanceConfig) -> AutomationControlResu
         status="ok",
         target_count=len(active_records),
     )
-    carecenter_ids = set(load_carecenter_paused_ids(config))
+    initial_ids = set(load_carecenter_paused_ids(config))
+    carecenter_ids = set(initial_ids)
     for record in active_records:
         try:
             if _set_status(record, PAUSED):
@@ -451,7 +491,8 @@ def pause_active_automations(config: MaintenanceConfig) -> AutomationControlResu
     _record_unparseable(result, unparseable)
     if result.errors:
         result.status = "partial" if result.changed_ids else "failed"
-    _save_carecenter_paused_ids(config, carecenter_ids)
+    if result.changed_ids or carecenter_ids != initial_ids:
+        _save_carecenter_paused_ids(config, carecenter_ids)
     _append_event(config, result)
     return result
 
