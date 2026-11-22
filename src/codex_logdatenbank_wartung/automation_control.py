@@ -240,13 +240,35 @@ def _atomic_write_json(
     path: Path,
     data: object,
     *,
-    indent: int = 2,
+    indent: int | None = 2,
     retries: int = 5,
     retry_delay: float = 0.05,
 ) -> None:
     """Schreibt ein JSON-Objekt atomar via ``_atomic_write_bytes``."""
     payload = (json.dumps(data, ensure_ascii=False, indent=indent) + "\n").encode("utf-8")
     _atomic_write_bytes(path, payload, retries=retries, retry_delay=retry_delay)
+
+
+def _append_jsonl_line(
+    path: Path,
+    payload: object,
+    *,
+    retries: int = 5,
+    retry_delay: float = 0.05,
+) -> None:
+    """Haengt eine JSONL-Zeile geflusht an; faengt transiente Windows-Sperren ab."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    line = json.dumps(payload, ensure_ascii=False) + "\n"
+    for attempt in range(max(1, retries)):
+        try:
+            with path.open("a", encoding="utf-8") as handle:
+                handle.write(line)
+                handle.flush()
+            return
+        except PermissionError:
+            if attempt >= retries - 1:
+                raise
+            time.sleep(retry_delay * (2 ** attempt))
 
 
 def _write_toml(path: Path, document: tomlkit.TOMLDocument) -> None:
@@ -392,14 +414,11 @@ def _save_carecenter_paused_ids(config: MaintenanceConfig, ids: set[str]) -> Non
 
 def _append_event(config: MaintenanceConfig, result: AutomationControlResult) -> None:
     path = control_state_dir(config) / "events.jsonl"
-    path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "ts": _now_iso(),
         **result.to_dict(),
     }
-    with path.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
-        handle.flush()
+    _append_jsonl_line(path, payload)
 
 
 def _set_status(record: AutomationRecord, status: str) -> bool:

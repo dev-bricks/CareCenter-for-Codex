@@ -203,6 +203,9 @@ def diagnose(
     anomalies = find_automation_anomalies(config)
     nested_automations = [str(item.path) for item in anomalies.nested]
     duplicate_automation_ids = [item.id for item in anomalies.duplicate_ids]
+    # Option (c) [2026-11-21, T-20261107-192001888]: unlesbare Automationen bleiben lokal
+    # in unparseable_automations / to_text(), ohne das Exchange-Schema v1.0.0 zu aendern;
+    # ein v1.1-Sprung mit `automation_file_unreadable` folgt erst beim Transit-Publisher (T-20260906-496406575).
     unparseable_automations = [str(item.path) for item in anomalies.unparseable]
 
     report = HealthReport(

@@ -17,6 +17,7 @@ from types import ModuleType
 
 import tomlkit
 
+from .automation_control import _atomic_write_bytes, _atomic_write_json
 from .config import MaintenanceConfig
 
 SAFE_START_PACKAGE_SPEC = (
@@ -521,14 +522,14 @@ def _snapshot_restore_rows(snapshot: dict[str, object]) -> list[dict[str, object
 
 
 def _set_automation_toml_status(path: Path, status: str) -> bool:
-    document = tomlkit.parse(path.read_text(encoding="utf-8", errors="replace"))
+    document = tomlkit.parse(path.read_bytes().decode("utf-8", errors="replace"))
     current = str(document.get("status") or "").strip().upper()
     if current == status.strip().upper():
         return False
     document["status"] = status
     if "updated_at" in document:
         document["updated_at"] = int(time.time() * 1000)
-    path.write_text(tomlkit.dumps(document), encoding="utf-8", newline="")
+    _atomic_write_bytes(path, tomlkit.dumps(document).encode("utf-8"))
     return True
 
 
@@ -572,9 +573,8 @@ def _write_carecenter_restore_snapshot(
     run_id = str(snapshot.get("run_id") or "safe-start")
     stamp = datetime.now().astimezone().strftime("%Y%m%d-%H%M%S")
     path = state_dir / f"{run_id}-carecenter-restored-{stamp}.json"
-    text = json.dumps(payload, ensure_ascii=False, indent=2)
-    path.write_text(text, encoding="utf-8")
-    (state_dir / "latest.json").write_text(text, encoding="utf-8")
+    _atomic_write_json(path, payload, indent=2)
+    _atomic_write_json(state_dir / "latest.json", payload, indent=2)
     return path
 
 

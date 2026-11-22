@@ -20,6 +20,7 @@ from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from .automation_control import _atomic_write_json
 from .config import MaintenanceConfig
 
 # T-20260926-212716751: zombie-killer-tray#4 (src/-Paketierung) merged as 039b4f2.
@@ -301,7 +302,7 @@ def _watch_pid_file(state_dir: Path) -> Path:
 
 def _write_watch_pid_file(state_dir: Path, pid: int, create_time: float | None) -> None:
     payload = {"pid": pid, "create_time": create_time}
-    _watch_pid_file(state_dir).write_text(json.dumps(payload), encoding="utf-8")
+    _atomic_write_json(_watch_pid_file(state_dir), payload, indent=None)
 
 
 def _read_watch_pid_file(state_dir: Path) -> tuple[int, float | None] | None:
