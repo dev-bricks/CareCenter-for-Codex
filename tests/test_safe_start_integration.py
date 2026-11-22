@@ -341,3 +341,60 @@ def test_restore_safe_start_latest_reactivates_tool_paused_items(tmp_path: Path)
     assert latest["phase"] == "restored"
     assert latest["delayed_release_ids"] == []
     assert latest["carecenter_restore"]["restored_ids"] == ["weekly"]
+    assert not list(config.safe_start_state_dir.glob("*.tmp"))
+
+
+def test_restore_safe_start_latest_interrupted_write_keeps_previous_latest_intact(
+    tmp_path: Path, monkeypatch
+) -> None:
+    import os
+
+    from codex_logdatenbank_wartung import automation_control
+
+    config = make_config(tmp_path)
+    weekly = write_automation(config.codex_home, "weekly", "PAUSED")
+    config.safe_start_state_dir.mkdir(parents=True)
+    latest_path = config.safe_start_state_dir / "latest.json"
+    initial_payload = json.dumps(
+        {
+            "run_id": "run-1",
+            "phase": "paused",
+            "tool_paused_ids": ["weekly"],
+            "released_ids": [],
+            "delayed_release_ids": ["weekly"],
+            "items": [
+                {
+                    "id": "weekly",
+                    "name": "weekly",
+                    "path": str(weekly),
+                    "original_status": "ACTIVE",
+                    "status": "PAUSED",
+                    "kind": "cron",
+                    "rrule": "FREQ=DAILY",
+                    "created_at": 1,
+                    "updated_at": 1,
+                    "tool_paused": True,
+                    "released": False,
+                }
+            ],
+        },
+        ensure_ascii=False,
+    )
+    latest_path.write_text(initial_payload, encoding="utf-8")
+    real_replace = os.replace
+
+    def fail_on_latest(src: object, dst: object) -> None:
+        if Path(str(dst)) == latest_path:
+            raise OSError("crash during latest.json replace")
+        real_replace(src, dst)
+
+    monkeypatch.setattr(automation_control.os, "replace", fail_on_latest)
+    try:
+        restore_safe_start_latest(config)
+    except OSError:
+        pass
+    else:
+        raise AssertionError("expected OSError when replacing latest.json fails")
+
+    assert latest_path.read_text(encoding="utf-8") == initial_payload
+    assert not list(config.safe_start_state_dir.glob("*.tmp"))

@@ -23,11 +23,11 @@ Pflicht-Sicherheit (die Datei war schon einmal als ``.badstate`` korrupt):
 from __future__ import annotations
 
 import json
-import os
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
 
+from .automation_control import _atomic_write_bytes
 from .config import MaintenanceConfig
 from .processes import ProcessProvider, find_codex_processes_by_executable
 
@@ -87,14 +87,9 @@ def global_state_path(config: MaintenanceConfig) -> Path:
 
 
 def _atomic_write_json(path: Path, data: object) -> None:
-    """Schreibt JSON atomar: temporäre Datei im selben Verzeichnis + ``os.replace``.
-
-    Standard-JSON (die App liest gewöhnliches JSON). ``ensure_ascii=False`` ist hier
-    unkritisch, weil Thread-IDs ASCII sind; die übrige Struktur bleibt unverändert.
-    """
-    tmp = path.with_name(path.name + ".carecenter-tmp")
-    tmp.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
-    os.replace(tmp, path)
+    """Schreibt JSON atomar via ``automation_control._atomic_write_bytes`` (tmp, fsync, os.replace + Retry)."""
+    payload = json.dumps(data, ensure_ascii=False).encode("utf-8")
+    _atomic_write_bytes(path, payload)
 
 
 def _is_unread_state_key(key: object) -> bool:

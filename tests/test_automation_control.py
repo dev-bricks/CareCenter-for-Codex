@@ -718,3 +718,41 @@ def test_save_carecenter_paused_ids_interrupted_leaves_previous_state_intact(
     assert load_carecenter_paused_ids(config) == ["initial-job"]
     assert sorted(item.name for item in control_state_dir(config).iterdir()) == ["paused-by-carecenter.json"]
 
+
+def test_append_event_flushes_and_retries_permission_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config = make_config(tmp_path)
+    events_path = control_state_dir(config) / "events.jsonl"
+    real_open = Path.open
+    attempts = 0
+    flushed = 0
+
+    def flaky_open(self: Path, *args: object, **kwargs: object):
+        nonlocal attempts
+        if self == events_path and args and args[0] == "a":
+            attempts += 1
+            if attempts < 3:
+                raise PermissionError("transient lock on events.jsonl")
+            handle = real_open(self, *args, **kwargs)
+            orig_flush = handle.flush
+
+            def spy_flush() -> None:
+                nonlocal flushed
+                flushed += 1
+                orig_flush()
+
+            handle.flush = spy_flush  # type: ignore[method-assign]
+            return handle
+        return real_open(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", flaky_open)
+    monkeypatch.setattr(automation_control.time, "sleep", lambda _s: None)
+
+    pause_active_automations(config)
+
+    assert attempts == 3
+    assert flushed >= 1
+    assert events_path.exists()
+    assert len(events_path.read_text(encoding="utf-8").splitlines()) == 1
+

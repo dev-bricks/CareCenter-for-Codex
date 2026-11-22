@@ -329,3 +329,14 @@ def test_german_contract_text_uses_real_umlauts_and_readmes_stay_in_sync() -> No
     assert "Zufällige" in contract
     assert "\ufffd" not in contract
     assert readme_dot == readme_underscore
+
+
+def test_option_c_keeps_v1_unchanged_for_unparseable_automations() -> None:
+    schema = _load_json(SCHEMA_PATH)
+    contract = CONTRACT_PATH.read_text(encoding="utf-8")
+
+    assert schema["properties"]["contract_version"]["const"] == "1.0.0"
+    assert "automation_file_unreadable" not in schema["$defs"]["issues"]["properties"]
+    assert "unparseable_automations" in contract
+    assert "automation_file_unreadable" in contract
+    assert "T-20260906-496406575" in contract

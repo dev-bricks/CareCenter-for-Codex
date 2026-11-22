@@ -70,6 +70,16 @@ findings map to one public code, the adapter uses the highest severity and marks
 `fixable` true only when every contributing finding is fixable. It emits no
 source message or source code.
 
+### Local-only `unparseable_automations` decision (Option c, 2026-11-21)
+
+Exchange contract `v1.0.0` remains intentionally closed and unchanged for
+unreadable `automation.toml` definitions (`T-20261107-192001888`, decision
+Option c): `HealthReport.unparseable_automations` and its `to_text()` output
+report unreadable files locally without adding an exchange issue code or
+breaking `v1.0.0` consumers. A future `contract_version: "1.1"` introducing a
+dedicated public code (`automation_file_unreadable`) is deferred until the
+actual transit publisher (`T-20260906-496406575`) is implemented.
+
 ## Replacement, ordering, and freshness
 
 Each accepted payload is a complete replacement snapshot, not a patch or event
