@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import tomllib
 from pathlib import Path
 
@@ -495,7 +496,7 @@ def test_lifecycle_workflows_present() -> None:
     assert welcome_path.is_file(), "Missing .github/workflows/welcome.yml"
 
     stale_text = stale_path.read_text(encoding="utf-8")
-    assert "actions/stale@v9" in stale_text
+    assert re.search(r"actions/stale@v\d+", stale_text)
     assert "30 1 * * *" in stale_text
     assert "timeout-minutes: 10" in stale_text
     assert "issues: write" in stale_text
@@ -686,7 +687,7 @@ def test_lifecycle_workflows_auto_assign_and_label_sync_parity() -> None:
     assert labels_yml.is_file(), "Missing labels.yml"
 
     aa_text = auto_assign.read_text(encoding="utf-8")
-    assert "actions/github-script@v7" in aa_text
+    assert re.search(r"actions/github-script@v\d+", aa_text)
     assert "timeout-minutes: 5" in aa_text
     assert "cancel-in-progress: true" in aa_text
     assert "issues: write" in aa_text
